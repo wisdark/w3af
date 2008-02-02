@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Project SYSTEM "Project-3.9.dtd">
 <!-- Project file for project w3af -->
-<!-- Saved: 2008-01-28, 18:37:17 -->
+<!-- Saved: 2008-02-02, 17:12:09 -->
 <!-- Copyright (C) 2008 Andres Riancho, andres.riancho@gmail.com -->
 <Project version="3.9">
   <ProgLanguage mixed="0">Python</ProgLanguage>
@@ -19,18 +19,6 @@
       <Dir>core</Dir>
       <Dir>ui</Dir>
       <Name>__init__.py</Name>
-    </Source>
-    <Source>
-      <Dir>core</Dir>
-      <Dir>ui</Dir>
-      <Dir>consoleUi</Dir>
-      <Name>consoleMenu.py</Name>
-    </Source>
-    <Source>
-      <Dir>core</Dir>
-      <Dir>ui</Dir>
-      <Dir>consoleUi</Dir>
-      <Name>pluginConfig.py</Name>
     </Source>
     <Source>
       <Dir>core</Dir>
@@ -61,12 +49,6 @@
       <Dir>ui</Dir>
       <Dir>consoleUi</Dir>
       <Name>session.py</Name>
-    </Source>
-    <Source>
-      <Dir>core</Dir>
-      <Dir>ui</Dir>
-      <Dir>consoleUi</Dir>
-      <Name>url.py</Name>
     </Source>
     <Source>
       <Dir>core</Dir>
@@ -3711,11 +3693,6 @@
       <Name>severity.py</Name>
     </Source>
     <Source>
-      <Dir>plugins</Dir>
-      <Dir>discovery</Dir>
-      <Name>backdoor.py</Name>
-    </Source>
-    <Source>
       <Dir>core</Dir>
       <Dir>ui</Dir>
       <Dir>gtkUi</Dir>
@@ -3732,6 +3709,54 @@
       <Dir>ui</Dir>
       <Dir>gtkUi</Dir>
       <Name>prompt.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>config.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>ecma48.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>history.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>menu.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>posixterm.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>rootMenu.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>tables.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>util.py</Name>
     </Source>
   </Sources>
   <Forms>
