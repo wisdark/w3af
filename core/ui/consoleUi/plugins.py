@@ -1,218 +1,167 @@
-'''
-plugins.py
-
-Copyright 2006 Andres Riancho
-
-This file is part of w3af, w3af.sourceforge.net .
-
-w3af is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation version 2 of the License.
-
-w3af is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with w3af; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-'''
-
-# Import w3af
-import core.controllers.w3afCore
-import core.controllers.outputManager as om
-from core.controllers.w3afException import w3afException
-import core.controllers.sessionManager as sessionManager
-from core.ui.consoleUi.pluginConfig import pluginConfig
-from core.ui.consoleUi.consoleMenu import consoleMenu
+import copy
+from core.ui.consoleUi.menu import *
+from core.ui.consoleUi.config import *
 from core.controllers.misc.parseOptions import parseXML
+import core.controllers.outputManager as om
 
-class plugins(consoleMenu):
+class pluginsMenu(menu):
     '''
-    This is the plugins configuration menu for the console.
-    
-    @author: Andres Riancho ( andres.riancho@gmail.com )    
+        List of plugins.
     '''
-    def __init__( self, w3af , commands=[] ):
-        consoleMenu.__init__(self)
-        self._menu = {'help':self._help, 'list':self._list,'back':self._back}
-        for i in w3af.getPluginTypes():
-            self._menu[ i ] = ''
-        self._w3af = w3af
-        self._sm = sessionManager.sessionManager()
-        self._commands = commands
-        self._plugins = {}
+
+    def __init__(self, name, console, w3af, parent):
+        menu.__init__(self, name, console, w3af, parent)
+        types = w3af.getPluginTypes()
+        children = {}
+        for t in types:
+            children[t] = pluginsTypeMenu(t, self._console, self._w3af, self)
+        self._children = children
     
-    def sh( self ):
-        '''
-        Starts the shell's main loop.
-        
-        @return: The prompt
-        '''
-        prompt = 'w3af/plugins>>> '
-        self._mainloop( prompt )        
-        
-    def _exec( self, command ):
-        '''
-        Executes a user input.
-        '''
-        command, parameters = self._parse( command )
-        
-        if command in self._w3af.getPluginTypes():
-            return self._pluginCfg( command, parameters )
+    def getChildren(self):
+        return self._children
+
+    def _cmd_list(self, params):
+        try:
+            type = params[0]
+            subMenu = self._children[type]
+        except:
+            self._cmd_help(['list'])
         else:
-            if command in self._menu.keys():
-                func = self._menu[command]
-                try:
-                    res = func(parameters)
-                except w3afException,e:
-                    om.out.console( str(e) )
-                else:
-                    return res
-            else:
-                om.out.console( 'command not found' )
-                return True
+            subMenu._cmd_list(params[1:])
+
+        return None
+
+    def _help_list(self):
+        return 'Usage: list pluginType ' + \
+                'where pluginType is one of ' + ', '.join(self._children.keys())
+
+    
+    def _para_list(self, params, part):
+        return suggest(self._children.keys(), part)
+
         
+class pluginsTypeMenu(menu):
+    '''
+        Common menu for all types of plugins. 
+        The type of plugins is defined by the menu's own name.
+    '''
+    def __init__(self, name, console, w3af, parent):
+        menu.__init__(self, name, console, w3af, parent)
+        plugins = w3af.getPluginList(name)
+        self._plugins = {} # name to number of options
+        for p in plugins:
+            options = parseXML(self._w3af.getPluginInstance(p, self._name).getOptionsXML())
+            self._plugins[p] = len(options)
+        self._configs = {}
+      
+
+    def suggestCommands(self, part):
+        return suggest(self._plugins.keys() + ['all'], part, True) + \
+            suggest(self.getCommands(), part)
+
+    def suggestParams(self, command, params, part):
+        if command in self.getCommands():
+            return menu.suggestParams(self, command, params, part)
+        
+        return suggest(self._plugins.keys() + ['all'], ','.join(params + [part]), True)
+
+    def execute(self, tokens):
+        if len(tokens)>0:
+            command, params = tokens[0], tokens[1:]
+            #print "command: " + command + "; " + str(self.getCommands())
+            if command in self.getCommands():
+                return menu.execute(self, tokens)
+            else:
+                self.enablePlugins(','.join(tokens).split(','))
+        else:
+            return self
+
+    def enablePlugins(self, list):
+        enabled = copy.copy(self._w3af.getPlugins(self._name))
+        
+        for plugin in list:
+            if plugin.startswith('!'):
+                p = plugin[1:]
+                if p == 'all':
+                    enabled = []
+                elif p in enabled:
+                    enabled.remove(p)
+            elif plugin == 'all':
+                enabled = self._plugins.keys()
+            elif plugin in self._plugins.keys() and plugin not in enabled:
+                enabled.append(plugin)
+
+        self._w3af.setPlugins(enabled, self._name)
+        
+    def _cmd_list(self, params):
+        #print 'list : ' + str(params)
+        filter = len(params)>0 and params[0] or 'all'
+
+        all = self._plugins.keys()
+        enabled = self._w3af.getPlugins(self._name)
+
+        if filter == 'all':
+            list = all
+        elif filter == 'enabled':
+            list = enabled
+        elif filter == 'disabled':
+            list = [p for p in all if p not in enabled]
+        else:
+            list = []
+                        
+        list.sort()
+        table = [['Plugin name', 'Status', 'Description']]
+
+        for pluginName in list:
+            row = []
+            plugin = self._w3af.getPluginInstance(pluginName, self._name)
+#            try:
+#                optionsXML = plugin.getOptionsXML()
+#                options = parseXML(optionsXML)
+#            except:
+#                options = {}
+    
+            optCount = self._plugins[pluginName]
+            row.append(pluginName)
+            status = pluginName in enabled and 'Enabled' or ''
+            row.append(status)
+            optInfo = optCount>0 and '\n(%i options)' % optCount or ''
+            row.append(str(plugin.getDesc()) + optInfo)
+
+            table.append(row)
+        self._console.drawTable(table, True)
+
+    def _help_list(self):
+        om.out.console( "Usage: list [all | enabled | disabled] ; default is all")
+        
+    def _cmd_config(self, params):
+        
+        if len(params) ==0:
+            self._help_config()
+            return
+
+        name = params[0]
+        if self._configs.has_key(name):
+            config = self._configs[name]
+        else:
+            config = configMenu(name, self._console, self._w3af, self, self._w3af.getPluginInstance(params[0], self._name))
+            self._configs[name] = config
+
+        return config
+
+    def _para_config(self, params, part):
+        if len(params) > 0:
+            return []
+
+        return suggest([p for p in self._plugins.keys() \
+            if self._plugins[p] > 0], part)
                 
-    def _help( self, parameters ):
-        '''
-        Prints a help message to the user.
-        '''
-        if len( parameters ) == 0:
-            om.out.console('The following commands are available:')
-            self.mprint('help','You are here. help [command] prints more specific help.')
-            self.mprint('list','List all available plugins.')
-            for p in self._w3af.getPluginTypes():
-                self.mprint( p ,'Enable and configure ' + p + ' plugins.')
-            self.mprint('back','Return to previous menu.')
+    def _help_config(self):
+        om.out.console("Usage: command <plugin> ");
 
-        else:
-            if len( parameters ) == 1:
-                if parameters[0] in self._menu.keys() or parameters[0] in self._w3af.getPluginTypes():
-                    if parameters[0] == 'list':
-                        om.out.console( 'List all available plugins.')
-                        om.out.console( 'Syntax: list {plugin type}')
-                        om.out.console( 'Example: list audit')
-                    elif parameters[0] in self._w3af.getPluginTypes():
-                        om.out.console( 'Enable, investigate and configure '+ parameters[0] +' plugins.' )
-                        om.out.console( '' )
-                        om.out.console( 'Syntax: '+parameters[0]+' [config plugin1] [plugin1,plugin2 ... pluginN]')
-                        om.out.console( 'Example: '+parameters[0] )
-                        om.out.console( 'Result: All enabled '+parameters[0] + ' plugins are listed.')
-                        om.out.console( '' )
-                        om.out.console( 'Example2: '+parameters[0]+ ' plugin1,plugin2')
-                        om.out.console( 'Result: plugin1 and plugin2 are configured to run')
-                        om.out.console( '' )
-                        om.out.console( 'Example3: '+parameters[0]+ ' config plugin1')
-                        om.out.console( 'Result: Enters to the plugin configuration menu.' )
-                        om.out.console( '' )
-                        om.out.console( 'Example4: '+parameters[0]+ ' all,!plugin3')
-                        om.out.console( 'Result: All ' + parameters[0] + ' plugins are configured to run except plugin3.' )
-                        om.out.console( '' )
-                        om.out.console( 'Syntax: '+parameters[0]+' [desc plugin1]')
-                        om.out.console( 'Example1: '+parameters[0]+ ' desc plugin1')
-                        om.out.console( 'Result: You will get the plugin description.' )
-                else:
-                    om.out.console('Help not found.')
-                    
-        
-        return True
-    
-    def _pluginCfg( self , type, parameters):
-        '''
-        Handles enabling, disabling and configuring plugins.
-        '''
-        if len( parameters ) == 0 and type in self._w3af.getPluginTypes():
-            
-            if type in self._plugins.keys():
-                om.out.console( 'Enabled ' +type +' plugins:' )
-                for plugin in self._plugins[ type ]:
-                    om.out.console( plugin )
-            elif self._w3af.getPlugins( type ):
-                om.out.console( 'Enabled ' +type +' plugins:' )
-                for plugin in self._w3af.getPlugins( type ):
-                    om.out.console( plugin )
-            else:
-                om.out.console( 'No '+ type +' plugins configured' )
-        else:   
-            if parameters[0] == 'config':
-                if len( parameters ) == 1:
-                    om.out.console('Invalid command, please see the help:')
-                    self._help([type,])
-                else:
-                    try:
-                        pConf = pluginConfig( self._w3af, self._commands )
-                        pluginName = parameters[1]
-                        prompt = 'w3af/plugin/' + pluginName + '>>> '
-                        try:
-                            configurableObject = self._w3af.getPluginInstance( pluginName, type )
-                        except w3afException, e:
-                            om.out.console('Error: ' + str(e) )
-                        else:                       
-                            pConf.sh( prompt, configurableObject )
-                    except KeyboardInterrupt:
-                        om.out.console( '' )
-            elif parameters[0] == 'desc':
-                if len( parameters ) == 1:
-                    om.out.console('Invalid command, please see the help:')
-                    self._help([type,])
-                else:
-                    pluginName = parameters[1]
-                    try:
-                        plugin = self._w3af.getPluginInstance( pluginName, type )
-                    except w3afException, e:
-                        om.out.console('Error: ' + str(e) )
-                    else:
-                        om.out.console( plugin.getLongDesc() )
-            else:
-                plugins = ''.join(parameters[0:]).split(',')
-                plugins = [ p.replace(' ', '') for p in plugins ]
+    def _para_list(self, params, part=''):
+        if len(params)==0:
+            return suggest(['enabled', 'all', 'disabled'], part)
+        return []
 
-                # This avoids duplicates in the list
-                plugins = list( set( plugins ) )    # bleh !
-                try:
-                    self._w3af.setPlugins( plugins, type )
-                except w3afException, w3:
-                    om.out.error( str(w3) )
-                else:
-                    self._plugins[ type ] = plugins
-        return True
 
-    def _list(self , parameters):
-        '''
-        Lists all available [audit|grep|discovery|evasion|output] plugins.
-        '''
-        if len( parameters ) == 0:
-            om.out.console( 'To get a list of plugins use :' )
-            om.out.console( 'Syntax: list {plugin type}' )
-            om.out.console( 'Example: list audit' )
-        else:
-            type = parameters[0]
-            if type not in self._w3af.getPluginTypes():
-                om.out.console('Unknown plugin type.')
-            else:
-                om.out.console('The plugins that are preceeded by a "+" sign have configurable parameters that can be configured using "' + type + ' config plugin_name"')
-                list = self._w3af.getPluginList( parameters[0] )
-                for plugin in list:
-                    pluginInstance = self._w3af.getPluginInstance( plugin, type )
-                    try:
-                        if len(parseXML( pluginInstance.getOptionsXML() )) > 0:
-                            hasConfig = '+'
-                        else:
-                            hasConfig = ' '
-                    except Exception, e:
-                        om.out.error('The "' + plugin + '" raised the following exception while calling getOptionsXML():' + str(e) )
-                    
-                    self.mprint( hasConfig + ' ' + plugin, pluginInstance.getDesc() )
-        return True
-        
-    def _back( self, parameters ):
-        # This is done here so output plugin options are applied.
-        if 'console' not in self._w3af.getPlugins('output') and 'output' in self._plugins.keys()\
-        and 'all' not in self._plugins['output']:
-            self._plugins['output'].append( 'console' )
-            self._w3af.setPlugins( self._plugins['output'] , 'output' )
-            
-        return False

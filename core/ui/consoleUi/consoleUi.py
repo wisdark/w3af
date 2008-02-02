@@ -1,293 +1,301 @@
-'''
-consoleUi.py
 
-Copyright 2006 Andres Riancho
-
-This file is part of w3af, w3af.sourceforge.net .
-
-w3af is free software; you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation version 2 of the License.
-
-w3af is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with w3af; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-'''
-
+from shlex import *
+import os.path
+import traceback
+from core.ui.consoleUi.rootMenu import *
+from core.ui.consoleUi.util import *
+import core.ui.consoleUi.posixterm as term
+from core.ui.consoleUi.history import *
+import core.ui.consoleUi.tables as tables
+import core.controllers.w3afCore
+import core.controllers.outputManager as om
+import core.controllers.miscSettings as miscSettings
 import sys
-try:
-    # Some traditional imports
-    from random import randint
-    import time
-    
-    # Import all other menu's
-    import core.ui.consoleUi.url as url
-    import core.ui.consoleUi.tools as tools
-    import core.ui.consoleUi.session as session
-    import core.ui.consoleUi.profiles as profiles
-    import core.ui.consoleUi.plugins as plugins
-    import core.ui.consoleUi.exploit as exploit
-    
-    # Import w3af
-    import core.controllers.w3afCore
-    import core.controllers.outputManager as om
-    from core.controllers.w3afException import w3afException
-    from core.ui.consoleUi.consoleMenu import consoleMenu
-    from core.controllers.threads.threadManager import threadManager as tm
-    import core.controllers.miscSettings as miscSettings
-    from core.ui.consoleUi.pluginConfig import pluginConfig
-    import core.data.kb.knowledgeBase as kb
-except KeyboardInterrupt:
-    print 'Exiting before importing modules.'
-    sys.exit(0)
-    
-class consoleUi(consoleMenu):
+import math
+
+class consoleUi:
     '''
-    A console user interface.
-    
-    @author: Andres Riancho ( andres.riancho@gmail.com )    
+    This class represents the console. 
+    It handles the keys pressed and delegate the completion and execution tasks 
+    to the current menu.
     '''
-    def __init__( self, scriptFile=None , commands=[] ):
-        self._scriptFileName = scriptFile
-        
-        consoleMenu.__init__(self)
-        self._menu = {'help':self._rootHelp, 'url-settings':self._url, 'misc-settings':self._misc,\
-        'session':self._session,'plugins':self._plugins,'start':self.start, 'assert': self._assert, \
-        'profiles':self._profile,'exploit':self._exploit,'exit':self._exit,'target':self._target,'tools':self._tools, 'version': self._version}
+
+    def __init__(self):
+        self._term = term.terminal()
+        self._line = [] # the line which is being typed
+        self._position = 0 # cursor position
         self._w3af = core.controllers.w3afCore.w3afCore()
-        self._commands = commands
-        # I will use pop(), so I need a reversed list.
-        self._commands.reverse()
-        self._targetURLs = []
-        
-        self._tm = tm()
-    
-    def sh( self ):
-        '''
-        Starts the shell's main loop.
-        
-        @parameter commands: A list of commands to run.
-        @return: The prompt
-        '''
-        prompt = 'w3af>>> '
-        self._mainloop( prompt )
-        
-    def _exec( self, command ):
-        '''
-        Executes a user input.
-        '''
-        command, parameters = self._parse( command )
+        self._context = rootMenu('', self, self._w3af ) # initial menu
+        self._handlers = { '\t' : self._onTab, \
+            '\r' : self._onEnter, \
+            term.KEY_BACKSPACE : self._onBackspace, \
+            term.KEY_LEFT : self._onLeft, \
+            term.KEY_RIGHT : self._onRight, \
+            term.KEY_UP : self._onUp, \
+            term.KEY_DOWN : self._onDown, \
+            '^C' : self._exit, \
+            '^D' : self._exit,
+            '^W': self._delWord,
+            '^H': self._onBackspace,
+            '^A' : self._toLineStart,
+            '^E' : self._toLineEnd } 
+        self._history = historyTable() # each menu has array of (array, positionInArray)
+        self._trace = []
 
-        if command in self._menu.keys():
-            func = self._menu[command]
-            return func(parameters)
-        else:
-            om.out.console( 'command not found' )
-        
-    def _rootHelp( self, parameters ):
-        '''
-        Prints a help message to the user.
-        '''
-        if len(parameters) == 0 :
-            self.mprint('The following commands are available:','')
-            self.mprint('help','You are here. help [command] prints more specific help.')
-            self.mprint('url-settings','Configure the URL opener.')
-            self.mprint('misc-settings','Configure w3af misc settings.')
-            self.mprint('session','Load and save sessions.')
-            self.mprint('plugins','Enable, disable and configure plugins.')
-            self.mprint('profiles','List and start scan profiles.')
-            self.mprint('start','Start site analysis.')
-            self.mprint('exploit','Exploit a vulnerability.')
-            self.mprint('tools','Enter the tools section.')
-            self.mprint('target','Set the target URL.')
-            self.mprint('exit','Exit w3af.')
-        elif parameters[0] == 'target':
-            self.mprint('Enter the target configuration. Here you will configure the target URL.','')
-        elif parameters[0] == 'exploit':
-            self.mprint('Enter the exploit configuration.','')
-        elif parameters[0] == 'plugins':
-            self.mprint('Enter the plugin configuration.','')
-        elif parameters[0] == 'session':
-            self.mprint('Enter the session configuration.','')
-        elif parameters[0] == 'url-settings':
-            self.mprint('Enter the url configuration.','')
-        elif parameters[0] == 'profiles':
-            self.mprint('Enter the profiles configuration. Here you will be able to run predefined scans.','')
-        elif parameters[0] == 'misc-settings':
-            self.mprint('Enter the w3af misc configuration.','')
     
-    def _tools( self, parameters ):
+    def sh(self):
         '''
-        Opens a tools menu
+        Main cycle
         '''
-        toolsObj = tools.tools( self._commands )
-        try:
-            toolsObj.sh()
-        except KeyboardInterrupt,k:
-            om.out.console('')
-    
-    def _url( self, parameters  ):
-        '''
-        Opens a URL config menu
-        '''
-        _url = url.url( self._w3af, self._commands )
-        try:
-            _url.sh()
-        except KeyboardInterrupt,k:
-            om.out.console('')
-        
-    def _session( self, parameters  ):
-        '''
-        Opens a session config menu
-        '''
-        s = session.session( self._w3af, self._commands )
-        try:
-            s.sh()
-        except KeyboardInterrupt,k:
-            om.out.console('')
-    
-    def _profile( self, parameters  ):
-        '''
-        Opens a profile config menu
-        '''
-        s = profiles.profiles( self._w3af, self._commands )
-        try:
-            s.sh()
-        except KeyboardInterrupt,k:
-            om.out.console('')
-        
-    def _plugins( self, parameters ):
-        '''
-        Opens a plugins config menu
-        '''
-        p = plugins.plugins( self._w3af, self._commands  )
-        try:
-            p.sh()
-        except KeyboardInterrupt,k:
-            om.out.console('')
-        
-    def _exploit( self, parameters  ):
-        '''
-        Opens a exploit config menu
-        '''
-        e = exploit.exploit( self._w3af, self._commands )
-        try:
-            e.sh()
-        except KeyboardInterrupt,k:
-            om.out.console('')
-    
-    def _version( self, parameters ):
-        '''
-        Prints the w3af version.
-        '''
-        om.out.information(self._w3af.getVersion())
-        return True
-        
-    def _misc( self, parameters ):
-        '''
-        Opens a misc config menu
-        '''
-        mS = miscSettings.miscSettings()
-        pConf = pluginConfig( self._w3af, self._commands )
-        prompt = 'w3af/misc-settings>>> '
-        pConf.sh( prompt, mS )
-        return True
-    
-    def _target( self, parameters ):
-        '''
-        Sets the target URL
-        '''
-        tar = self._w3af.target
-        pConf = pluginConfig( self._w3af, self._commands )
-        prompt = 'w3af/target>>> '
-        pConf.sh( prompt, tar )
-        return True
-        
-    def start( self, parameters  ):
-        '''
-        Starts the discovery and audit work.
-        '''
-        try:
-            self._w3af.initPlugins()
-            self._w3af.verifyEnvironment()
-            self._w3af.start()
-        except w3afException, e:
-            om.out.console( str(e) )
-        except AssertionError, ae:
-            om.out.error( str(ae) )
-        except KeyboardInterrupt, e:
-            self._exit()
-        
-        return True
-        
-    def _getRndExitMsg( self ):
-        '''
-        @return: A random exit msg.
-        '''
-        res = []
-        res.append('bye.')
-        res.append('Be a good boy and contribute with some lines of code.')
-        res.append('Be a good boy and contribute with some money :)')
-        res.append('w3af, better than the regular script kiddie.')
-        res.append('GPL v2 inside.')
-        res.append('got shell?')
-        res.append('spawned a remote shell today?')
-        
-        res = res[ randint( 0, len(res) -1 ) ]
-        
-        return res
-    
-    def _assert( self, parameters ):
-        '''
-        This command is used to replace unit-tests.
-        '''
-        assertCommand = 'assert '
-        assertCommand += ' '.join( parameters )
-        try:
-            exec( assertCommand )
-        except AssertionError, ae:
-            if self._scriptFileName:
-                msg = 'Assert **FAILED** in w3af script "'+ self._scriptFileName +'"'
-            else:
-                msg = 'Assert **FAILED**'
-
+        self._lastWasArrow = False
+        self._showPrompt()
+        self._active = True
+        term.setRawInputMode(True)
+        while self._active: 
             try:
-                # Get the value of the first argument
-                a = parameters[0]
-                exec( 'aRes = ' + a )
-            except:
-                pass
-            else:
-                msg += ' : ' + a + ' == ' + str(aRes)
-            raise w3afException( msg )
-        except Exception, e:
-            om.out.error('An unexpected exception was raised during assertion: ' + str(e) )
-            om.out.error('The executed command was: ' + assertCommand )
-        else:
-            om.out.console('Assert succeded.')
-        
-    def _exit( self, parameters = [] ):
-        om.out.console( '' )
-        om.out.console( self._getRndExitMsg() )
-        try:
-            self._tm.stopAllDaemons()
-            self._tm.join( joinAll=True )
-            # Let them die ...
-            try:
-                time.sleep(0.3)
-            except:
-                pass
-        except w3afException, w3:
-            om.out.error( 'Found exception while joining threads: '+str(w3) )
-        except Exception, e:
-            om.out.debug( 'Found unhandled exception while joining threads: '+str(e) )
+                c = self._term.getch()
+                self._handleKey(c)
+            except Exception, e:
+                om.out.console(str(e))
 
-        return False
+        term.setRawInputMode(False)
+        print '\n\r'
+
+    def write(self, s):
+        om.out.console(s)
     
-    _back = _exit
+    def writeln(self, s=''):
+        om.out.console(s+'\n')
+
+    def term_width(self):
+        return 80
+
+           
+    def drawTable(self, lines, header=False):
+        table = tables.table(lines)
+        table.draw(self.term_width(), header)
+        
+        
+    def back(self):
+        if len(self._trace) == 0:
+            return None
+        else:
+            return self._trace.pop()
+
+
+    def _initPrompt(self):
+        self._position = 0
+        self._line = []
+        self._showPrompt()
+
+
+    def _exit(self):
+        self._active = False
+
+    def _getHistory(self):
+        return self._context.getHistory()
+
+    def _setHistory(self, hist):
+        path = self._context.getPath()
+        self._history[path] = (hist, [])
+    
+    def _handleKey(self, key):
+        try:
+            if self._handlers.has_key(key):
+                self._handlers[key]()
+            else:
+                self._paste(key)
+        except Exception, e:
+            traceback.print_exc() # TODO
+        
+    def _onBackspace(self):
+        if self._position >0:
+            self._position -= 1
+            del self._line[self._position]
+            term.moveDelta(-1,0)
+            term.eraseLine()
+            self._showTail()
+
+    def _onEnter(self):
+
+       # term.writeln()
+
+        tokens = self._parseLine()
+        if len(tokens) > 0:
+
+            self._getHistory().remember(self._line)
+    
+            # New menu is the result of any command.
+            # If None, the menu is not changed.
+            term.setRawInputMode(False)
+            om.out.console('')
+            menu = self._context.execute(tokens)
+            term.setRawInputMode(True)
+            if menu is not None:
+                if callable(menu):
+                    
+                    # Command is able to delegate the detection 
+                    # of the new menu to the console 
+                    # (that's useful for back command:
+                    # otherwise it's not clear what must be added to the trace)
+                    # It's kind of hack, but I had no time 
+                    # to think of anything better.
+                    # An other option is to allow menu 
+                    # objects modify console state directly which I don't like
+                    # -- Sasha
+                    menu = menu() 
+                    
+                elif menu != self._context:
+                    # Remember this for the back command
+                    self._trace.append(self._context)
+                if menu is not None:
+                    self._context = menu
+
+        self._initPrompt()
+
+
+    def _delWord(self):
+        trimming = True
+        filt = None
+        while (True):
+            if self._position == 0:
+                break
+
+            char = self._line[self._position-1]
+            if filt is None:
+                for f in [str.isspace, str.isalnum, lambda s: not s.isalnum()]:
+                    if f(char):
+                        filt = f
+                        break
+
+            if filt(char):
+                self._onBackspace()
+            else:
+                break
+
+    def _toLineEnd(self):
+        term.moveDelta(len(self._line) - self._position, 0)
+        self._position = len(self._line)
+
+    def _toLineStart(self):
+        term.moveDelta(-self._position, 0)
+        self._position = 0
+
+    def _onTab(self):
+        '''
+            Autocompletion logic is called here
+        '''
+        line = self._getLineStr()[:self._position] # take the line before the cursor
+        tokens = self._parseLine(line)
+        if not line.endswith(' ') and len(tokens)>0:
+            # if the cursor is after non-space, the last word is used 
+            # as a hint for autocompletion
+            incomplete = tokens.pop()
+        else:
+            incomplete = ''
+
+        completions = self._context.suggest(tokens, incomplete)
+        prefix = commonPrefix(completions)
+        if prefix != '':
+            self._paste(prefix)
+        elif len(completions) > 0:
+            term.writeln()
+            for variant in map(lambda c: c[1], completions):
+                term.write(variant + ' ')
+            term.writeln()
+            
+            self._showPrompt()
+
+            self._showLine()
+        else:
+            term.bell()
+    
+    def _onLeft(self):
+        if self._position > 0:
+            self._position -= 1
+            term.moveDelta(-1,0)
+        else:
+            term.bell()
+    
+    def _onRight(self):
+        if self._position < len(self._line):
+            self._position += 1
+            term.moveDelta(1,0)
+        else:
+            term.bell()
+
+    def _onUp(self):
+        history = self._getHistory()
+        newLine = history.back(self._line)
+
+        if newLine is not None:
+            self._setLine(newLine)
+        else:
+            term.bell()
+
+    def _onDown(self):
+        history = self._getHistory()
+        newLine = history.forward()
+        if newLine is not None:
+            self._setLine(newLine)
+        else:
+            term.bell()
+
+    def _setLine(self, line):
+        term.moveDelta(- self._position, 0)
+        term.eraseLine()
+        term.write(''.join(line))
+        self._line = line
+        self._position = len(line)
+
+    def _getLineStr(self):
+        return ''.join(self._line)
+
+    def _parseLine(self, line=None):
+        if line==None:
+            line = self._getLineStr()
+        result = []
+        parser = shlex(line)
+        parser.whitespace_split = True
+        while True:
+            token = parser.get_token()
+            if token == parser.eof:
+                break
+            result.append(token)
+
+        return result
+
+    def _paste(self, text):
+
+        term.savePosition()
+        tail = self._line[self._position:]
+        for c in text:
+            self._line.insert(self._position, c)
+            self._position += 1
+
+        term.write(text)
+        term.write(''.join(tail))
+        term.restorePosition()  
+        term.moveDelta(len(text), 0)
+        
+
+
+    def _showPrompt(self):
+        term.write('w3af' + self._context.getPath() + ">>>")
+        
+    def _showLine(self):
+        strLine = self._getLineStr()
+        term.write(strLine)
+        term.moveDelta(self._position - len(strLine), 0)
+
+    def _showTail(self, afterDel=False):
+        '''
+            reprint everything that should be after the cursor
+        '''
+        term.savePosition()
+        strLine = self._getLineStr()
+        term.write(strLine[self._position:])
+        term.restorePosition()
+
+
+
