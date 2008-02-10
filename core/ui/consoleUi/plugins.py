@@ -134,7 +134,7 @@ class pluginsTypeMenu(menu):
             list = []
                         
         list.sort()
-        table = [['Plugin name', 'Status', 'Description']]
+        table = [['Plugin name', 'Status', 'Conf', 'Description']]
 
         for pluginName in list:
             row = []
@@ -149,8 +149,9 @@ class pluginsTypeMenu(menu):
             row.append(pluginName)
             status = pluginName in enabled and 'Enabled' or ''
             row.append(status)
-            optInfo = optCount>0 and '\n(%i options)' % optCount or ''
-            row.append(str(plugin.getDesc()) + optInfo)
+            optInfo = optCount>0 and 'Yes' or ''
+            row.append(optInfo)
+            row.append(str(plugin.getDesc()))
 
             table.append(row)
         self._console.drawTable(table, True)

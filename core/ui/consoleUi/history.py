@@ -28,23 +28,22 @@ class historyTable:
     A wrapper around a dictionary which stores menu-related history objects.
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
-	def __init__(self):
-		self._table = {}
+    def __init__(self):
+        self._table = {}
 
-	def getHistory(self, key):
-    '''
-    Returns a history object for the key (which is a menu name).
-    If no object exist yet, a new one is created and registered.
-    @param key
+    def getHistory(self, key):
+        '''
+        Returns a history object for the key (which is a menu name).
+        If no object exist yet, a new one is created and registered.
+        @param key
+        '''
+        if self._table.has_key(key):
+            result = self._table[key]
+        else:
+            result = history()
+            self._table[key] = result
 
-    '''
-		if self._table.has_key(key):
-			result = self._table[key]
-		else:
-			result = history()
-			self._table[key] = result
-
-		return result
+        return result
 
 class history:
     '''
@@ -53,44 +52,44 @@ class history:
 
     '''
 
-	def __init__(self):
-		self._stack = []
-		self._pointer = 0
-		self._pending = None
+    def __init__(self):
+        self._stack = []
+        self._pointer = 0
+        self._pending = None
 
-	def remember(self, pending):
-		self._stack.append(copy.deepcopy(pending))
-		self._pointer = len(self._stack)
-		
+    def remember(self, pending):
+        self._stack.append(copy.deepcopy(pending))
+        self._pointer = len(self._stack)
+        
 
-	def back(self, pending = None):
-		if self._pointer == 0:
-			return None
+    def back(self, pending = None):
+        if self._pointer == 0:
+            return None
 
-		if self._pointer == len(self._stack):
-			self._pending = pending
+        if self._pointer == len(self._stack):
+            self._pending = pending
 
-		self._pointer -= 1
-		return self._stack[self._pointer]
+        self._pointer -= 1
+        return self._stack[self._pointer]
 
-		
-	def forward(self):
-	
-		sl = len(self._stack)
-		if self._pointer == sl:
-			return None
+        
+    def forward(self):
+    
+        sl = len(self._stack)
+        if self._pointer == sl:
+            return None
 
-		self._pointer += 1
+        self._pointer += 1
 
-		if self._pointer == sl:
-			if self._pending != None:
-				result = self._pending
-				self._pending = None
-			else:
-				result = None
-		else:
-			result = self._stack[self._pointer]
-			
-			
-		return result
-		
+        if self._pointer == sl:
+            if self._pending != None:
+                result = self._pending
+                self._pending = None
+            else:
+                result = None
+        else:
+            result = self._stack[self._pointer]
+            
+            
+        return result
+        
