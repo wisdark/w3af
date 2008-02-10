@@ -1,3 +1,25 @@
+'''
+util.py
+
+Copyright 2008 Andres Riancho
+
+This file is part of w3af, w3af.sourceforge.net .
+
+w3af is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation version 2 of the License.
+
+w3af is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with w3af; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+'''
+
 
 def commonPrefix(completions):
     ''' 
@@ -5,6 +27,7 @@ def commonPrefix(completions):
     suggested as autocompletion.
     @parameter completions: [(part, completion)] where part is a prefix of completion 
     (see core.ui.consoleUi.menu)
+    @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
 
     def cp(str1, str2):
@@ -53,7 +76,7 @@ def splitPath(path, sep='/'):
 
 def removePrefix(s, prefix='!'):
     '''
-        If the string starts from the prefix, the prefix is removed.
+    If the string starts from the prefix, the prefix is removed.
     '''
     if s.startswith(prefix):
         return s[len(prefix):]
@@ -63,13 +86,14 @@ def removePrefix(s, prefix='!'):
 
 def suggest(tree, part, allowSet=False):
     '''
-        The basic autocompletion logic.
-        @parameter tree: dict of list to take possible completions from.
-        @part: the prefix for the completions.
-        @allowSet: if True, it allows to autocomplete expressions 
-        like "dog,!cat,gira" into dog,!cat,giraffee' (useful for plugins)
-        @return: list of (p, c) where p is the prefix of the completion c and suffix of part.
-            (currently, only lengths of p's are used).
+    The basic autocompletion logic.
+    @parameter tree: dict of list to take possible completions from.
+    @part: the prefix for the completions.
+    @allowSet: if True, it allows to autocomplete expressions 
+    like "dog,!cat,gira" into dog,!cat,giraffee' (useful for plugins)
+    @return: list of (p, c) where p is the prefix of the completion c and suffix of part.
+        (currently, only lengths of p's are used).
+    @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
     try:
         list = tree.keys()
