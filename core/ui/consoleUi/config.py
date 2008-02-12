@@ -37,15 +37,39 @@ class configMenu(menu):
         self._memory = {}
         for o in self._options.keys():
             self._memory[str(o)] = [str(self._options[o]['default'])]
+        self._groupOptionsByTabId()
        
 
     def _cmd_view(self, params):
         #col1Len = max([len(o) for o in self._options.keys()]) + 4
         #col2Len = 16
-            table = [['Setting', 'Value', 'Description']]
-            table += [[o, self._options[o]['default'], self._options[o]['desc']] \
-                for o in self._options.keys()]           
-            self._console.drawTable(table, True)
+        table = [['Setting', 'Value', 'Description']]
+        for tabid in self._tabbedOptions.keys():
+            tabOpts = self._tabbedOptions[tabid]
+            table += [[o, tabOpts[o]['default'], tabOpts[o]['desc']] \
+                for o in tabOpts ]           
+            table.append([])
+        if len(table) > 1:
+            table.pop()
+        self._console.drawTable(table, True)
+
+    def _groupOptionsByTabId(self):      
+        self._tabbedOptions = {}
+        for o in self._options.keys():
+            opt = self._options[o]
+            if opt.has_key('tabid'):
+                tabid = str(opt['tabid'])
+            else:
+                tabid = ''
+
+            if tabid not in self._tabbedOptions:
+                target = {}
+                self._tabbedOptions[tabid] = target
+            else:
+                target = self._tabbedOptions[tabid]
+
+            target[o] = opt
+                
 
     def _cmd_set(self, params):
         if len(params) != 2:

@@ -36,13 +36,19 @@ class pluginsMenu(menu):
     def __init__(self, name, console, w3af, parent):
         menu.__init__(self, name, console, w3af, parent)
         types = w3af.getPluginTypes()
-        children = {}
+        self._children = {}
         for t in types:
-            children[t] = pluginsTypeMenu(t, self._console, self._w3af, self)
-        self._children = children
+            self._children[t] = pluginsTypeMenu(t, self._console, self._w3af, self)
     
     def getChildren(self):
         return self._children
+
+    def execute(self, tokens):
+        if len(tokens) == 1 and tokens[0] in self._children:
+            return self._cmd_list(tokens)
+        return menu.execute(self, tokens)
+
+
 
     def _cmd_list(self, params):
         try:

@@ -33,7 +33,7 @@ import core.controllers.w3afCore
 import core.controllers.outputManager as om
 import core.controllers.miscSettings as miscSettings
 import sys
-import math
+import random
 
 class consoleUi:
     '''
@@ -43,7 +43,9 @@ class consoleUi:
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
 
-    def __init__(self):
+    def __init__(self, scriptFile=None, commands=[]):
+        self._scriptFile = scriptFile
+        self._commands = commands 
         self._term = term.terminal()
         self._line = [] # the line which is being typed
         self._position = 0 # cursor position
@@ -56,10 +58,10 @@ class consoleUi:
             term.KEY_RIGHT : self._onRight, \
             term.KEY_UP : self._onUp, \
             term.KEY_DOWN : self._onDown, \
-            '^C' : self._exit, \
-            '^D' : self._exit,
-            '^W': self._delWord,
-            '^H': self._onBackspace,
+            '^C' : self.exit, \
+            '^D' : self.exit,
+            '^W' : self._delWord,
+            '^H' : self._onBackspace,
             '^A' : self._toLineStart,
             '^E' : self._toLineEnd } 
         self._history = historyTable() # each menu has array of (array, positionInArray)
@@ -74,6 +76,9 @@ class consoleUi:
         self._showPrompt()
         self._active = True
         term.setRawInputMode(True)
+
+        self._executePending()
+
         while self._active: 
             try:
                 c = self._term.getch()
@@ -82,7 +87,16 @@ class consoleUi:
                 om.out.console(str(e))
 
         term.setRawInputMode(False)
-        print '\n\r'
+        print '\n'
+        print self._randomMessage()
+
+
+    def _executePending(self):
+        while (self._commands):
+            curCmd, self._commands = self._commands[0], self._commands[1:]
+
+            self._paste(curCmd)
+            self._onEnter()
 
     def write(self, s):
         om.out.console(s)
@@ -112,7 +126,7 @@ class consoleUi:
         self._showPrompt()
 
 
-    def _exit(self):
+    def exit(self):
         self._active = False
 
     def _getHistory(self):
@@ -321,4 +335,12 @@ class consoleUi:
         term.restorePosition()
 
 
+    def _randomMessage(self):
+        f = file('core/ui/consoleUi/exitMessages.txt', 'r')
+        lines = f.readlines()
+        idx = random.randrange(len(lines))
+        line = lines[idx]
+        return line
+        
+        
 

@@ -21,6 +21,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import traceback
+        
+import core.data.kb.knowledgeBase as kb        
 from core.ui.consoleUi.util import *
 from core.ui.consoleUi.history import *
 
@@ -157,6 +159,9 @@ class menu:
     def _cmd_back(self, tokens):
         return self._console.back
 
+    def _cmd_exit(self, tokens):
+        return self._console.exit
+
 
     def _cmd_help(self, params, brief=False):
         if len(params) == 0:
@@ -175,6 +180,9 @@ class menu:
             else:
                 fun()
 
+    def _cmd_assert(self, params):
+        exec ('assert ' + ' '.join(params))
+        return None
 
     def _getHelpItems(self):
         list = self.getBriefHelp().keys()

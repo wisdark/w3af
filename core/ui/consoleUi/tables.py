@@ -67,7 +67,7 @@ class table:
         space = termWidth - self._colsNum*(ls + 2) - ls # Useful space
             
         #maximal length of content for every column
-        maxLengths = [max([max(map(len, row[i].split('\n'))) for row in self._rows]) \
+        maxLengths = [max([max(map(len, row[i].split('\n'))) for row in self._rows if len(row)>0]) \
             for i in self._colsRange]
         sumMaxLen = sum(maxLengths)
 
@@ -85,7 +85,7 @@ class table:
         This function acts as Robin Hood: it takes excess of space from the "richest" column and gives it 
         to the poorest ones.
         '''
-        minLengths = [max([max(map(len, row[i].split()+[''])) for row in self._rows]) \
+        minLengths = [max([max(map(len, row[i].split()+[''])) for row in self._rows if len(row)>0]) \
             for i in range(self._colsNum)]
         shifts = [w - mw for mw,w in zip(minLengths , self._widthes)]
 #        length = len(shifts)
@@ -124,6 +124,9 @@ class table:
         om.out.console(self._separator + char*(self._tableWidth-2*ls) + self._separator)
 
     def drawRow( self, row ):
+        if len(row)==0:
+            self.drawBr()
+            return
         columns = [formatParagraph(col, w) for col, w in zip(row, self._widthes)]
         emptyLines = [' ' * w for w in self._widthes]
         maxHeight = max(map(len, columns))
