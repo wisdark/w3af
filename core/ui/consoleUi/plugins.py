@@ -44,6 +44,14 @@ class pluginsMenu(menu):
         return self._children
 
     def execute(self, tokens):
+        '''
+        This is a trick to make this console back-compatible.
+        For example, command 'audit' means 'show all audit plugins', 
+        while command 'audit xss' means 'enable xss plugin'.
+        At the same time, to show only enabled audit plugin, the command
+        'list audit enabled' has to be used. 
+        That's an inconsistency, which needs a resolution.
+        '''
         if len(tokens) == 1 and tokens[0] in self._children:
             return self._cmd_list(tokens)
         return menu.execute(self, tokens)

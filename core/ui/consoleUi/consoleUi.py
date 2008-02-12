@@ -58,8 +58,8 @@ class consoleUi:
             term.KEY_RIGHT : self._onRight, \
             term.KEY_UP : self._onUp, \
             term.KEY_DOWN : self._onDown, \
-            '^C' : self.exit, \
-            '^D' : self.exit,
+            '^C' : self._backOrExit, \
+            '^D' : self._backOrExit,
             '^W' : self._delWord,
             '^H' : self._onBackspace,
             '^A' : self._toLineStart,
@@ -119,11 +119,10 @@ class consoleUi:
         else:
             return self._trace.pop()
 
-
     def _initPrompt(self):
         self._position = 0
         self._line = []
-        self._showPrompt()
+#        self._showPrompt()
 
 
     def exit(self):
@@ -144,16 +143,27 @@ class consoleUi:
                 self._paste(key)
         except Exception, e:
             traceback.print_exc() # TODO
-        
+
+    def _backOrExit(self):
+        exit = len(self._trace)==0 
+        cmd = exit and 'exit' or 'back'
+        self._initPrompt()
+        self._paste(cmd)
+        self._execute()
+        if not exit:
+            self._initPrompt()
+            self._showPrompt()
+
     def _onBackspace(self):
         if self._position >0:
             self._position -= 1
             del self._line[self._position]
             term.moveDelta(-1,0)
             term.eraseLine()
-            self._showTail()
+            self._showTail()            
 
-    def _onEnter(self):
+
+    def _execute(self):
 
        # term.writeln()
 
@@ -188,7 +198,10 @@ class consoleUi:
                 if menu is not None:
                     self._context = menu
 
+    def _onEnter(self):
+        self._execute()
         self._initPrompt()
+        self._showPrompt()
 
 
     def _delWord(self):
