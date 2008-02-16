@@ -62,8 +62,7 @@ def luhnCheck(value):
 class creditCards(baseGrepPlugin):
     '''
     This plugin detects the occurence of credit card numbers in web pages.
-    It can be tested against URL 
-    https://www.paypal.com/en_US/vhelp/paypalmanager_help/credit_card_numbers.htm 
+
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
     
@@ -71,14 +70,12 @@ class creditCards(baseGrepPlugin):
     def __init__(self):
         baseGrepPlugin.__init__(self)
         self._cardResponses = []
-        self._alreadyScanned = []
         regex = '(?:^|[^\d])(\d{4}[\- ]?\d{4}[\- ]?\d{2}[\- ]?\d{2}[\- ]?\d{1,4})(?:[^\d]|$)'
         self._regex = re.compile(regex)
         
     def _testResponse(self, request, response):
         
-        if isTextOrHtml(response.getHeaders()) and response.getCode()==200 \
-        and not response.getURL() in self._alreadyScanned:
+        if isTextOrHtml(response.getHeaders()) and response.getCode()==200:
             if self._findCard(response.getBody()):
                 v = vuln.vuln()
                 v.setURL( response.getURL() )
@@ -87,13 +84,10 @@ class creditCards(baseGrepPlugin):
                 v.setName( 'Credit card number disclosure' )
                 v.setDesc( "The URL: " + v.getURL() + " discloses credit card numbers." )
                 kb.kb.append( self, 'creditCards', v )
-                self._alreadyScanned.append( response.getURL() )
- 
      
     def _findCard(self, body):
         res = self._regex.search(body)
         return res and luhnCheck(res.group(1))
-    
     
     def end(self):
         '''
@@ -121,7 +115,8 @@ class creditCards(baseGrepPlugin):
         '''
         return '''
         This plugins scans every response page to find the strings that are likely to be 
-        the credit card numbers.
+        the credit card numbers. It can be tested against URL 
+        https://www.paypal.com/en_US/vhelp/paypalmanager_help/credit_card_numbers.htm         
         '''
     def getPluginDeps( self ):
         '''
