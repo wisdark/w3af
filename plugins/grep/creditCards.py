@@ -93,7 +93,7 @@ class creditCards(baseGrepPlugin):
         '''
         This method is called when the plugin wont be used anymore.
         '''
-        # Print codeDisclosure
+        # Print results
         self.printUniq( kb.kb.getData( 'creditCards', 'creditCards' ), 'URL' )
 
 
