@@ -1,4 +1,5 @@
 '''
+import core.controllers.outputManager as om
 config.py
 
 Copyright 2008 Andres Riancho
@@ -22,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from core.ui.consoleUi.menu import *
 from core.controllers.misc.parseOptions import parseXML
+from core.controllers.basePlugin.basePlugin import basePlugin
         
 class configMenu(menu):
     '''
@@ -30,14 +32,23 @@ class configMenu(menu):
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
 
-    def __init__(self, name, console, w3af, parent, configurable):
+    def __init__(self, name, console, w3af, parent, configurable, expectsPlain=False):
         menu.__init__(self, 'config:' + name, console, w3af, parent)
         self._configurable = configurable
         self._options = parseXML(self._configurable.getOptionsXML())
         self._memory = {}
+        self._requiresPlain = expectsPlain
+        self._plainOptions = {}
         for o in self._options.keys():
-            self._memory[str(o)] = [str(self._options[o]['default'])]
+            k = str(o)
+            v = str(self._options[o]['default']) 
+            self._memory[k] = [v]
+            self._plainOptions [k] = v
         self._groupOptionsByTabId()
+        self._help.addHelp({
+            'set' : 'Set an option',
+            'view' : 'List the available options'
+        }, 'commands')
        
 
     def _cmd_view(self, params):
@@ -80,10 +91,22 @@ class configMenu(menu):
             name = params[0]
             value = params[1]
             self._options[name]['default'] = value
+            self._plainOptions[name] = value
             mem = self._memory[name]
             if value not in mem:
                 mem.append(value)
-            self._configurable.setOptions(self._options)
+            if isinstance( self._configurable, basePlugin ):
+                self._w3af.setPluginOptions( self._configurable.getName() , self._configurable.getType(), self._options )
+                om.out.setPluginOptions( self._configurable.getName() , self._options )
+            else:
+                try:
+                    self._configurable.setOptions( self._options )
+                except w3afException, w3:
+                    om.out.error( str(w3) )
+
+   #         optsToSet = self._requiresPlain and self._plainOptions or self._options
+   #         self._configurable.setOptions(optsToSet)
+        
     
 
     def _para_set(self, params, part):

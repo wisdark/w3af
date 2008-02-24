@@ -39,6 +39,11 @@ class pluginsMenu(menu):
         self._children = {}
         for t in types:
             self._children[t] = pluginsTypeMenu(t, self._console, self._w3af, self)
+            self._help.addHelpEntry(t, "List %s plugins" % t, 'plugins')
+        
+        self._help.addHelpEntry('list', "List plugins by their type", 'commands')
+        self._help.addHelpEntry('config', "Config plugins (same as <type> config>)", 'commands')
+          
     
     def getChildren(self):
         return self._children
@@ -57,6 +62,15 @@ class pluginsMenu(menu):
         return menu.execute(self, tokens)
 
 
+    def _cmd_config(self, params):
+        try:
+            type = params[0]
+            subMenu = self._children[type]
+        except:
+            self._cmd_help(['config'])
+        else:
+            subMenu._cmd_list(params[1:])
+
 
     def _cmd_list(self, params):
         try:
@@ -70,8 +84,8 @@ class pluginsMenu(menu):
         return None
 
     def _help_list(self):
-        return 'Usage: list pluginType ' + \
-                'where pluginType is one of ' + ', '.join(self._children.keys())
+        om.out.console ('Usage: list pluginType ' + \
+                'where pluginType is one of ' + ', '.join(self._children.keys()))
 
     
     def _para_list(self, params, part):
@@ -183,7 +197,7 @@ class pluginsTypeMenu(menu):
         if self._configs.has_key(name):
             config = self._configs[name]
         else:
-            config = configMenu(name, self._console, self._w3af, self, self._w3af.getPluginInstance(params[0], self._name))
+            config = configMenu(name, self._console, self._w3af, self, self._w3af.getPluginInstance(params[0], self._name), True)
             self._configs[name] = config
 
         return config

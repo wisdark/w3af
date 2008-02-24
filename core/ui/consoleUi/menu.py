@@ -25,6 +25,8 @@ import traceback
 import core.data.kb.knowledgeBase as kb        
 from core.ui.consoleUi.util import *
 from core.ui.consoleUi.history import *
+from core.ui.consoleUi.help import *
+import core.controllers.outputManager as om
 
 class menu:
     '''
@@ -55,22 +57,60 @@ class menu:
 
     def __init__(self, name, console, w3af, parent=None, **other):
         self._name = name
+        self._history = history()
+        
+        self._help = help()
+        self._keysHelp = help()
         self._w3af = w3af
+        self._handlers = {}
+        self._paramHandlers = {}
+        self._helpHandlers = {}
         self._parent = parent
         self._console = console
-        self._prevContext = None
-        self._history = history()
-        self._helpTable = {
+        
+        commonHelp = {
+            'keys' : 'Keys combinations',
             'help': 'Display help', 
-            'back': 'Go to the parent menu'
+            'back': 'Go to the parent menu',
+            'assert': 'Check an assertion',
+            'exit': 'Exit w3af'
         }
 
+        for cmd in [c for c in dir(self) if c.startswith('_cmd_')]:
+            self._handlers[cmd[5:]] =  getattr(self, cmd)
+
+        for cmd in self.getCommands():
+            try:
+                pHandler = getattr(self, '_para_'+cmd)
+                self._paramHandlers[cmd] = pHandler
+            except:
+                pass
+
+            if cmd not in commonHelp:
+                self._help.addHelpEntry(cmd, 'UNDOCUMENTED', 'commands')
+
+            try:
+                helpHandler = getattr(self, '_help_'+cmd)
+                self._helpHandlers[cmd] = helpHandler
+            except:
+                pass
+
+
+        self._help.addHelp(commonHelp, 'common')
+
+
+
+        self._keysHelp.addHelp({
+            'Ctrl-D': 'Go to the previous menu or exit w3af',
+            'Ctrl-W': 'Erase the last word',
+            'Ctrl-H': 'Erase the last character',
+            'Ctrl-A': 'To the beginning of the line',
+            'Ctrl-E': 'To the end of the line'
+        }, 'keys')
 
     def getBriefHelp(self):
         return self._helpTable
 
-    def _addHelp(self, ext):
-        self._helpTable.update(ext)
 
     def suggestCommands(self, part=''):
 
@@ -103,7 +143,7 @@ class menu:
                 return []
 
         try:
-            compl = getattr(self, '_para_'+command)
+            compl = self._paramHandlers[command]
             return compl(params, part)
         except Exception, e:    
             return self.suggestParams(command+'/', params, part)
@@ -113,20 +153,24 @@ class menu:
         '''
         By default, commands are defined by methods _cmd_<command>.
         '''
-        return map(lambda s: s[5:], [c for c in dir(self) if c.startswith('_cmd_')])
+        return self._handlers.keys()
 
     def getChildren(self):
         return {} #self.getCommands()
 
     def getHandler(self, command):
         try:
-            return getattr(self, '_cmd_'+command)
+            return self._handlers[command]
         except:
             return None
             
+    def getHelper(self, command):
+        try:
+            return self._helpHandlers[command]
+        except:
+            return None
 
     def execute(self, tokens):
-        self._prevContext = self._console._context   
 
         if len(tokens) == 0:
             return self
@@ -137,13 +181,14 @@ class menu:
         first, other = splitPath(command)
 
         if other is not None:
-            try:
+            children = self.getChildren()
+            if first in children:
                 subMenu = self.getChildren()[first]
                 subCmd = (other and [other] or [])  + params
                 result = subMenu.execute( subCmd )
                 return result
-            except Exception, e:
-                traceback.print_exc()
+            else:
+                om.out.console("I don't know what to do with %s" % first)
                 return None
 
         handler = self.getHandler(command)
@@ -165,36 +210,34 @@ class menu:
 
     def _cmd_help(self, params, brief=False):
         if len(params) == 0:
-            self._help()
+            table = self._help.getPlainHelpTable(True)
+            self._console.drawTable(table)
         else:
             subj = params[0]
-            try:
-                fun = getattr(self, '_help_'+subj)
-            except:
-                help = self.getBriefHelp()
-                if help.has_key(subj):
-                    self._console.writeln(help[subj])
-                else:
-                    self._console.writeln('Nothing is known about ' + subj)
-
-            else:
+            fun = self.getHelper(subj)
+            if fun:
                 fun()
+            else:
+                help = self._help.getHelp(subj)
+                if help is None:
+                    om.out.console("I don't know anything about " + subj)
+                else:
+                    om.out.console(help)
+                    
+
+    def _help_keys(self, params=None):
+        table = self._keysHelp.getPlainHelpTable(True)
+        self._console.drawTable(table)
+        
 
     def _cmd_assert(self, params):
         exec ('assert ' + ' '.join(params))
         return None
 
-    def _getHelpItems(self):
-        list = self.getBriefHelp().keys()
-        methods = [m for m in dir(self) if m.startswith('_help_')]
-        for f in map(lambda s: s[6:], methods):
-            if f not in list:
-                list.append(f)
 
-        list.extend([c for c in self.getCommands() if c not in list])
-
-        return list
-
+    def _cmd_keys(self, params):
+        self._help_keys()
+    
     def _getHelpForSubj(self, subj):
         table = self.getBriefHelp()
         if table.has_key(subj):
@@ -202,22 +245,10 @@ class menu:
         else:
             return None
 
-    def _help(self):
-        helpTable = self.getBriefHelp()
-        helpItems = self._getHelpItems()
-        #firstFieldLen = max([len(s) for s in helpItems]) + 2
-        helpLines = []
-
-        for subj in helpItems:
-            help = helpTable.has_key(subj) and helpTable[subj] or ''
-            helpLines.append([subj, help])
-
-        self._console.drawTable(helpLines)
-       
-            
+           
     def _para_help(self, params, part):
         if len(params) ==0:
-            return suggest(self._getHelpItems(), part)
+            return suggest(self._help.getItems(), part)
         else:
             return []
 

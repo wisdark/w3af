@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
+import core.controllers.w3afCore
 
 def commonPrefix(completions):
     ''' 
@@ -168,3 +169,20 @@ def formatParagraphLine(text, width):
         result.append(buf + ' ' * (width - len(buf)))
     return result
 
+
+def groupBy(array, fun):
+    print str(array)
+    result = {}
+    for a in array:
+        tag = fun(a)
+        if tag not in result:
+            dest = result[tag]
+        else:
+            dest = []
+            result[tag] = dest
+        
+        dest.append(a)
+
+    return result
+
+            

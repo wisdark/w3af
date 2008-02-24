@@ -87,8 +87,7 @@ class consoleUi:
                 om.out.console(str(e))
 
         term.setRawInputMode(False)
-        print '\n'
-        print self._randomMessage()
+        om.out.console(self._randomMessage())
 
 
     def _executePending(self):
@@ -105,7 +104,7 @@ class consoleUi:
         om.out.console(s+'\n')
 
     def term_width(self):
-        return 80
+        return term.terminal_size()[0]
 
            
     def drawTable(self, lines, header=False):
@@ -164,20 +163,18 @@ class consoleUi:
 
 
     def _execute(self):
-
        # term.writeln()
 
         tokens = self._parseLine()
+        term.setRawInputMode(False)
+        om.out.console('')
         if len(tokens) > 0:
 
             self._getHistory().remember(self._line)
     
             # New menu is the result of any command.
             # If None, the menu is not changed.
-            term.setRawInputMode(False)
-            om.out.console('')
             menu = self._context.execute(tokens)
-            term.setRawInputMode(True)
             if menu is not None:
                 if callable(menu):
                     
@@ -197,6 +194,7 @@ class consoleUi:
                     self._trace.append(self._context)
                 if menu is not None:
                     self._context = menu
+        term.setRawInputMode(True)
 
     def _onEnter(self):
         self._execute()
@@ -205,21 +203,18 @@ class consoleUi:
 
 
     def _delWord(self):
-        trimming = True
-        filt = None
+        filt = str.isspace
         while (True):
             if self._position == 0:
                 break
 
             char = self._line[self._position-1]
-            if filt is None:
-                for f in [str.isspace, str.isalnum, lambda s: not s.isalnum()]:
-                    if f(char):
-                        filt = f
-                        break
 
             if filt(char):
                 self._onBackspace()
+            elif filt==str.isspace:
+                filt = str.isalnum(char) and str.isalnum \
+                    or (lambda s: not s.isalnum())
             else:
                 break
 

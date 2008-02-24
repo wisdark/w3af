@@ -27,6 +27,7 @@ import core.ui.consoleUi.posixterm as term
 import core.controllers.miscSettings as ms
 from core.ui.consoleUi.session import *
 
+
 class rootMenu(menu):
     '''
     Main menu
@@ -35,14 +36,18 @@ class rootMenu(menu):
 
     def __init__(self, name, console, core, parent=None):
         menu.__init__(self, name, console, core, parent)
-        self._addHelp({
-            'plugins': 'Enable, disable and configure plugins'
-        })
+#        self._addHelp({
+#            'plugins': 'Enable, disable and configure plugins'
+#        })
+        self._help.addHelpEntry('plugins', 'Enable, disable and configure plugins', 'commands')
+        self._help.addHelp({'start': 'Run the scan'}, 'commands')
+
         self._children =\
             {'plugins': pluginsMenu('plugins', self._console, self._w3af, self), \
              'target' : configMenu('target', self._console, self._w3af, self, self._w3af.target),
-             'misc-settings' : configMenu('misc-settings', self._console, self._w3af, self, ms.miscSettings()),
-             'url-settings' : configMenu('url-settings', self._console, self._w3af, self, self._w3af.uriOpener.settings),
+             'misc-settings' : configMenu('misc-settings', self._console, self._w3af, self, \
+                 ms.miscSettings(), True),
+             'url-settings' : configMenu('url-settings', self._console, self._w3af, self, self._w3af.uriOpener.settings, True),
              'profiles' : profilesMenu('profiles', self._console, self._w3af, self),
              'session' : sessionMenu('session', self._console, self._w3af, self)}
 

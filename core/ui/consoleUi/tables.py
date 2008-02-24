@@ -42,10 +42,10 @@ class table:
         self._separator = '|'
         
 
-    def draw(self, termWidth, header = False):
+    def draw(self, termWidth, header = False, group=None, transf=None):
         if len(self._rows) == 0:
             return
-  
+
         self._initRelWidthes(termWidth)
         self._justify()        
         sl = len(self._separator)
