@@ -231,7 +231,28 @@ class menu:
         
 
     def _cmd_assert(self, params):
-        exec ('assert ' + ' '.join(params))
+        assertCommand = 'assert '
+        assertCommand += ' '.join( params )
+        try:
+            exec( assertCommand )
+        except AssertionError, ae:
+            msg = 'Assert **FAILED**'
+
+            try:
+                # Get the value of the first argument
+                a = params[0]
+                exec( 'aRes = ' + a )
+            except:
+                pass
+            else:
+                msg += ' : ' + a + ' == ' + str(aRes)
+            om.out.error( msg )
+        except Exception, e:
+            om.out.error('An unexpected exception was raised during assertion: ' + str(e) )
+            om.out.error('The executed command was: ' + assertCommand )
+        else:
+            om.out.console('Assert succeded.')
+        
         return None
 
 
