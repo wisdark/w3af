@@ -68,7 +68,7 @@ class menu:
         self._children = {}
 
         self._loadHelp('common')
-        self._keysHelp = loadHelp('keys')
+        self._keysHelp = {} 
 
         self._initHandlers()
 
@@ -89,7 +89,8 @@ class menu:
                 pass
 
     def _loadHelp(self, name, vars=None):
-        self._help = loadHelp(name, self._help, vars)
+        helpMainRepository.loadHelp(name, self._help, vars)
+#        self._help = loadHelp(name, self._help, vars)
 
 
     def addChild(self, name, constructor):

@@ -76,14 +76,14 @@ class pluginsMenu(menu):
         return menu.execute(self, tokens)
 
 
-    def _cmd_config(self, params):
-        try:
-            type = params[0]
-            subMenu = self._children[type]
-        except:
-            self._cmd_help(['config'])
-        else:
-            subMenu._list(params[1:])
+#    def _cmd_config(self, params):
+#        try:
+#            type = params[0]
+#            subMenu = self._children[type]
+#        except:
+#            self._cmd_help(['config'])
+#        else:
+#            subMenu._list(params[1:])
 
 
     def _cmd_list(self, params):

@@ -1,49 +1,49 @@
 from string import Template
-from xml.dom.minidom import parse
+import xml.etree.ElementTree as ET
+from xml.dom.minidom import *
 
-def loadHelp( name, obj=None, vars=None):
-    dom = parse('core/ui/consoleUi/help/%s.xml' % name)
-    return helpFromDOM( dom, obj, vars )
+class helpRepository:
+    def __init__(self, path='core/ui/consoleUi/help.xml'):
+        self.__doc = ET.parse(path)
+        self.__map = {}
+        topics = self.__doc.findall('.//topic')
+        for t in topics:
+            self.__map[str(t.attrib['name'])] = t
 
-def helpFromDOM( dom, obj=None, vars=None ):
-    def subst(templ):
-        if not vars:
-            return templ
-        return Template(templ).safe_substitute(vars)
 
-    if obj is None:
-        obj = help() 
-    for catElem in dom.getElementsByTagName('category'):
-        catName = str( catElem.getAttribute('name') )
-        if not catName:
-            catName = 'default'
-        for itemElem in catElem.getElementsByTagName('item'):
-            itemName = str( itemElem.getAttribute('name') )
+    def loadHelp(self, topic, obj=None, vars=None):
+        def subst(templ):
+            if not vars:
+                return templ
+            return Template(templ).safe_substitute(vars)
 
-            itemName = subst(itemName)
-            short = full = None
+        if not obj:
+            obj = help()
+        elt = self.__map[topic]
+        for catElt in elt.findall('category'):
+            catName = 'name' in catElt.attrib and catElt.attrib['name'] or 'default'
+            catName = str(catName)
 
-            for child in itemElem.childNodes:
-                isShort = child.nodeName == 'short'
-                isFull = child.nodeName == 'full'
-                if isShort or isFull:
-                    value = str( subst( child.childNodes[0].data ) )
-                    if isShort:
-                        short = value
-                    else:
-                        full = value
-             
-            obj.addHelpEntry( itemName, (short, full), catName )
-    return obj
-   
-     
-#def getText(elem):
-#    nodelist = elem.childNodes
-#    rc = ""
-#    for node in nodelist:
-#        if node.nodeType == node.TEXT_NODE:
-#            rc = rc + node.data
-#    return rc
+            for itemElt in catElt.findall('item'):
+                itemName = str( itemElt.attrib['name'] )
+                itemName = subst(itemName)
+
+                short = itemElt.findtext('short')
+                full = itemElt.findtext('full')
+                
+                if not short:
+                    short = itemElt.text
+
+                short = subst(short)
+                if full:
+                    full = subst(full)
+
+                obj.addHelpEntry(itemName, (short, full), catName)
+
+
+        return obj
+
+helpMainRepository = helpRepository()
 
     
 

@@ -69,10 +69,18 @@ class consoleUi:
         self._trace = []
 
     
-    def sh(self):
+    def sh(self, name='w3af', callback=None):
         '''
         Main cycle
         '''
+
+        if callback:
+            self._callback = callback
+            root = menu(name, self, self._w3af)
+        else:
+            root = rootMenu(name, self, self._w3af)
+            self._callback = self._executeLine
+            
         self._lastWasArrow = False
         self._showPrompt()
         self._active = True
@@ -89,6 +97,7 @@ class consoleUi:
 
         term.setRawInputMode(False)
         om.out.console(self._randomMessage())
+
 
 
     def _executePending(self):
@@ -162,11 +171,14 @@ class consoleUi:
             term.eraseLine()
             self._showTail()            
 
-
     def _execute(self):
+        l = self._getLineStr()
+        self._callback(l)
+
+    def _executeLine(self, line=None):
         # term.writeln()
 
-        tokens = self._parseLine()
+        tokens = self._parseLine(line)
         term.setRawInputMode(False)
         om.out.console('')
         if len(tokens) > 0:
@@ -202,8 +214,9 @@ class consoleUi:
                     self._context = menu
         term.setRawInputMode(True)
 
+
     def _onEnter(self):
-        self._execute()
+        self._executeLine()
         self._initPrompt()
         self._showPrompt()
 

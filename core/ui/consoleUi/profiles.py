@@ -32,10 +32,17 @@ class profilesMenu(menu):
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
 
     '''
+    
+
+    def __init__(self, name, console, w3af, parent=None):
+        menu.__init__(self, name, console, w3af, parent)
+        self._loadHelp('profiles')
+
+
     def _cmd_use(self, params):
         if len(params) != 1:
             om.out.console('Parameter is missed, please see the help:')
-            self._help_use()
+            self._cmd_help(['use'])
         else:
             profile = params[0]
             try:

@@ -1,0 +1,80 @@
+<help>
+    <topic name="common">
+        <category name="common">
+            <item name="keys"> Display keys combination. </item>
+            <item name="back"> Go to the previous menu.  </item>
+            <item name="exit"> Exit w3af.  </item>
+            <item name="help"> Display help. </item>
+            <item name="assert"> Check assertion. </item>
+        </category>
+    </topic>
+    <topic name="root">
+        <category name="menu">
+            <item name="start"> Start the scan.  </item>
+            <item name="plugins"> Configure plugins.  </item>
+            <item name="exploit"> Exploit the vulnerability.  </item>
+            <item name="profiles">
+                <short>List and start scan profiles.</short>
+                <full>You will be able to run predefined scans.</full>
+            </item>
+        </category>
+        <category name="config">
+            <item name="http-settings"> Configure the URL opener.  </item>
+            <item name="misc-settings"> Configure w3af misc settings.  </item>
+            <item name="target"> Configure the target URL.  </item>
+        </category>
+    </topic>
+    <topic name="profiles">
+        <category name="menu">
+            <item name="use">
+                
+            </item>
+        </category>
+    </topic>
+    <topic name="plugins">
+        <category name="menu">
+            <item name="list">
+                <short>List available plugins.</short>
+                <full><![CDATA[
+Syntax: list {plugin type} [all | enabled | disabled]
+By default all plugins are listed.
+                ]]></full>
+            </item>
+        </category>
+    </topic>
+    <topic name="pluginType">
+        <category name="plugins">
+            <item name="${TYPE}">
+                <short>View, configure and enable ${TYPE} plugins</short>
+                <full><![CDATA[
+Syntax: ${TYPE} [config plugin | plugin1[,plugin2 ... pluginN] | desc plugin]
+Example: ${TYPE}
+Result: All enabled ${TYPE} plugins are listed.
+
+Example2: ${TYPE} ${PLUGIN1},${PLUGIN2}
+Result: ${PLUGIN1} and ${PLUGIN2} are configured to run
+
+Example3: ${TYPE} config ${PLUGIN1}
+Result: Enters to the plugin configuration menu.
+
+Example4: ${TYPE} all,!${PLUGIN2}
+Result: All ${TYPE} plugins are configured to run except ${PLUGIN2}.
+
+Example1: ${TYPE} desc ${PLUGIN1}
+Result: You will get the plugin description ]]></full>
+            </item>
+        </category>
+
+    </topic>
+    <topic name="config">
+        <category name="menu">
+            <item name="view">
+                <short>List the available options and their values.</short>
+            </item>
+            <item name="set">
+                <short>Set a parameter value.</short>
+                <full>Syntax: {parameter} {value}</full>
+            </item>
+        </category>
+    </topic>
+</help>
