@@ -1,49 +1,101 @@
+from string import Template
+from xml.dom.minidom import parse
+
+def loadHelp( name, obj=None, vars=None):
+    dom = parse('core/ui/consoleUi/help/%s.xml' % name)
+    return helpFromDOM( dom, obj, vars )
+
+def helpFromDOM( dom, obj=None, vars=None ):
+    def subst(templ):
+        if not vars:
+            return templ
+        return Template(templ).safe_substitute(vars)
+
+    if obj is None:
+        obj = help() 
+    for catElem in dom.getElementsByTagName('category'):
+        catName = str( catElem.getAttribute('name') )
+        if not catName:
+            catName = 'default'
+        for itemElem in catElem.getElementsByTagName('item'):
+            itemName = str( itemElem.getAttribute('name') )
+
+            itemName = subst(itemName)
+            short = full = None
+
+            for child in itemElem.childNodes:
+                isShort = child.nodeName == 'short'
+                isFull = child.nodeName == 'full'
+                if isShort or isFull:
+                    value = str( subst( child.childNodes[0].data ) )
+                    if isShort:
+                        short = value
+                    else:
+                        full = value
+             
+            obj.addHelpEntry( itemName, (short, full), catName )
+    return obj
+   
+     
+#def getText(elem):
+#    nodelist = elem.childNodes
+#    rc = ""
+#    for node in nodelist:
+#        if node.nodeType == node.TEXT_NODE:
+#            rc = rc + node.data
+#    return rc
+
+    
+
 class help:
     def __init__(self):
         self._table = {}
-        self._commonTable = {}
+        self._subj2Gat = {}
+        self._cat2Subj = {}
 
 
-    def addHelpEntry(self, subj, content, group=''):
+    def addHelpEntry(self, subj, content, cat=''):
 
-        if group in self._table:
-            groupDict = self._table[group]
+        if type(content) not in (tuple, list): 
+            content = (content, None)
+
+        self._table[subj] = content
+        self._subj2Gat[subj] = cat
+        if cat in self._cat2Subj:
+            d = self._cat2Subj[cat]
         else:
-            groupDict = {}
-            self._table[group] = groupDict
+            d = []
+            self._cat2Subj[cat] = d
 
-        groupDict[subj] = content
-        self._commonTable[subj] = content
+        d.append(subj)
 
 
     def getCategories(self):
-        return self._table.keys()
+        return self._subj2Gat.keys()
 
-    def addHelp(self, table, group=''):
+    def addHelp(self, table, cat=''):
         for subj in table:
-            self.addHelpEntry(subj, table[subj], group)
+            self.addHelpEntry(subj, table[subj], cat)
 
 
     def getHelp(self, subj):
-        try:
-            return self._commonTable[subj]
-        except:
-            return None
+        if subj not in self._table:
+            return (None, None)
 
-    def getItems(self, group=None):
-        if group:
-            return self._table[group].keys()
-        else:
-            return self._commonTable.keys()
+        return self._table[subj]
 
 
-    def getPlainHelpTable(self, separators=True, group=None):
+    def getItems(self):
+        return self._table.keys()
+
+
+    def getPlainHelpTable(self, separators=True, cat=None):
         result = []
         
-        if group is not None:
-            self._appendHelpTable(result, group)
+        if cat is not None:
+            self._appendHelpTable(result, cat)
         else:
-            for g in self._table:
+            for g in self._cat2Subj:
                 self._appendHelpTable(result, g)
                 if separators:
                     result.append([])
@@ -54,10 +106,9 @@ class help:
         return result
 
 
-    def _appendHelpTable(self, result, groupName):
-        if groupName in self._table:
-            group = self._table[groupName]
-            
-            for subj in group:
-               result.append([subj, group[subj]])
+    def _appendHelpTable(self, result, cat):
+        items = cat in self._cat2Subj and self._cat2Subj[cat] or self._table
+           
+        for subj in items:
+            result.append([subj, self.getHelp(subj)[0]])
         

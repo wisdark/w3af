@@ -25,7 +25,8 @@ from core.ui.consoleUi.plugins import *
 from core.ui.consoleUi.profiles import *
 import core.ui.consoleUi.posixterm as term
 import core.controllers.miscSettings as ms
-from core.ui.consoleUi.session import *
+#from core.ui.consoleUi.session import *
+from core.ui.consoleUi.util import *
 
 
 class rootMenu(menu):
@@ -36,27 +37,20 @@ class rootMenu(menu):
 
     def __init__(self, name, console, core, parent=None):
         menu.__init__(self, name, console, core, parent)
-#        self._addHelp({
-#            'plugins': 'Enable, disable and configure plugins'
-#        })
-        self._help.addHelpEntry('plugins', 'Enable, disable and configure plugins', 'commands')
-        self._help.addHelp({'start': 'Run the scan'}, 'commands')
+        self._loadHelp( 'root' )
 
-        self._children =\
-            {'plugins': pluginsMenu('plugins', self._console, self._w3af, self), \
-             'target' : configMenu('target', self._console, self._w3af, self, self._w3af.target),
-             'misc-settings' : configMenu('misc-settings', self._console, self._w3af, self, \
-                 ms.miscSettings(), True),
-             'url-settings' : configMenu('url-settings', self._console, self._w3af, self, self._w3af.uriOpener.settings, True),
-             'profiles' : profilesMenu('profiles', self._console, self._w3af, self),
-             'session' : sessionMenu('session', self._console, self._w3af, self)}
-
-    def getChildren(self):
-        return self._children
-
+        mapDict(self.addChild, {
+            'plugins': pluginsMenu,
+            'target' : (configMenu, self._w3af.target),
+            'misc-settings' : (configMenu, ms.miscSettings(), True),
+            'http-settings' : (configMenu, self._w3af.uriOpener.settings, True),
+            'profiles' : profilesMenu           
+       })
+    
     def _cmd_start(self, params):
         try:
             self._w3af.initPlugins()
+            self._w3af.verifyEnvironment()
             self._w3af.start()
         except Exception, e:
             om.out.console(str(e))

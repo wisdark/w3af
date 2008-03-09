@@ -32,6 +32,7 @@ import core.ui.consoleUi.tables as tables
 import core.controllers.w3afCore
 import core.controllers.outputManager as om
 import core.controllers.miscSettings as miscSettings
+from core.controllers.w3afException import w3afException
 import sys
 import random
 
@@ -163,7 +164,7 @@ class consoleUi:
 
 
     def _execute(self):
-       # term.writeln()
+        # term.writeln()
 
         tokens = self._parseLine()
         term.setRawInputMode(False)
@@ -172,10 +173,15 @@ class consoleUi:
 
             self._getHistory().remember(self._line)
     
-            # New menu is the result of any command.
-            # If None, the menu is not changed.
-            menu = self._context.execute(tokens)
-            if menu is not None:
+            try:               
+                # New menu is the result of any command.
+                # If None, the menu is not changed.
+                menu = self._context.execute(tokens)
+            except w3afException, e:
+                menu = None
+                om.out.console( e.value )
+                
+            if menu:
                 if callable(menu):
                     
                     # Command is able to delegate the detection 

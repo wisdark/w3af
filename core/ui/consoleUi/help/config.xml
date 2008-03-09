@@ -1,0 +1,11 @@
+<help>
+    <category name="menu">
+        <item name="view">
+            <short>List the available options and their values.</short>
+        </item>
+        <item name="set">
+            <short>Set a parameter value.</short>
+            <full>Syntax: {parameter} {value}</full>
+        </item>
+    </category>
+</help>

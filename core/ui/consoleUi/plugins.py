@@ -35,15 +35,29 @@ class pluginsMenu(menu):
 
     def __init__(self, name, console, w3af, parent):
         menu.__init__(self, name, console, w3af, parent)
-        types = w3af.getPluginTypes()
+        types = w3af.getPluginTypes()        
         self._children = {}
+
+        self._loadHelp('plugins')
+
         for t in types:
-            self._children[t] = pluginsTypeMenu(t, self._console, self._w3af, self)
-            self._help.addHelpEntry(t, "List %s plugins" % t, 'plugins')
-        
-        self._help.addHelpEntry('list', "List plugins by their type", 'commands')
-        self._help.addHelpEntry('config', "Config plugins (same as <type> config>)", 'commands')
+            self.addChild(t, pluginsTypeMenu)
+#            self._help.addHelpEntry(t, "List %s plugins" % t, 'plugins')
+        self.__loadPluginTypesHelp(types)
+
+#        self._help.addHelpEntry('list', "List plugins by their type", 'commands')
+#        self._help.addHelpEntry('config', "Config plugins (same as <type> config>)", 'commands')
           
+    def __loadPluginTypesHelp(self, types): 
+        vars = {}
+        for t in types:
+            pList = self._w3af.getPluginList(t)
+            (p1, p2) = len(pList)>1 and (pList[0], pList[1]) \
+                or ('plugin1', 'plugin2')
+            vars['PLUGIN1'], vars['PLUGIN2'] = p1, p2
+            vars['TYPE'] = t
+            
+            self._loadHelp('pluginType', vars=vars)
     
     def getChildren(self):
         return self._children
@@ -69,7 +83,7 @@ class pluginsMenu(menu):
         except:
             self._cmd_help(['config'])
         else:
-            subMenu._cmd_list(params[1:])
+            subMenu._list(params[1:])
 
 
     def _cmd_list(self, params):
@@ -79,17 +93,17 @@ class pluginsMenu(menu):
         except:
             self._cmd_help(['list'])
         else:
-            subMenu._cmd_list(params[1:])
+            subMenu._list(params[1:])
 
         return None
 
-    def _help_list(self):
-        om.out.console ('Usage: list pluginType ' + \
-                'where pluginType is one of ' + ', '.join(self._children.keys()))
-
-    
     def _para_list(self, params, part):
-        return suggest(self._children.keys(), part)
+        l = len(params)
+        if l==0:
+            return suggest(self._children.keys(), part)
+        if l==1:
+            return suggest(['all', 'enabled', 'disabled'], part)
+        return []
 
         
 class pluginsTypeMenu(menu):
@@ -140,12 +154,30 @@ class pluginsTypeMenu(menu):
                     enabled.remove(p)
             elif plugin == 'all':
                 enabled = self._plugins.keys()
-            elif plugin in self._plugins.keys() and plugin not in enabled:
+            elif plugin in self._plugins and plugin not in enabled:
                 enabled.append(plugin)
 
+        for p in enabled:
+            if p!='all' and p not in self._plugins:
+                raise w3afException("I don't know the %s plugin." % p)
+
         self._w3af.setPlugins(enabled, self._name)
+
+    def _cmd_desc(self, params):
+        if len(params) != 1:
+            self._cmd_help(['desc'])
+            return None
+
+        pluginName = params[0]
+        if pluginName not in self._plugins:
+            raise w3afException("I don't know the %s plugin." % p)
+
+        plugin = self._w3af.getPluginInstance(pluginName, self._name)
+        om.out.console( str(plugin.getDesc()) )
+
+
         
-    def _cmd_list(self, params):
+    def _list(self, params):
         #print 'list : ' + str(params)
         filter = len(params)>0 and params[0] or 'all'
 
@@ -160,7 +192,13 @@ class pluginsTypeMenu(menu):
             list = [p for p in all if p not in enabled]
         else:
             list = []
-                        
+                       
+
+        if len(list) == 0:
+            om.out.console('No plugins have status ' + filter)
+            return
+
+
         list.sort()
         table = [['Plugin name', 'Status', 'Conf', 'Description']]
 
@@ -184,13 +222,11 @@ class pluginsTypeMenu(menu):
             table.append(row)
         self._console.drawTable(table, True)
 
-    def _help_list(self):
-        om.out.console( "Usage: list [all | enabled | disabled] ; default is all")
-        
+       
     def _cmd_config(self, params):
         
         if len(params) ==0:
-            self._help_config()
+            self._cmd_help(['config'])
             return
 
         name = params[0]
@@ -209,9 +245,6 @@ class pluginsTypeMenu(menu):
         return suggest([p for p in self._plugins.keys() \
             if self._plugins[p] > 0], part)
                 
-    def _help_config(self):
-        om.out.console("Usage: command <plugin> ");
-
     def _para_list(self, params, part=''):
         if len(params)==0:
             return suggest(['enabled', 'all', 'disabled'], part)

@@ -1,0 +1,11 @@
+<help>
+    <category name="menu">
+        <item name="list">
+            <short>List available plugins.</short>
+            <full><![CDATA[
+Syntax: list {plugin type} [all | enabled | disabled]
+By default all plugins are listed.
+            ]]></full>
+        </item>
+    </category>
+</help>

@@ -27,6 +27,7 @@ from core.ui.consoleUi.util import *
 from core.ui.consoleUi.history import *
 from core.ui.consoleUi.help import *
 import core.controllers.outputManager as om
+from core.controllers.w3afException import w3afException
 
 class menu:
     '''
@@ -60,22 +61,23 @@ class menu:
         self._history = history()
         
         self._help = help()
-        self._keysHelp = help()
         self._w3af = w3af
         self._handlers = {}
-        self._paramHandlers = {}
-        self._helpHandlers = {}
         self._parent = parent
         self._console = console
-        
-        commonHelp = {
-            'keys' : 'Keys combinations',
-            'help': 'Display help', 
-            'back': 'Go to the parent menu',
-            'assert': 'Check an assertion',
-            'exit': 'Exit w3af'
-        }
+        self._children = {}
 
+        self._loadHelp('common')
+        self._keysHelp = loadHelp('keys')
+
+        self._initHandlers()
+
+#            if cmd not in helpTab:
+                # highlight undocumented items
+#                self._help.addHelpEntry(cmd, 'UNDOCUMENTED', 'menu')
+
+    def _initHandlers( self ):
+        self._paramHandlers = {}
         for cmd in [c for c in dir(self) if c.startswith('_cmd_')]:
             self._handlers[cmd[5:]] =  getattr(self, cmd)
 
@@ -86,31 +88,19 @@ class menu:
             except:
                 pass
 
-            if cmd not in commonHelp:
-                self._help.addHelpEntry(cmd, 'UNDOCUMENTED', 'commands')
-
-            try:
-                helpHandler = getattr(self, '_help_'+cmd)
-                self._helpHandlers[cmd] = helpHandler
-            except:
-                pass
+    def _loadHelp(self, name, vars=None):
+        self._help = loadHelp(name, self._help, vars)
 
 
-        self._help.addHelp(commonHelp, 'common')
+    def addChild(self, name, constructor):
+        if type(constructor) in (tuple, list):
+            constructor, params = constructor[0], constructor[1:]
+        else:
+            params = []
 
+        self._children[name] = constructor(name, self._console, self._w3af, self, *params)
 
-
-        self._keysHelp.addHelp({
-            'Ctrl-D': 'Go to the previous menu or exit w3af',
-            'Ctrl-W': 'Erase the last word',
-            'Ctrl-H': 'Erase the last character',
-            'Ctrl-A': 'To the beginning of the line',
-            'Ctrl-E': 'To the end of the line'
-        }, 'keys')
-
-    def getBriefHelp(self):
-        return self._helpTable
-
+        
 
     def suggestCommands(self, part=''):
 
@@ -131,22 +121,13 @@ class menu:
                 return []
 
     def suggestParams(self, command, params, part):
-        first, rest = splitPath(command)    
-        if rest is not None:
-            try:
-                # delegate
-                ctx = self.getChildren()[first]
-                if rest != '':
-                    params = [rest] + params
-                return ctx.suggest(params, part)
-            except:
-                return []
+        if command in self._paramHandlers:
+            return self._paramHandlers[command](params, part)
 
-        try:
-            compl = self._paramHandlers[command]
-            return compl(params, part)
-        except Exception, e:    
-            return self.suggestParams(command+'/', params, part)
+        children = self.getChildren()
+        if command in children:
+            child = children[command]
+            return child.suggest(params, part)
 
 
     def getCommands(self):
@@ -156,7 +137,7 @@ class menu:
         return self._handlers.keys()
 
     def getChildren(self):
-        return {} #self.getCommands()
+        return self._children #self.getCommands()
 
     def getHandler(self, command):
         try:
@@ -164,41 +145,23 @@ class menu:
         except:
             return None
             
-    def getHelper(self, command):
-        try:
-            return self._helpHandlers[command]
-        except:
-            return None
 
     def execute(self, tokens):
 
         if len(tokens) == 0:
             return self
 
-#:      context.addToHistory(append)
         command, params = tokens[0], tokens[1:]
-        
-        first, other = splitPath(command)
+        handler = self.getHandler( command )
+        if handler:
+            return handler( params )
 
-        if other is not None:
-            children = self.getChildren()
-            if first in children:
-                subMenu = self.getChildren()[first]
-                subCmd = (other and [other] or [])  + params
-                result = subMenu.execute( subCmd )
-                return result
-            else:
-                om.out.console("I don't know what to do with %s" % first)
-                return None
+        children = self.getChildren()
+        if command in children:
+            child = children[command]
+            return child.execute( params )
 
-        handler = self.getHandler(command)
-        if handler is not None:
-            try:
-                return handler(params)
-            except Exception, e:
-                traceback.print_exc()
-        else:
-            return self.execute([command + '/'] + params)
+        raise w3afException("I don't know what to do with %s" % command)
 
 
     def _cmd_back(self, tokens):
@@ -214,18 +177,16 @@ class menu:
             self._console.drawTable(table)
         else:
             subj = params[0]
-            fun = self.getHelper(subj)
-            if fun:
-                fun()
-            else:
-                help = self._help.getHelp(subj)
-                if help is None:
-                    om.out.console("I don't know anything about " + subj)
-                else:
-                    om.out.console(help)
-                    
+            short, full = self._help.getHelp(subj)
+            if short is None:
+                raise w3afException("I don't know anything about " + subj)
 
-    def _help_keys(self, params=None):
+            om.out.console(short)
+            if full:
+                om.out.console(full)
+                
+
+    def _cmd_keys(self, params=None):
         table = self._keysHelp.getPlainHelpTable(True)
         self._console.drawTable(table)
         
@@ -255,10 +216,6 @@ class menu:
         
         return None
 
-
-    def _cmd_keys(self, params):
-        self._help_keys()
-    
     def _getHelpForSubj(self, subj):
         table = self.getBriefHelp()
         if table.has_key(subj):

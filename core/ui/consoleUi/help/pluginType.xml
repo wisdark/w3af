@@ -1,0 +1,24 @@
+<help>
+    <category name="plugins">
+        <item name="${TYPE}">
+            <short>View, configure and enable ${TYPE} plugins</short>
+            <full><![CDATA[
+Syntax: ${TYPE} [config plugin | plugin1[,plugin2 ... pluginN] | desc plugin]
+Example: ${TYPE}
+Result: All enabled ${TYPE} plugins are listed.
+
+Example2: ${TYPE} ${PLUGIN1},${PLUGIN2}
+Result: ${PLUGIN1} and ${PLUGIN2} are configured to run
+
+Example3: ${TYPE} config ${PLUGIN1}
+Result: Enters to the plugin configuration menu.
+
+Example4: ${TYPE} all,!${PLUGIN2}
+Result: All ${TYPE} plugins are configured to run except ${PLUGIN2}.
+
+Example1: ${TYPE} desc ${PLUGIN1}
+Result: You will get the plugin description
+           ]]></full>
+        </item>
+    </category>
+</help>

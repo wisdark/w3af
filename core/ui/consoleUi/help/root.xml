@@ -1,0 +1,28 @@
+<help>
+    <category name="menu">
+        <item name="start">
+            <short>Start the scan.</short>
+        </item>
+        <item name="plugins">
+            <short>Configure plugins.</short>
+        </item>
+        <item name="exploit">
+            <short>Exploit the vulnerability.</short>
+        </item>
+        <item name="profiles">
+            <short>List and start scan profiles.</short>
+            <full>You will be able to run predefined scans.</full>
+        </item>
+    </category>
+    <category name="config">
+        <item name="http-settings">
+            <short>Configure the URL opener.</short>
+        </item>
+        <item name="misc-settings">
+            <short>Configure w3af misc settings.</short>
+        </item>
+        <item name="target">
+            <short>Configure the target URL.</short>
+        </item>
+    </category>
+</help>
