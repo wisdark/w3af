@@ -89,7 +89,9 @@ class info(dict):
         
     def getDesc( self ):
         if self._id != None and self._id != 0:
-            return self._desc + ' The information was found in the request with id ' + str(self._id) + '.'
+            if not self._desc.endswith('.'):
+                self._desc += '.'
+            return self._desc + ' This information was found in the request with id ' + str(self._id) + '.'
         else:
             return self._desc
             
@@ -104,8 +106,15 @@ class info(dict):
         This is is the one from the response object that uniquely identifies all 
         requests and responses.
         '''
-        self._id = id       
+        self._id = id
     
+    def getId( self ):
+        '''
+        This is is the one from the response object that uniquely identifies all 
+        requests and responses.
+        '''
+        return self._id
+        
     def setVar( self, variable ):
         self._variable = variable
         

@@ -72,7 +72,7 @@ class passwordProfiling(baseGrepPlugin):
             self.lang = 'unknown'
 
         if not self.is404( response ) and request.getMethod() in ['POST', 'GET'] and \
-        response.getCode() != 500:
+        response.getCode() not in [500,401,403]:
             data = self._runPpPlugins( response )
             oldData = kb.kb.getData( 'passwordProfiling', 'passwordProfiling' )
             # "merge" both maps and update the repetitions
@@ -152,7 +152,7 @@ class passwordProfiling(baseGrepPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return ['discovery.error404page','grep.lang']
+        return ['grep.lang']
     
     def getLongDesc( self ):
         '''

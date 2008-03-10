@@ -51,6 +51,7 @@ class detectTransparentProxy(baseDiscoveryPlugin):
             
             if self._isProxyedConn( fuzzableRequest ):
                 i = info.info()
+                i.setName( 'Transparent proxy detected' )
                 i.setURL( fuzzableRequest.getURL() )
                 i.setDesc( 'Your ISP seems to have a transparent proxy installed, this can influence w3af results.' )
                 kb.kb.append( self, 'detectTransparentProxy', i )
@@ -120,6 +121,6 @@ class detectTransparentProxy(baseDiscoveryPlugin):
         return '''
         This plugin tries to detect transparent proxies.
         
-        The procedure for detecting transparent proxies if simple, I try to connect to a series of IP addresses,
+        The procedure for detecting transparent proxies is simple, I try to connect to a series of IP addresses,
         to the port 80, if all of them return an opened socket, then it's the proxy server responding.
         '''

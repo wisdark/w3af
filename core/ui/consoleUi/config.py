@@ -32,12 +32,11 @@ class configMenu(menu):
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
 
-    def __init__(self, name, console, w3af, parent, configurable, expectsPlain=False):
+    def __init__(self, name, console, w3af, parent, configurable):
         menu.__init__(self, 'config:' + name, console, w3af, parent)
         self._configurable = configurable
         self._options = parseXML(self._configurable.getOptionsXML())
         self._memory = {}
-        self._requiresPlain = expectsPlain
         self._plainOptions = {}
         for o in self._options.keys():
             k = str(o)
@@ -96,7 +95,8 @@ class configMenu(menu):
             if value not in mem:
                 mem.append(value)
             if isinstance( self._configurable, basePlugin ):
-                self._w3af.setPluginOptions( self._configurable.getName() , self._configurable.getType(), self._options )
+                self._w3af.setPluginOptions( self._configurable.getType(),\
+                    self._configurable.getName(), self._options )
                 om.out.setPluginOptions( self._configurable.getName() , self._options )
             else:
                 try:
@@ -104,9 +104,6 @@ class configMenu(menu):
                 except w3afException, w3:
                     om.out.error( str(w3) )
 
-   #         optsToSet = self._requiresPlain and self._plainOptions or self._options
-   #         self._configurable.setOptions(optsToSet)
-        
     
 
     def _para_set(self, params, part):

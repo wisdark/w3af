@@ -52,6 +52,7 @@ class collectCookies(baseGrepPlugin):
                 
                 # Load the cookie in the kb
                 i = info.info()
+                i.setName('Cookie')
                 i.setURL( response.getURL() )
                 i['cookie-string'] = headers[key]
                 
@@ -120,6 +121,7 @@ class collectCookies(baseGrepPlugin):
             if cookieObj.output(header='').count( cookie[0] ):
                 if cookie[1] not in self._alreadyReportedServer:
                     i = info.info()
+                    i.setName('Identified cookie')
                     i.setURL( response.getURL() )
                     i['cookie-string'] = cookieObj.output(header='')
                     i['cookie-object'] = cookieObj
@@ -151,17 +153,32 @@ class collectCookies(baseGrepPlugin):
         # This is a simplificated version of ramon's cookie db.
         cookieDB = []
         
+        # Web application firewalls
+        cookieDB.append( ('st8id=','Teros web application firewall') )
+        cookieDB.append( ('ASINFO=','F5 TrafficShield') )
+        cookieDB.append( ('NCI__SessionId=','Netcontinuum') )
+        
+        # oracle
+        cookieDB.append( ('$OC4J_','Oracle container for java') )
+        
+        # Java
+        cookieDB.append( ('JSESSIONID=','Jakarta Tomcat / Apache') )
+        cookieDB.append( ('JServSessionIdroot=','Apache JServ') )
+        
+        # ASP
+        cookieDB.append( ('ASPSESSIONID','IIS') )        
+        
+        # Others
         cookieDB.append( ('WebLogicSession=','BEA Logic') )
         cookieDB.append( ('SaneID=','Sane NetTracker') )
         cookieDB.append( ('ssuid=','Vignette') )
         cookieDB.append( ('vgnvisitor=','Vignette') )
-        cookieDB.append( ('ASPSESSIONID','IIS') )
         cookieDB.append( ('SESSION_ID=','IBM Net.Commerce') )
         cookieDB.append( ('NSES40Session=','Netscape Enterprise Server') )
         cookieDB.append( ('iPlanetUserId=','iPlanet') )
         cookieDB.append( ('RMID=','RealMedia OpenADStream') )
-        cookieDB.append( ('JSESSIONID=','Jakarta Tomcat / Apache') )
-        cookieDB.append( ('JServSessionIdroot=','Apache JServ') )
+        cookieDB.append( ('cftoken=','Coldfusion') )
+        cookieDB.append( ('PORTAL-PSJSESSIONID=','PeopleSoft') )
         cookieDB.append( ('WEBTRENDS_ID=','WebTrends') )
         cookieDB.append( ('sesessionid=','IBM WebSphere') )
         cookieDB.append( ('CGISESSID=','Perl CGI::Session') )

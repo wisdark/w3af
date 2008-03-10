@@ -65,6 +65,7 @@ class oracleDiscovery(baseDiscoveryPlugin):
                     dirs.extend( self._createFuzzableRequests( response ) )
                     if re.match( regexString , response.getBody(), re.DOTALL):
                         i = info.info()
+                        i.setName('Oracle application')
                         i.setURL( response.getURL() )
                         i.setDesc( self._parseFunction( url, response ) )
                         i.setId( response.id )
@@ -145,7 +146,7 @@ class oracleDiscovery(baseDiscoveryPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return ['discovery.error404page', 'grep.pathDisclosure']
+        return ['grep.pathDisclosure']
         
     def getLongDesc( self ):
         '''

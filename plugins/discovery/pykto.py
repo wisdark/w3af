@@ -373,6 +373,9 @@ class pykto(baseDiscoveryPlugin):
         except Exception,e:
             om.out.error( 'Error when requesting: '+ url )
             om.out.error('Error: ' + str(e) )
+            print url
+            import traceback
+            om.out.debug( str(traceback.format_exc()) )
             return False
         
         if self._analyzeResult( response, expectedResponse, parameters, url ):
@@ -381,7 +384,10 @@ class pykto(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setURI( response.getURI() )
             v.setMethod( method )
-            v.setDesc( 'pykto plugin found a vulnerability at URL: ' + v.getURL() + ' . Vulnerability description: ' + desc.strip() )
+            vulnDesc = 'pykto plugin found a vulnerability at URL: ' + v.getURL() + ' . Vulnerability description: ' + desc.strip()
+            if not vulnDesc.endswith('.'):
+                vulnDesc += '.'
+            v.setDesc( vulnDesc )
             v.setId( response.id )
             v.setName( 'Insecure file' )
             v.setSeverity(severity.LOW)
@@ -526,7 +532,7 @@ class pykto(baseDiscoveryPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return ['discovery.serverHeader','discovery.error404page']
+        return ['discovery.serverHeader']
     
     def getLongDesc( self ):
         '''

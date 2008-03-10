@@ -10,7 +10,7 @@ back
 output config console
 set verbosity 0
 back
-discovery backdoor
+discovery findBackdoor
 discovery
 
 back
@@ -19,6 +19,6 @@ set target http://localhost/w3af/backdoors/f00.html
 back
 start
 
-assert len(kb.kb.getData('backdoor','backdoors')) == 1
+assert len(kb.kb.getData('findBackdoor','backdoors')) == 1
 
 exit

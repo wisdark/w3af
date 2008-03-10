@@ -25,6 +25,7 @@ from shlex import *
 import os.path
 import traceback
 from core.ui.consoleUi.rootMenu import *
+from core.ui.consoleUi.callbackMenu import *
 from core.ui.consoleUi.util import *
 import core.ui.consoleUi.posixterm as term
 from core.ui.consoleUi.history import *
@@ -44,14 +45,15 @@ class consoleUi:
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
 
-    def __init__(self, scriptFile=None, commands=[]):
+    def __init__(self, scriptFile=None, commands=[], parent=None):
         self._scriptFile = scriptFile
         self._commands = commands 
         self._term = term.terminal()
         self._line = [] # the line which is being typed
         self._position = 0 # cursor position
-        self._w3af = core.controllers.w3afCore.w3afCore()
-        self._context = rootMenu('', self, self._w3af ) # initial menu
+        self._history = historyTable() # each menu has array of (array, positionInArray)
+        self._trace = []
+
         self._handlers = { '\t' : self._onTab, \
             '\r' : self._onEnter, \
             term.KEY_BACKSPACE : self._onBackspace, \
@@ -65,21 +67,35 @@ class consoleUi:
             '^H' : self._onBackspace,
             '^A' : self._toLineStart,
             '^E' : self._toLineEnd } 
-        self._history = historyTable() # each menu has array of (array, positionInArray)
-        self._trace = []
 
-    
+        if parent:
+            self.__initFromParent(parent)
+        else:
+            self.__initRoot()
+
+
+    def __initRoot(self):
+        self._w3af = core.controllers.w3afCore.w3afCore()
+       
+    def __initFromParent(self, parent):
+        self._context = parent._context
+        self._w3af = parent._w3af
+        
     def sh(self, name='w3af', callback=None):
         '''
         Main cycle
         '''
 
+        om.out.console("WARNING: This branch is under development and unstable. \n \
+Please see http://w3af.sourceforge.net for the stable version info.")
         if callback:
-            self._callback = callback
-            root = menu(name, self, self._w3af)
+            if hasattr(self, '_context'):
+                ctx = self._context
+            else:
+                ctx = None
+            self._context = callbackMenu(name, self, self._w3af, ctx, callback)
         else:
-            root = rootMenu(name, self, self._w3af)
-            self._callback = self._executeLine
+            self._context = rootMenu(name, self, self._w3af)
             
         self._lastWasArrow = False
         self._showPrompt()
@@ -96,8 +112,8 @@ class consoleUi:
                 om.out.console(str(e))
 
         term.setRawInputMode(False)
-        om.out.console(self._randomMessage())
-
+        if not hasattr(self, '_parent'):
+            om.out.console(self._randomMessage())
 
 
     def _executePending(self):
@@ -133,6 +149,8 @@ class consoleUi:
         self._line = []
 #        self._showPrompt()
 
+    def inRawLineMode( self ):
+        return hasattr(self._context, 'isRaw') and self._context.isRaw()
 
     def exit(self):
         self._active = False
@@ -172,23 +190,20 @@ class consoleUi:
             self._showTail()            
 
     def _execute(self):
-        l = self._getLineStr()
-        self._callback(l)
-
-    def _executeLine(self, line=None):
         # term.writeln()
 
-        tokens = self._parseLine(line)
+        line = self._getLineStr()
         term.setRawInputMode(False)
         om.out.console('')
-        if len(tokens) > 0:
+        if len(line) and not line.isspace():
 
             self._getHistory().remember(self._line)
     
             try:               
                 # New menu is the result of any command.
                 # If None, the menu is not changed.
-                menu = self._context.execute(tokens)
+                params = self.inRawLineMode() and line or self._parseLine(line)
+                menu = self._context.execute(params)
             except w3afException, e:
                 menu = None
                 om.out.console( e.value )
@@ -216,7 +231,7 @@ class consoleUi:
 
 
     def _onEnter(self):
-        self._executeLine()
+        self._execute()
         self._initPrompt()
         self._showPrompt()
 
@@ -249,6 +264,11 @@ class consoleUi:
         '''
             Autocompletion logic is called here
         '''
+
+        # TODO: autocomplete for raw menu
+        if self.inRawLineMode():
+            return
+
         line = self._getLineStr()[:self._position] # take the line before the cursor
         tokens = self._parseLine(line)
         if not line.endswith(' ') and len(tokens)>0:
@@ -259,6 +279,8 @@ class consoleUi:
             incomplete = ''
 
         completions = self._context.suggest(tokens, incomplete)
+        if completions is None:
+            return
         prefix = commonPrefix(completions)
         if prefix != '':
             self._paste(prefix)
@@ -345,7 +367,7 @@ class consoleUi:
 
 
     def _showPrompt(self):
-        term.write('w3af' + self._context.getPath() + ">>>")
+        term.write(self._context.getPath() + ">>>")
         
     def _showLine(self):
         strLine = self._getLineStr()

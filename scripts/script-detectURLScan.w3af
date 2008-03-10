@@ -1,8 +1,5 @@
-# saving a session demo
+# This scripts detects an URLScan installation
 
-session
-save test
-back
 plugins
 output console,textFile
 output
@@ -13,12 +10,14 @@ back
 output config console
 set verbosity 0
 back
-discovery digitSum,error404page, webSpider
+discovery detectURLScan
 discovery
-grep all
-grep
 back
 target
-set target http://localhost/w3af/, http://localhost/w3af/digitSum/index-3-1.html
+set target http://www.microsoft.com/
 back
 start
+
+assert len(kb.kb.getData('detectURLScan','detectURLScan')) == 0
+
+exit

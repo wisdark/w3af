@@ -138,12 +138,12 @@ class pluginsTypeMenu(menu):
             if command in self.getCommands():
                 return menu.execute(self, tokens)
             else:
-                self.enablePlugins(','.join(tokens).split(','))
+                self._enablePlugins(','.join(tokens).split(','))
         else:
             return self
 
-    def enablePlugins(self, list):
-        enabled = copy.copy(self._w3af.getPlugins(self._name))
+    def _enablePlugins(self, list):
+        enabled = copy.copy(self._w3af.getEnabledPlugins(self._name))
         
         for plugin in list:
             if plugin.startswith('!'):
@@ -182,7 +182,7 @@ class pluginsTypeMenu(menu):
         filter = len(params)>0 and params[0] or 'all'
 
         all = self._plugins.keys()
-        enabled = self._w3af.getPlugins(self._name)
+        enabled = self._w3af.getEnabledPlugins(self._name)
 
         if filter == 'all':
             list = all
@@ -233,7 +233,7 @@ class pluginsTypeMenu(menu):
         if self._configs.has_key(name):
             config = self._configs[name]
         else:
-            config = configMenu(name, self._console, self._w3af, self, self._w3af.getPluginInstance(params[0], self._name), True)
+            config = configMenu(name, self._console, self._w3af, self, self._w3af.getPluginInstance(params[0], self._name))
             self._configs[name] = config
 
         return config

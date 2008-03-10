@@ -26,6 +26,7 @@ import core.data.kb.knowledgeBase as kb
 import core.data.kb.config as cf
 import sys, os
 import cgi 
+import codecs
 
 TITLE = 'w3af  -  Web Attack and Audit Framework - Vulnerability Report'
 
@@ -52,15 +53,16 @@ class htmlFile(baseOutputPlugin):
     def _init( self ):
         self._initialized = True
         try:
-            self._file = open( self._filename, "w" )
-        except:
-            raise w3afException('Cant open Report file ' + self._filename + ' for output.')
+            self._file = codecs.open( self._filename, "w", "utf-8", 'replace' )            
+        except Exception, e:
+            raise w3afException('Cant open report file ' + self._httpFilename + ' for output. Exception: ' + str(e) )
             self._error = True
         
         try:
-            self._http = open( self._httpFilename, "w" )
-        except:
-            raise w3afException('Cant open file ' + self._httpFilename + ' for output.')
+            # Images aren't ascii, so this file that logs every request/response, will be binary
+            self._http = file( self._httpFilename, "wb" )
+        except Exception, e:
+            raise w3afException('Cant open file ' + self._httpFilename + ' for output. Exception: ' + str(e) )
             self._error = True      
         try:
             self._style = open( self._styleFilename, "r" )
@@ -79,14 +81,14 @@ class htmlFile(baseOutputPlugin):
         try:
             self._file.write( msg )
         except Exception, e:
-            print 'An exception was raised while trying to write to the output file.'
+            print 'An exception was raised while trying to write to the output file:', e
             sys.exit(1)
         
     def _writeToHTTPLog( self, msg ):
         try:
             self._http.write( msg )
         except Exception, e:
-            print 'An exception was raised while trying to write to the output file.'
+            print 'An exception was raised while trying to write to the output file:', e
             sys.exit(1)
 
     def debug(self, message, newLine = True ):
@@ -98,7 +100,7 @@ class htmlFile(baseOutputPlugin):
             self._init()
             
         if self._reportDebug:
-            toPrint = str ( message )
+            toPrint = unicode ( message )
             self._aditionalInfo+= '<tr>\n<td class=content>debug: ' + cgi.escape ( toPrint ) + ' \n</td></tr>\n'
             self._flush()
 
@@ -119,7 +121,7 @@ class htmlFile(baseOutputPlugin):
         if not self._initialized:
             self._init()
         
-        toPrint = str ( message )
+        toPrint = unicode ( message )
         self._aditionalInfo+= '<tr>\n<td class=content>error: ' + cgi.escape ( toPrint ) + ' \n</td></tr>\n'
         self._flush()
 
@@ -136,7 +138,7 @@ class htmlFile(baseOutputPlugin):
         '''
         if not self._initialized:
             self._init()
-        toPrint = str ( message )
+        toPrint = unicode ( message )
         self._aditionalInfo+= '<tr>\n<td class=content>console: ' + cgi.escape ( toPrint ) + ' \n</td></tr>\n'
         self._flush()
         

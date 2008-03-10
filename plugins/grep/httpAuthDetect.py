@@ -49,6 +49,10 @@ class httpAuthDetect(baseGrepPlugin):
                     wwwAuth = response.getHeaders()[ key ]
             
             i = info.info()
+            if 'ntlm' in wwwAuth.lower():
+                i.setName('NTLM authentication')
+            else:
+                i.setName('HTTP Basic authentication')
             i.setURL( response.getURL() )
             i.setId( response.id )
             i.setDesc( 'The resource: '+ response.getURL() + ' requires authentication.' +
@@ -56,36 +60,37 @@ class httpAuthDetect(baseGrepPlugin):
             i['message'] = wwwAuth
             
             kb.kb.append( self , 'auth' , i )
-            om.out.vulnerability( i.getDesc() )
+            om.out.information( i.getDesc() )
             
-        elif re.match( '.*://(.*?):(.*?)@.*' , response.getURL() ):
-            # An authentication URI was found!
-            
-            v = vuln.vuln()
-            v.setURL( response.getURL() )
-            v.setId( response.id )
-            v.setDesc( 'The resource: '+ response.getURL() + ' has a user and password in the URI .')
-            v.setSeverity(severity.HIGH)
-            v.setName( 'Basic HTTP credentials' )
-            
-            kb.kb.append( self , 'userPassUri' , v )
-            om.out.vulnerability( v.getDesc() )
-            
-        # I also search for authentication URI's in the body
-        # I know that by doing this I loose the chance of finding hashes in PDF files, but...
-        # This is much faster
-        if isTextOrHtml( response.getHeaders() ):
-            for authURI in re.findall( '\w{2,10}://(.*?):(.*?)@' , response.getBody() ):
+        else:
+            if re.match( '.*://(.*?):(.*?)@.*?/' , response.getURI() ):
+                # An authentication URI was found!
+                
                 v = vuln.vuln()
                 v.setURL( response.getURL() )
                 v.setId( response.id )
-                v.setDesc( 'The resource: '+ response.getURL() + ' has a user and password in the body .')
-                
+                v.setDesc( 'The resource: '+ response.getURI() + ' has a user and password in the URI .')
                 v.setSeverity(severity.HIGH)
                 v.setName( 'Basic HTTP credentials' )
                 
                 kb.kb.append( self , 'userPassUri' , v )
                 om.out.vulnerability( v.getDesc() )
+                
+            # I also search for authentication URI's in the body
+            # I know that by doing this I loose the chance of finding hashes in PDF files, but...
+            # This is much faster
+            if isTextOrHtml( response.getHeaders() ):
+                for authURI in re.findall( '\w{2,10}://(.*?):(.*?)@' , response.getBody() ):
+                    v = vuln.vuln()
+                    v.setURL( response.getURL() )
+                    v.setId( response.id )
+                    v.setDesc( 'The resource: '+ response.getURL() + ' has a user and password in the body. The offending code is: "' + authURI + '".')
+                    
+                    v.setSeverity(severity.HIGH)
+                    v.setName( 'Basic HTTP credentials' )
+                    
+                    kb.kb.append( self , 'userPassUri' , v )
+                    om.out.vulnerability( v.getDesc() )
             
     def setOptions( self, OptionList ):
         pass

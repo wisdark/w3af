@@ -85,6 +85,7 @@ class crossDomain(baseDiscoveryPlugin):
                         om.out.vulnerability( v.getDesc() )
                     else:
                         i = info.info()
+                        i.setName('Crossdomain allow ACL')
                         i.setURL( response.getURL() )
                         i.setMethod( 'GET' )
                         i.setDesc( 'Crossdomain.xml file allows access from domain: ' + url )
@@ -123,7 +124,7 @@ class crossDomain(baseDiscoveryPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return ['discovery.error404page']
+        return []
         
     def getLongDesc( self ):
         '''

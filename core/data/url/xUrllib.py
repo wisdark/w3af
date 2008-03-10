@@ -41,6 +41,7 @@ import urllib
 
 import time
 import os
+import user
 
 # for better debugging of handlers
 import traceback
@@ -75,18 +76,16 @@ class xUrllib:
         self._grepPlugins = []
         self._evasionPlugins = []
         
-        self._checkLocalCache()
-        
-    def _checkLocalCache( self ):
+    def end( self ):
         '''
-        Clearing cache used by localCache
+        This method is called when the xUrllib is not going to be used anymore.
         '''
         try:
-            for dir in os.listdir('.urllib2cache'):
-                fileList = os.listdir('.urllib2cache' + os.path.sep + dir )
-                for file in fileList:
-                    os.unlink( '.urllib2cache' + os.path.sep + dir + os.path.sep +file )
-                os.rmdir( '.urllib2cache' + os.path.sep + dir )
+            cacheLocation = user.home + os.path.sep + '.w3af' + os.path.sep + 'urllib2cache' + os.path.sep + str(os.getpid())
+            if os.path.exists(cacheLocation):
+                for f in os.listdir(cacheLocation):
+                    os.unlink( cacheLocation + os.path.sep + f)
+                os.rmdir(cacheLocation)
         except Exception, e:
             om.out.debug('Error while cleaning urllib2 cache, exception: ' + str(e) )
         else:
@@ -277,7 +276,7 @@ class xUrllib:
                 if self._xurllib._isBlacklisted( uri ):
                     return httpResponse( NO_CONTENT, '', {}, uri, uri )
             
-                if 'data' in keywords:
+                if 'data' in keywords and keywords['data'] != None:
                     req = self.methodRequest( uri, keywords['data'] )
                     keywords.pop('data')
                 else:
@@ -359,15 +358,20 @@ class xUrllib:
             # also possible when a proxy is configured and not available
             # also possible when auth credentials are wrong for the URI
             if hasattr(e, 'reason'):
-                if e.reason[0] == -2:
-                    raise w3afException('Failed to resolve domain name for URL: ' + req.get_full_url() )
-                if e.reason[0] == 111:
-                    raise w3afException('Connection refused while requesting: ' + req.get_full_url() )
+                try:
+                    e.reason[0]
+                except:
+                    raise w3afException('Unexpected error in urllib2 / httplib: ' + repr(e.reason) )                    
                 else:
-                    om.out.debug( 'w3af failed to reach the server while requesting: "'+originalUrl+'".\nReason: "' + str(e.reason) + '" , Exception: "'+ str(e)+'"; going to retry.')
-                    #om.out.debug( 'Traceback for this error: ' + str( traceback.format_exc() ) )
-                    req._Request__original = originalUrl
-                    return self._retry( req, useCache )
+                    if e.reason[0] == -2:
+                        raise w3afException('Failed to resolve domain name for URL: ' + req.get_full_url() )
+                    if e.reason[0] == 111:
+                        raise w3afException('Connection refused while requesting: ' + req.get_full_url() )
+                    else:
+                        om.out.debug( 'w3af failed to reach the server while requesting: "'+originalUrl+'".\nReason: "' + str(e.reason) + '" , Exception: "'+ str(e)+'"; going to retry.')
+                        #om.out.debug( 'Traceback for this error: ' + str( traceback.format_exc() ) )
+                        req._Request__original = originalUrl
+                        return self._retry( req, useCache )
             elif hasattr(e, 'code'):
                 om.out.debug( req.get_method() + ' ' + originalUrl +' returned HTTP code "' + str(e.code) + '"' )
                 # Return this info to the caller
@@ -441,7 +445,12 @@ class xUrllib:
         self._grepPlugins = grepPlugins
     
     def setEvasionPlugins( self, evasionPlugins ):
-        evasionPlugins.sort()
+        # I'm sorting evasion plugins based on priority
+        def sortFunc(x, y):
+            return cmp(x.getPriority(), y.getPriority())
+        evasionPlugins.sort(sortFunc)
+
+        # Save the info
         self._evasionPlugins = evasionPlugins
         
     def _evasion( self, request ):
@@ -461,7 +470,7 @@ class xUrllib:
     def _grepResult(self, request, response):
         # The grep process is all done in another thread. This improved the
         # speed of all w3af.
-        if len( self._grepPlugins ):
+        if len( self._grepPlugins ) and urlParser.getDomain( request.get_full_url() ) in cf.cf.getData('targetDomains'):
             # I'll create a fuzzable request based on the urllib2 request object
             fuzzReq = createFuzzableRequestRaw( request.get_method(), request.get_full_url(), request.get_data(), request.headers )
             targs = (fuzzReq, response)

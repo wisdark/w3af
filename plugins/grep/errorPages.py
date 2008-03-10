@@ -90,6 +90,7 @@ class errorPages(baseGrepPlugin):
                 if response.getBody().count( msg ) and response.getURL():
                     
                     i = info.info()
+                    i.setName('Descriptive error page')
                     i.setURL( response.getURL() )
                     i.setId( response.id )
                     i.setSeverity(severity.LOW)
@@ -108,9 +109,10 @@ class errorPages(baseGrepPlugin):
                         if resStr not in self._alreadyReportedVersions:
                             # Save the info obj
                             i = info.info()
+                            i.setName('Error page with information disclosure')
                             i.setURL( response.getURL() )
                             i.setId( response.id )
-                            i.setName( 'Error page' )
+                            i.setName( 'Error page with information disclosure' )
                             i.setDesc( 'An error page sent this ' + server +' version: ' + resStr  )
                             kb.kb.append( self , 'server' , i )
                             # Save the string

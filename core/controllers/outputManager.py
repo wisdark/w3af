@@ -77,6 +77,10 @@ class outputManager:
         @parameter message: Message that is sent.
         '''
         if self._echo:
+            try:
+                message = unicode( message, errors='replace')
+            except:
+                pass
             for oPlugin in self._outputPluginList:
                 oPlugin.debug( message, newLine )
     
@@ -87,6 +91,10 @@ class outputManager:
         @parameter message: Message that is sent.
         '''
         if self._echo:
+            try:
+                message = unicode( message, errors='replace')
+            except:
+                pass
             for oPlugin in self._outputPluginList:
                 oPlugin.information( message, newLine )
             
@@ -97,6 +105,10 @@ class outputManager:
         @parameter message: Message that is sent.
         '''
         if self._echo:
+            try:
+                message = unicode( message, errors='replace')
+            except:
+                pass
             for oPlugin in self._outputPluginList:
                 oPlugin.error( message, newLine )
 
@@ -117,6 +129,10 @@ class outputManager:
         @parameter message: Message that is sent.
         '''
         if self._echo:
+            try:
+                message = unicode( message, errors='replace')
+            except:
+                pass
             for oPlugin in self._outputPluginList:
                 oPlugin.vulnerability( message, newLine )
 
@@ -125,6 +141,10 @@ class outputManager:
         This method is used by the w3af console to print messages to the outside.
         '''
         if self._echo:
+            try:
+                message = unicode( message, errors='replace')
+            except:
+                pass
             for oPlugin in self._outputPluginList:
                 oPlugin.console( message, newLine )
     

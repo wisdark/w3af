@@ -25,7 +25,6 @@ from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
 import core.data.url.httpResponse as httpResponse
 
 import cStringIO
-import signal
 
 from core.data.request.frFactory import createFuzzableRequestRaw
 
@@ -35,24 +34,6 @@ from core.data.getResponseType import *
 from core.controllers.daemons.proxy import *
 from core.controllers.w3afException import *
 import core.data.constants.w3afPorts as w3afPorts
-
-class sigCallback:
-    '''
-    The class object, when created, replaces current signal handler by itself.
-    When the signal appears, the callback function is called and the handler is restored back.
-    @author: Alexander Berezhnoy < alexander.berezhnoy |at| gmail.com >
-    '''
-    def __init__(self, fun, sigCode):
-        self._fun = fun
-        self._code = sigCode
-        self._sigHandler = signal.getsignal(sigCode)
-        signal.signal(sigCode, self)
-
-    def __call__(self, *ignore):
-        self._fun.__call__()
-        signal.signal(self._code, self._sigHandler)
-
-
 
 class spiderMan(baseDiscoveryPlugin):
     '''
@@ -77,7 +58,6 @@ class spiderMan(baseDiscoveryPlugin):
 
     def extFuzzableRequests(self, response):                 
         self._fuzzableRequests.extend(self._createFuzzableRequests(response))
-
 
     def stopProxy(self):
         self._proxy.stop()
@@ -108,18 +88,12 @@ class spiderMan(baseDiscoveryPlugin):
             # Inform the user
             om.out.information('spiderMan proxy is running on ' + self._listenAddress + ':' + str(self._listenPort) + ' .' )
             om.out.information('Please configure your browser to use these proxy settings and navigate the target site.')
-            om.out.information('To exit spiderMan plugin please navigate to http://w3af/spiderMan?terminate or press ctrl+c .')
+            om.out.information('To exit spiderMan plugin please navigate to http://w3af/spiderMan?terminate.')
             
-            # Set the signal handler
-            sigCallback(self._proxy.stop, signal.SIGINT)
-
             # Run the server
             self._proxy.run()
             
-        
         return self._fuzzableRequests
-
-    
 
     def getOptionsXML(self):
         '''
@@ -192,12 +166,17 @@ class spiderMan(baseDiscoveryPlugin):
 class proxyHandler(w3afProxyHandler):
 
     def __init__(self, request, client_address, server, spiderMan):
+        self._firstRequest = True
         self._version = 'spiderMan-w3af/1.0'
         self._spiderMan = spiderMan
         self._urlOpener = spiderMan._urlOpener
         w3afProxyHandler.__init__(self, request, client_address, server)
     
     def doAll(self):
+        if self._firstRequest:
+            self._firstRequest = False
+            om.out.information('The user is navigating through the spiderMan proxy.')
+            
         if self.path == 'http://w3af/spiderMan?terminate':
             self._sendEnd()
             self._spiderMan.stopProxy()

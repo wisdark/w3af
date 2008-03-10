@@ -40,9 +40,9 @@ import smtpd, os, time, asyncore
 import smtplib
 import time
 
-class mailer(baseDiscoveryPlugin, smtpd.SMTPServer):
+class _mailer(baseDiscoveryPlugin, smtpd.SMTPServer):
     '''
-    Start a smtpd, sends forms that have an email field in it, and waits to see if a mail arrives.
+    Start a smtpd, sends forms that have an email field in it, and waits to see if a mail arrives. **PLUGIN UNDER DEVELOPMENT**
     
     @author: Andres Riancho ( andres.riancho@gmail.com )  
     '''
@@ -176,6 +176,7 @@ class mailer(baseDiscoveryPlugin, smtpd.SMTPServer):
         
         # Save the source email address to the kb
         i = info.info()
+        i.setName('Mailing address')
         i.setDesc( 'The email address: ' + mailfrom + ' is used by the application to send emails.' )
         i['mail'] = mailfrom
         i['user'] = mailfrom.split('@')[0]
@@ -279,13 +280,15 @@ class mailer(baseDiscoveryPlugin, smtpd.SMTPServer):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return [ 'discovery.error404page' ]
+        return [ ]
             
     def getLongDesc( self ):
         '''
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
+        **PLUGIN UNDER DEVELOPMENT**
+
         This plugin tries to find new URLs by filling up forms that have an email input, receiving the email,
         and then analyzing the email. This plugin also tries to identify the private IP address of the remote
         web server using SMTP header analysis.

@@ -62,10 +62,7 @@ class urlOpenerSettings( configurable ):
         self._httpsHandler = None
         self._mangleHandler = None
         self._cookieHandler = None
-        
-        #self._keepAliveHandler = None
-        self._kAHTTP = kAHTTP()
-        self._kAHTTPS = kAHTTPS()
+        # Keep alive handlers are created on buildOpeners()
         
         # Openers
         self._nonCacheOpener = None
@@ -95,7 +92,9 @@ class urlOpenerSettings( configurable ):
         self._maxFileSize = 400000
         self._maxRetrys = 2
         
+        # Some internal variables
         self.needUpdate = True
+        self._proxy = None
         
         # By default, dont mangle any request/responses
         self._manglePlugins = []
@@ -213,7 +212,11 @@ class urlOpenerSettings( configurable ):
         self._proxyPort = port
         self._proxyAddress = ip
         
-        proxyMap = { 'http' : "http://" + ip + ":" + str(port) , 'https' : "https://" + ip + ":" + str(port) }
+        # Remember that this line:
+        #proxyMap = { 'http' : "http://" + ip + ":" + str(port) , 'https' : "https://" + ip + ":" + str(port) }
+        # makes no sense, because urllib2.ProxyHandler doesn't support HTTPS proxies with CONNECT.
+        # The proxying with CONNECT is implemented in keep-alive handler. (nasty!)
+        proxyMap = { 'http' : "http://" + ip + ":" + str(port) }
         self._proxyHandler = self._ulib.ProxyHandler( proxyMap )
         self._proxy = ip + ":" + str(port) 
 
@@ -251,6 +254,10 @@ class urlOpenerSettings( configurable ):
         if self._cookieHandler == None and not self._ignoreSessCookies:
             cj = self._cookielib.MozillaCookieJar()
             self._cookieHandler = self._ulib.HTTPCookieProcessor(cj)
+        
+        # Instanciate the handlers passing the proxy as parameter
+        self._kAHTTP = kAHTTP()
+        self._kAHTTPS = kAHTTPS(self._proxy)
         
         # Prepare the list of handlers
         handlers = []
@@ -350,11 +357,13 @@ class urlOpenerSettings( configurable ):
                 <desc>Set the basic authentication username for HTTP requests</desc>\
                 <tabID>Basic Authentication</tabID>\
                 <type>string</type>\
-            </Option>\
+                <tabid>Authentication</tabid>\
+                </Option>\
             <Option name="basicAuthPass">\
                 <default>'+str(self._basicAuthPass)+'</default>\
                 <desc>Set the basic authentication password for HTTP requests</desc>\
                 <tabID>Basic Authentication</tabID>\
+                <tabid>Authentication</tabid>\
                 <type>string</type>\
             </Option>\
             <Option name="basicAuthDomain">\
@@ -362,32 +371,35 @@ class urlOpenerSettings( configurable ):
                 <desc>Set the basic authentication domain for HTTP requests</desc>\
                 <help>This configures on which request to send the authentication settings configured in basicAuthPass and basicAuthUser.</help>\
                 <tabID>Basic Authentication</tabID>\
+                <tabid>Authentication</tabid>\
                 <type>string</type>\
             </Option>\
             <Option name="cookieJarFile">\
                 <default>'+str(self._cookieJarFile)+'</default>\
                 <desc>Set the cookiejar filename.</desc>\
                 <help>The cookiejar file must be in mozilla format</help>\
+                <tabid>Cookies</tabid>\
                 <type>string</type>\
             </Option>\
             <Option name="ignoreSessCookies">\
                 <default>'+str(self._ignoreSessCookies)+'</default>\
                 <desc>Ignore session cookies</desc>\
                 <help>If set to True, w3af will ignore all session cookies sent by the web application.</help>\
+                <tabid>Cookies</tabid>\
                 <type>boolean</type>\
             </Option>\
             <Option name="proxyPort">\
                 <default>'+str(self._proxyPort)+'</default>\
                 <desc>Proxy TCP port</desc>\
                 <help>TCP port for the remote proxy server to use.</help>\
-                <tabID>Proxy</tabID>\
+                <tabid>Proxy</tabid>\
                 <type>integer</type>\
             </Option>\
             <Option name="proxyAddress">\
                 <default>'+str(self._proxyAddress)+'</default>\
                 <desc>Proxy IP address</desc>\
                 <help>IP address for the remote proxy server to use.</help>\
-                <tabID>Proxy</tabID>\
+                <tabid>Proxy</tabid>\
                 <type>string</type>\
             </Option>\
             <Option name="userAgent">\

@@ -24,6 +24,7 @@ import core.controllers.outputManager as om
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
+from core.controllers.misc.groupbyMinKey import groupbyMinKey
 
 class strangeHeaders(baseGrepPlugin):
     '''
@@ -41,6 +42,7 @@ class strangeHeaders(baseGrepPlugin):
         for headerName in response.getHeaders().keys():
             if headerName.upper() not in self._commonHeaders:
                 i = info.info()
+                i.setName('Strange header')
                 i.setURL( response.getURL() )
                 i.setId( response.id )
                 i.setDesc( 'The URL : ' +  i.getURL() + ' sent the Header: "' + headerName + '" with value: "' + response.getHeaders()[headerName] + '"' )
@@ -67,8 +69,32 @@ class strangeHeaders(baseGrepPlugin):
         '''
         This method is called when the plugin wont be used anymore.
         '''
-        self.printUniq( kb.kb.getData( 'strangeHeaders', 'headers' ), None )
-
+        headers = kb.kb.getData( 'strangeHeaders', 'strangeHeaders' )
+        # This is how I saved the data:
+        #i['headerName'] = headerName
+        #i['headerValue'] = response.getHeaders()[headerName]
+        
+        # Group correctly
+        tmp = []
+        for i in headers:
+            tmp.append( (i['headerName'], i.getURL() ) )
+        
+        # And don't print duplicates
+        tmp = list(set(tmp))
+        
+        resDict, itemIndex = groupbyMinKey( tmp )
+        if itemIndex == 0:
+            # Grouped by headerName
+            msg = 'The header: "%s" was sent by these URLs:'
+        else:
+            # Grouped by URL
+            msg = 'The URL: "%s" sent these strange headers:'
+            
+        for k in resDict:
+            om.out.information(msg % k)
+            for i in resDict[k]:
+                om.out.information('- ' + i )
+        
     def _getCommonHeaders(self):
         headers = []
         ### TODO: verify if I need to add more values here
@@ -95,6 +121,8 @@ class strangeHeaders(baseGrepPlugin):
         headers.append("CONTENT-LANGUAGE")
         headers.append("VARY")
         headers.append("LOCATION")
+        headers.append("PUBLIC")
+        headers.append("AGE")
         return headers
 
     def getPluginDeps( self ):

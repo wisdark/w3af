@@ -47,7 +47,13 @@ class miscSettings(configurable):
             cf.cf.save('demo', False )
             cf.cf.save('showProgressBar', True )
             cf.cf.save('nonTargets', [] )
-        
+            
+            cf.cf.save('404exceptions', []  )
+            cf.cf.save('always404', [] )
+            cf.cf.save('autodetect404', True )
+            cf.cf.save('byDirectory404', False )
+            cf.cf.save('byDirectoryAndExtension404', False)
+            
     def getOptionsXML(self):
         '''
         This method returns a XML containing the Options that the plugin has.
@@ -147,6 +153,38 @@ class miscSettings(configurable):
                 <type>list</type>\
                 <tabid>Misc settings</tabid>\
             </Option>\
+            <Option name="404exceptions">\
+                <default>'+','.join(cf.cf.getData('404exceptions'))+'</default>\
+                <desc>A comma separated list that determines what URLs will NEVER be detected as 404 pages.</desc>\
+                <type>list</type>\
+                <tabid>404 settings</tabid>\
+            </Option>\
+            <Option name="always404">\
+                <default>'+','.join(cf.cf.getData('always404'))+'</default>\
+                <desc>A comma separated list that determines what URLs will ALWAYS be detected as 404 pages.</desc>\
+                <type>list</type>\
+                <tabid>404 settings</tabid>\
+            </Option>\
+            <Option name="autodetect404">\
+                <default>'+str(cf.cf.getData('autodetect404'))+'</default>\
+                <desc>Perform 404 page autodetection.</desc>\
+                <type>boolean</type>\
+                <tabid>404 settings</tabid>\
+            </Option>\
+            <Option name="byDirectory404">\
+                <default>'+str(cf.cf.getData('byDirectory404'))+'</default>\
+                <desc>Perform 404 page detection based on the knowledge found in the directory of the file</desc>\
+                <type>boolean</type>\
+                <help>Only used when autoDetect404 is False.</help>\
+                <tabid>404 settings</tabid>\
+            </Option>\
+            <Option name="byDirectoryAndExtension404">\
+                <default>'+str(cf.cf.getData('byDirectoryAndExtension404'))+'</default>\
+                <desc>Perform 404 page detection based on the knowledge found in the directory of the file AND the file extension</desc>\
+                <help>Only used when autoDetect404 and byDirectory404 are False.</help>\
+                <type>boolean</type>\
+                <tabid>404 settings</tabid>\
+            </Option>\
         </OptionList>\
         '
     
@@ -176,6 +214,12 @@ class miscSettings(configurable):
         cf.cf.save('demo', OptionMap['demo']  )
         cf.cf.save('showProgressBar', OptionMap['showProgressBar']  )
         cf.cf.save('nonTargets', OptionMap['nonTarget'] )
+        # 404
+        cf.cf.save('404exceptions', OptionMap['404exceptions']  )
+        cf.cf.save('always404', OptionMap['always404'] )
+        cf.cf.save('autodetect404', OptionMap['autodetect404'] )
+        cf.cf.save('byDirectory404', OptionMap['byDirectory404'] )
+        cf.cf.save('byDirectoryAndExtension404', OptionMap['byDirectoryAndExtension404'] )
         
 # This is an undercover call to __init__ :) , so I can set all default parameters.
 miscSettings()

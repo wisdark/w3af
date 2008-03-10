@@ -46,6 +46,8 @@ class menu:
             return self.suggestCommands(part)
         return self.suggestParams(tokens[0], tokens[1:], part)
 
+    def isRaw(self=None):
+        return False
 
     def getPath(self):
         if self._parent is None:

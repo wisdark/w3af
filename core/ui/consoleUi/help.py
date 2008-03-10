@@ -28,8 +28,8 @@ class helpRepository:
                 itemName = str( itemElt.attrib['name'] )
                 itemName = subst(itemName)
 
-                short = itemElt.findtext('short')
-                full = itemElt.findtext('full')
+                short = itemElt.findtext('head')
+                full = itemElt.findtext('body')
                 
                 if not short:
                     short = itemElt.text

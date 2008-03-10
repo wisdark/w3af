@@ -45,10 +45,11 @@ class osCommanding(baseAuditPlugin):
         '''
         om.out.debug( 'osCommanding plugin is testing: ' + freq.getURL() )
         
+        # Prepare the strings to create the mutants
         cList = self._getCommandList()
         onlyCommands = [ v.getCommand() for v in cList ]
         mutants = createMutants( freq , onlyCommands )
-            
+        
         for mutant in mutants:
             if self._hasNoBug( 'osCommanding','osCommanding',mutant.getURL() , mutant.getVar() ):
                 # Only spawn a thread if the mutant has a modified variable
@@ -97,14 +98,19 @@ class osCommanding(baseAuditPlugin):
             
         commands = []
         for specialChar in ['','&&','|',';']:
-            commands.append( command( specialChar + ' ping -n 5 localhost','windows',specialChar))
-            commands.append( command( specialChar + ' ping -c 6 localhost','unix',specialChar))
-            
-        commands.append( command( '` ping -n 5 localhost`','windows',specialChar))
-        commands.append( command( '` ping -c 6 localhost`','unix',specialChar))
+            if cf.cf.getData('targetOS') in ['windows', 'unknown']:
+                commands.append( command( specialChar + ' ping -n 5 localhost','windows',specialChar))
+            if cf.cf.getData('targetOS') in ['unix', 'unknown']:                
+                commands.append( command( specialChar + ' ping -c 6 localhost','unix',specialChar))
+        
+        if cf.cf.getData('targetOS') in ['windows', 'unknown']:
+            commands.append( command( '` ping -n 5 localhost`','windows',specialChar))
+        if cf.cf.getData('targetOS') in ['unix', 'unknown']:            
+            commands.append( command( '` ping -c 6 localhost`','unix',specialChar))
             
         # FoxPro uses run to run os commands. I found one of this vulns !!
-        commands.append( command( 'run ping -n 5 localhost','windows',specialChar))
+        if cf.cf.getData('targetOS') in ['windows', 'unknown']:
+            commands.append( command( 'run ping -n 5 localhost','windows',specialChar))
         
         return commands
         

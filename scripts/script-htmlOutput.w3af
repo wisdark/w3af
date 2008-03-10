@@ -12,14 +12,14 @@ discovery config pykto
 set updateScandb True
 view
 back
-discovery pykto,serverHeader,error404page
+discovery pykto,serverHeader
 back
 target
 set target http://127.0.0.1/
 back
 start
 
-assert len(kb.kb.getData('pykto','vuln')) == 3
-assert len(kb.kb.getData('urls','urlList')) == 3
+assert len(kb.kb.getData('pykto','vuln')) == 4
+assert len(kb.kb.getData('urls','urlList')) == 4
 
 exit

@@ -37,9 +37,9 @@ try:
 except Exception, e:
     om.out.error('You won\'t be able to use the web20Spider without zc.testbrowser.real library installed. Exception: ' + str(e) )
     
-class web20Spider(baseDiscoveryPlugin):
+class _web20Spider(baseDiscoveryPlugin):
     '''
-    A web spider with javascript support (beta).
+    A web spider with javascript support **PLUGIN UNDER DEVELOPMENT**.
     
     @author: Andres Riancho ( andres.riancho@gmail.com )  
     '''
@@ -174,13 +174,15 @@ class web20Spider(baseDiscoveryPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return ['discovery.error404page' ]
+        return [ ]
             
     def getLongDesc( self ):
         '''
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
+        **PLUGIN UNDER DEVELOPMENT**
+
         This plugin is a web spider on anabolics, it will search through the DOM tree of the loaded
         HTML for tags that have an onClick, onChange or onMouseOver and it will call them. The javascript
         will be executed just as if you would have *really* clicked on the link using your favorite browser.

@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from core.ui.consoleUi.menu import *
 from core.ui.consoleUi.plugins import *
 from core.ui.consoleUi.profiles import *
+from core.ui.consoleUi.exploit import *
 import core.ui.consoleUi.posixterm as term
 import core.controllers.miscSettings as ms
 #from core.ui.consoleUi.session import *
@@ -42,9 +43,10 @@ class rootMenu(menu):
         mapDict(self.addChild, {
             'plugins': pluginsMenu,
             'target' : (configMenu, self._w3af.target),
-            'misc-settings' : (configMenu, ms.miscSettings(), True),
-            'http-settings' : (configMenu, self._w3af.uriOpener.settings, True),
-            'profiles' : profilesMenu           
+            'misc-settings' : (configMenu, ms.miscSettings()),
+            'http-settings' : (configMenu, self._w3af.uriOpener.settings),
+            'profiles' : profilesMenu,
+            'exploit' : exploit
        })
     
     def _cmd_start(self, params):

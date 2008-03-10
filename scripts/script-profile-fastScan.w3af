@@ -3,14 +3,13 @@
 profiles
 list
 
-use fastScan
+use fast_scan
 
 plugins
-output config textFile
-set verbosity 10
+audit
+discovery
+output
 back
-back
-
 
 target
 set target http://localhost/w3af/

@@ -25,6 +25,7 @@ from core.controllers.w3afException import w3afException
 from core.controllers.w3afException import w3afFileException
 import sys, os
 import time
+import codecs
 
 class textFile(baseOutputPlugin):
     '''
@@ -52,14 +53,15 @@ class textFile(baseOutputPlugin):
     def _init( self ):
         self._initialized = True
         try:
-            self._file = open( self._filename, "w" )
-        except:
-            raise w3afFileException('Cant open file ' + self._filename + ' for output.')
+            self._file = codecs.open( self._filename, "w", "utf-8", 'replace' )
+        except Exception, e:
+            raise w3afException('Cant open report file ' + self._httpFilename + ' for output. Exception: ' + str(e) )
             
         try:
-            self._http = open( self._httpFilename, "w" )
-        except:
-            raise w3afFileException('Cant open file ' + self._httpFilename + ' for output.')
+            # Images aren't ascii, so this file that logs every request/response, will be binary
+            self._http = file( self._httpFilename, "wb" )
+        except Exception, e:
+            raise w3afException('Cant open HTTP log file ' + self._httpFilename + ' for output. Exception: ' + str(e) )
         
     def __del__(self):
         if self._file != None:
@@ -67,16 +69,16 @@ class textFile(baseOutputPlugin):
     
     def _writeToFile( self, msg ):
         try:
-            self._file.write ( msg )
+            self._file.write( msg )
         except Exception, e:
-            print 'An exception was raised while trying to write to the output file.'
+            print 'An exception was raised while trying to write to the output file:', e
             sys.exit(1)
         
     def _writeToHTTPLog( self, msg ):
         try:
-            self._http.write ( msg )
+            self._http.write( msg )
         except Exception, e:
-            print 'An exception was raised while trying to write to the output file.'
+            print 'An exception was raised while trying to write to the HTTP log output file:', e
             sys.exit(1)
             
     def debug(self, message, newLine = True ):
@@ -88,7 +90,7 @@ class textFile(baseOutputPlugin):
             self._init()
             
         if self.verbosity > 5:
-            toPrint = str ( message )
+            toPrint = message
             
             now = time.localtime(time.time())
             theTime = time.strftime("%c", now)
@@ -114,7 +116,7 @@ class textFile(baseOutputPlugin):
         if not self._initialized:
             self._init()
             
-        toPrint = str ( message )
+        toPrint = message
     
         now = time.localtime(time.time())
         theTime = time.strftime("%c", now)
@@ -142,7 +144,7 @@ class textFile(baseOutputPlugin):
         if not self._initialized:
             self._init()
         
-        toPrint = str ( message )
+        toPrint = message
         if newLine == True:
             toPrint += '\n'
         
@@ -165,7 +167,7 @@ class textFile(baseOutputPlugin):
         if not self._initialized:
             self._init()
         
-        toPrint = str ( message )
+        toPrint = message
         if newLine == True:
             toPrint += '\n'
         now = time.localtime(time.time())
@@ -184,7 +186,7 @@ class textFile(baseOutputPlugin):
         '''
         if not self._initialized:
             self._init()
-        toPrint = str ( message )
+        toPrint = message
         if newLine == True:
             toPrint += '\n'
         now = time.localtime(time.time())
