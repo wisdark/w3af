@@ -44,11 +44,8 @@ class configMenu(menu):
             self._memory[k] = [v]
             self._plainOptions [k] = v
         self._groupOptionsByTabId()
-        self._help.addHelp({
-            'set' : 'Set an option',
-            'view' : 'List the available options'
-        }, 'commands')
-       
+        self._loadHelp('config')
+      
 
     def _cmd_view(self, params):
         #col1Len = max([len(o) for o in self._options.keys()]) + 4

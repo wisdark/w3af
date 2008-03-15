@@ -36,6 +36,9 @@ class profilesMenu(menu):
 
     def __init__(self, name, console, w3af, parent=None):
         menu.__init__(self, name, console, w3af, parent)
+        self._profiles = {}
+        for profile in w3af.getProfileList():
+            self._profiles[profile.getName()] = profile
         self._loadHelp('profiles')
 
 
@@ -45,35 +48,30 @@ class profilesMenu(menu):
             self._cmd_help(['use'])
         else:
             profile = params[0]
-            try:
-                self._w3af.useProfile(profile)
-            except w3afException, e:
-                om.out.error(str(e))
-                return None
-            else:
-                om.out.console('The plugins configured by the scan profile have been enabled, and their options configured.')
-                om.out.console('Please set the target URL(s) and start the scan.')
+            if profile not in self._profiles:
+                raise w3afException('Unknown profile: ' + profile)
+
+            self._w3af.useProfile(profile)
+            om.out.console('The plugins configured by the scan profile have been enabled, and their options configured.')
+            om.out.console('Please set the target URL(s) and start the scan.')
                     
 
     def _cmd_list(self, params):
         if len(params) != 0:
             om.out.console('No parameters expected')
         else:
-            try:
-                profileList = self._w3af.getProfileList()
-            except w3afException, w3:
-                om.out.error( str(w3) )
-            else:
-                for profileInstance in profileList:
-                    om.out.console( profileInstance.getName() , profileInstance.getDesc() )
+            table = [['Profile', 'Description'],[]]
+            for profileInstance in self._profiles:
+                table.append([profileInstance.getName() , profileInstance.getDesc()])
+
+            self._console.drawTable(table)
 
     def _para_use(self, params, part):
-        profiles = [str(p.getName()) for p in self._w3af.getProfileList()]
-        try:
-            result = suggest (profiles, part)
-        except Exception, e:
-            om.out.console(str(e))
-        return result
+        if len(params)==0:
+#        profiles = [str(p.getName()) for p in self._w3af.getProfileList()]
+            return suggest (profiles.keys(), part)
+
+        return []
 
             
        
