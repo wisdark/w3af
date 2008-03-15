@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from core.ui.consoleUi.menu import *
 from core.controllers.misc.parseOptions import parseXML
 from core.controllers.basePlugin.basePlugin import basePlugin
+from core.controllers.w3afException import w3afException
         
 class configMenu(menu):
     '''
@@ -79,13 +80,13 @@ class configMenu(menu):
                 
 
     def _cmd_set(self, params):
-        if len(params) != 2:
-            self._console.writeln('Error')
+        if len(params) < 2:
+            self._cmd_help(['set'])
         elif not self._options.has_key(params[0]):
-            self._console.writeln('Unknown option: ' + params[0])
+            raise w3afException('Unknown option: ' + params[0])
         else:
             name = params[0]
-            value = params[1]
+            value = ''.join(params[1:])
             self._options[name]['default'] = value
             self._plainOptions[name] = value
             mem = self._memory[name]

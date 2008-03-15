@@ -176,6 +176,12 @@ class pluginsTypeMenu(menu):
         om.out.console( str(plugin.getDesc()) )
 
 
+    def _para_desc(self, params, part):
+        if len(params)>0:
+            return []
+
+        return suggest(self._plugins.keys(), part)
+
         
     def _list(self, params):
         #print 'list : ' + str(params)
