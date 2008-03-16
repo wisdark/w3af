@@ -147,20 +147,24 @@ class pluginsTypeMenu(menu):
         
         for plugin in list:
             if plugin.startswith('!'):
-                p = plugin[1:]
-                if p == 'all':
+                disabling = True
+                plugin = plugin[1:]
+            else:
+                disabling = False
+
+            if plugin not in self._plugins:
+                raise w3afException("I don't know the %s plugin." % plugin)
+
+            if disabling:
+                if plugin == 'all':
                     enabled = []
-                elif p in enabled:
+                elif plugin in enabled:
                     enabled.remove(p)
             elif plugin == 'all':
                 enabled = self._plugins.keys()
-            elif plugin in self._plugins and plugin not in enabled:
+            elif plugin not in enabled:
                 enabled.append(plugin)
-
-        for p in enabled:
-            if p!='all' and p not in self._plugins:
-                raise w3afException("I don't know the %s plugin." % p)
-
+        
         self._w3af.setPlugins(enabled, self._name)
 
     def _cmd_desc(self, params):
