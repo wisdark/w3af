@@ -153,7 +153,7 @@ class pluginsTypeMenu(menu):
                 disabling = False
 
             if plugin not in self._plugins:
-                raise w3afException("I don't know the %s plugin." % plugin)
+                raise w3afException("Unknown plugin: '%s'" % plugin)
 
             if disabling:
                 if plugin == 'all':
@@ -174,7 +174,7 @@ class pluginsTypeMenu(menu):
 
         pluginName = params[0]
         if pluginName not in self._plugins:
-            raise w3afException("I don't know the %s plugin." % p)
+            raise w3afException("Unknown plugin: '%s'" % p)
 
         plugin = self._w3af.getPluginInstance(pluginName, self._name)
         om.out.console( str(plugin.getDesc()) )
