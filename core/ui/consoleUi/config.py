@@ -106,10 +106,23 @@ class configMenu(menu):
 
     def _para_set(self, params, part):
         if len(params) == 0:
+            
             result = suggest(map(str, self._options.keys()), part)
             return result
         elif len(params) == 1:
-            return suggest(self._memory[params[0]], part)
+            paramName = params[0]
+            if paramName not in self._options:
+                return []
+
+            opts = self._options[paramName]
+            paramType = str(opts['type'])
+            if paramType == 'boolean':
+                values = [str(opts['default']) == 'True' and 'False' or 'True']
+            else:
+                values = self._memory[paramName]
+
+
+            return suggest(values, part)
         else:
             return []
 
