@@ -172,7 +172,7 @@ Please see http://w3af.sourceforge.net for the stable version info.")
             traceback.print_exc() # TODO
 
     def _backOrExit(self):
-        exit = len(self._trace)==0 
+        exit = len(self._trace)==0
         cmd = exit and 'exit' or 'back'
         self._initPrompt()
         self._paste(cmd)
@@ -389,7 +389,7 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         lines = f.readlines()
         idx = random.randrange(len(lines))
         line = lines[idx]
-        return line
+        return '\n' + line
         
         
 

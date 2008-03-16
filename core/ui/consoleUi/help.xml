@@ -21,7 +21,7 @@ This is the central help file for the consoleUi
 <help>
     <topic name="common">
         <category name="common">
-            <item name="keys">Display keys combination. </item>
+            <item name="keys">Display key shortcuts. </item>
             <item name="back">Go to the previous menu.  </item>
             <item name="exit">Exit w3af.  </item>
             <item name="help">Display help. </item>
@@ -34,12 +34,12 @@ This is the central help file for the consoleUi
             <item name="plugins">Configure plugins.  </item>
             <item name="exploit">Exploit the vulnerability.  </item>
             <item name="profiles">
-                <head>List and start scan profiles.</head>
+                <head>List and use scan profiles.</head>
                 <body>You will be able to run predefined scans.</body>
             </item>
         </category>
         <category name="config">
-            <item name="http-settings">Configure the URL opener.  </item>
+            <item name="http-settings">Configure the HTTP settings of the framework.  </item>
             <item name="misc-settings">Configure w3af misc settings.  </item>
             <item name="target">Configure the target URL.  </item>
         </category>
@@ -113,7 +113,7 @@ Examples: The "interact" command will list available shells and "interact 3" wil
             <item name="fastexploit">
                 <head>Exploit a vulnerability based on external parameters.</head>
                 <body><![CDATA[Syntax: fastexploit {plugin name}
-Example: fastexploit bsql]]></body>
+Example: fastexploit sqlmap]]></body>
             </item>
          </category>
     </topic>

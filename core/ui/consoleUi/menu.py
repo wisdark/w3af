@@ -164,7 +164,7 @@ class menu:
             child = children[command]
             return child.execute( params )
 
-        raise w3afException("I don't know what to do with %s" % command)
+        raise w3afException("Unknown command '%s'" % command)
 
 
     def _cmd_back(self, tokens):
@@ -182,7 +182,7 @@ class menu:
             subj = params[0]
             short, full = self._help.getHelp(subj)
             if short is None:
-                raise w3afException("I don't know anything about " + subj)
+                raise w3afException("No help for '%s'" % subj)
 
             om.out.console(short)
             if full:
