@@ -173,10 +173,16 @@ Please see http://w3af.sourceforge.net for the stable version info.")
 
     def _backOrExit(self):
         exit = len(self._trace)==0
-        cmd = exit and 'exit' or 'back'
-        self._initPrompt()
-        self._paste(cmd)
-        self._execute()
+        if self.inRawLineMode():
+            # temporary hack for exploit interaction mode
+            # possibly, menu should have it's 'exit' method
+            self._context = self.back()
+            om.out.console('')
+        else:
+            cmd = exit and 'exit' or 'back'
+            self._initPrompt()
+            self._paste(cmd)
+            self._execute()
         if not exit:
             self._initPrompt()
             self._showPrompt()
