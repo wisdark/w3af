@@ -22,8 +22,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #import core.controllers.outputManager as om
 import sys
-import tty
-import termios
+
+# If this two modules are imported here instead of below
+# we loose windows support.
+#import tty
+#import termios
 
 from ecma48 import *
 
