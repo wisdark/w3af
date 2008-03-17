@@ -129,7 +129,10 @@ class pluginsTypeMenu(menu):
         if command in self.getCommands():
             return menu.suggestParams(self, command, params, part)
         
-        return suggest(self._plugins.keys() + ['all'], ','.join(params + [part]), True)
+        alreadySel = command.split(',')
+        return suggest(self._plugins.keys() + ['all'], \
+            ','.join(alreadySel + params + [part]), True)
+
 
     def execute(self, tokens):
         if len(tokens)>0:
@@ -146,6 +149,8 @@ class pluginsTypeMenu(menu):
         enabled = copy.copy(self._w3af.getEnabledPlugins(self._name))
         
         for plugin in list:
+            if plugin=='':
+                continue 
             if plugin.startswith('!'):
                 disabling = True
                 plugin = plugin[1:]
@@ -159,7 +164,7 @@ class pluginsTypeMenu(menu):
                 if plugin == 'all':
                     enabled = []
                 elif plugin in enabled:
-                    enabled.remove(p)
+                    enabled.remove(plugin)
             elif plugin == 'all':
                 enabled = self._plugins.keys()
             elif plugin not in enabled:
