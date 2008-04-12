@@ -28,34 +28,18 @@ import sys
 #import tty
 #import termios
 
-from ecma48 import *
-KEY_BACKSPACE = '\x7F'
+#from ecma48 import *
 
-ctrlCodes = range(1,27)
-ctrlCodes.remove(9)
-ctrlCodes.remove(13)
+from core.controllers.w3afException import w3afException
 
-def getch(buf=None):
 
-    ch = read(1)
-    if buf is not None:
-        buf.append(ch)
-        strval = ''.join(buf)
-        if strval in extKeys or len(strval) >= longestSequence:
-            result = strval
-        else:
-            result = getch(buf)
-    elif ch == SEQ_PREFIX:
-        result = getch([ch])
-    elif ord(ch) in ctrlCodes:
-        result = '^' + chr(ord(ch)+64)
-    else:
-        result = ch
-
-    return result
+CTRL_CODES = range(1,27)
+CTRL_CODES.remove(9)
+CTRL_CODES.remove(13)
 
 def write(s):
-    sys.stdout.write(s)
+    if (len(s)):
+        sys.stdout.write(s)
 
 def writeln(s=''):
     sys.stdout.write(s+'\n\r')
@@ -63,77 +47,30 @@ def writeln(s=''):
 def bell():
     sys.stdout.write('\x07')
 
-class terminal:
+def backspace():
+    sys.stdout.write(KEY_BACKSPACE)
 
-    def __init__(self):
-        self._buf = None
-        self._extKeys = [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
-        self._longestSequence = 5 # max(map(len, self._extKeys))
-
-        self._ctrlCodes = range(1,27)
-        self._ctrlCodes.remove(9)
-        self._ctrlCodes.remove(13)
-
-
-    def getch(self):
-        ch = read(1)
-        if self._buf is not None:
-            self._buf.append(ch)
-            strval = ''.join(self._buf)
-            if strval in self._extKeys or len(strval) >= self._longestSequence:
-                result = strval
-                self._buf = None
-            else:
-                result = self.getch()
-        elif ch == '\x1B':
-            self._buf = ['\x1B']
-            result = self.getch()
-        elif ord(ch) in self._ctrlCodes:
-            result = '^' + chr(ord(ch)+64)
+def getch(buf=None):
+    ch = read(1)
+    if buf is not None:
+        buf.append(ch)
+        strval = ''.join(buf)
+        posixVal = normalizeSequence(strval)
+        if posixVal or len(buf)>=longestSequence:
+            if posixVal:
+                return posixVal
+            print str(buf)
         else:
-            result = ch
+            return getch(buf)
+    elif ch == SEQ_PREFIX:
+        buf = [ ch ]
+        result = getch(buf)
+    elif ord(ch) in CTRL_CODES:
+        result = '^' + chr(ord(ch)+64)
+    else:
+        result = ch
 
-        return result
-
-    def write(self, s):
-        sys.stdout.write(s)
-
-
-def setRawInputMode_win( raw ):
-    '''
-    Sets the raw input mode, in windows.
-    '''
-    pass
-    
-def read_win( amt ):
-    res = ''
-    for i in xrange( amt ):
-        res += msvcrt.getch()
-    return res
-    
-oldSettings = None
-def setRawInputMode_unix( raw ):
-    '''
-    Sets the raw input mode, in linux.
-    '''
-    global oldSettings
-    if raw and oldSettings is None:
-        fd = sys.stdin.fileno()
-        try:
-            oldSettings = termios.tcgetattr(fd)
-            tty.setraw(sys.stdin.fileno())
-        except Exception, e:
-            om.out.console('termios error: ' + str(e) )
-    elif not (raw or oldSettings is None):
-        try:
-            termios.tcsetattr( sys.stdin.fileno() , termios.TCSADRAIN, oldSettings )
-            oldSettings = None
-        except Exception, e:
-            om.out.console('termios error: ' + str(e) )
-
-def read_unix( amt ):
-    return sys.stdin.read( amt )
-
+    return result
 
 def wrapper( fun ):
     try:
@@ -174,37 +111,19 @@ def terminal_size():
     return int(cr[1]), int(cr[0])
 
 
-
 try:
     import tty, termios
-    
-    SEQ_PREFIX = '\x1B'
-    KEY_UP = '\x1B[A'
-    KEY_DOWN = '\x1B[B'
-    KEY_RIGHT = '\x1B[C'
-    KEY_LEFT = '\x1B[D'
-
-except:
+    from core.ui.consoleUi.terminal.unixctrl import * 
+except Exception, e:
+    print str(e)
     # We arent on unix !
     try:
         import msvcrt
-        SEQ_PREFIX = '\xE0'
-        KEY_UP = '\xE0\x48'
-        KEY_DOWN = '\xE0\x50'
-        KEY_RIGHT = '\xE0\x4B'
-        KEY_LEFT = '\xE0\x4D'
-
-    except:
+        from core.ui.consoleUi.terminal.winctrl import * 
+    except Exception, a:
+        print str(a)
         # We arent on windows nor unix
         raise w3afException('w3af support for OS X aint available yet! Please contribute.')
-    else:
-        setRawInputMode = setRawInputMode_win
-        read = read_win
-else:
-    setRawInputMode = setRawInputMode_unix
-    read = read_unix
 
-extKeys = [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
+#extKeys = [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
 longestSequence = 5
-
-

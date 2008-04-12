@@ -48,7 +48,6 @@ class consoleUi:
     def __init__(self, scriptFile=None, commands=[], parent=None):
         self._scriptFile = scriptFile
         self._commands = commands 
-        self._term = term.terminal()
         self._line = [] # the line which is being typed
         self._position = 0 # cursor position
         self._history = historyTable() # each menu has array of (array, positionInArray)
@@ -106,7 +105,7 @@ Please see http://w3af.sourceforge.net for the stable version info.")
 
         while self._active: 
             try:
-                c = self._term.getch()
+                c = term.getch()
                 self._handleKey(c)
             except Exception, e:
                 om.out.console(str(e))
@@ -191,9 +190,16 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         if self._position >0:
             self._position -= 1
             del self._line[self._position]
-            term.moveDelta(-1,0)
-            term.eraseLine()
-            self._showTail()            
+            term.moveBack(1)            
+#            lenToErase = len(self._line[:self._position])+1
+#            term.write (' ' * lenToErase)
+#            term.moveBack (lenToErase)
+
+#            term.eraseLine()
+            self._line.append(' ')
+            self._showTail()
+            del self._line[-1]
+#            term.write(' ')
 
     def _execute(self):
         # term.writeln()
@@ -259,11 +265,11 @@ Please see http://w3af.sourceforge.net for the stable version info.")
                 break
 
     def _toLineEnd(self):
-        term.moveDelta(len(self._line) - self._position, 0)
+        term.moveDelta(len(self._line) - self._position)
         self._position = len(self._line)
 
     def _toLineStart(self):
-        term.moveDelta(-self._position, 0)
+        term.moveBack(self._position)
         self._position = 0
 
     def _onTab(self):
@@ -305,14 +311,14 @@ Please see http://w3af.sourceforge.net for the stable version info.")
     def _onLeft(self):
         if self._position > 0:
             self._position -= 1
-            term.moveDelta(-1,0)
+            term.moveBack()
         else:
             term.bell()
     
     def _onRight(self):
         if self._position < len(self._line):
             self._position += 1
-            term.moveDelta(1,0)
+            term.moveForward()
         else:
             term.bell()
 
@@ -334,8 +340,10 @@ Please see http://w3af.sourceforge.net for the stable version info.")
             term.bell()
 
     def _setLine(self, line):
-        term.moveDelta(- self._position, 0)
-        term.eraseLine()
+        term.moveBack(self._position)
+        term.write(' ' * len(self._line))
+        term.moveBack(len(self._line))
+#        term.eraseLine()
         term.write(''.join(line))
         self._line = line
         self._position = len(line)
@@ -359,7 +367,7 @@ Please see http://w3af.sourceforge.net for the stable version info.")
 
     def _paste(self, text):
 
-        term.savePosition()
+#        term.savePosition()
         tail = self._line[self._position:]
         for c in text:
             self._line.insert(self._position, c)
@@ -367,8 +375,8 @@ Please see http://w3af.sourceforge.net for the stable version info.")
 
         term.write(text)
         term.write(''.join(tail))
-        term.restorePosition()  
-        term.moveDelta(len(text), 0)
+#        term.restorePosition()  
+        term.moveBack(len(tail))
         
 
 
@@ -384,10 +392,13 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         '''
             reprint everything that should be after the cursor
         '''
-        term.savePosition()
+#        term.savePosition()
         strLine = self._getLineStr()
-        term.write(strLine[self._position:])
-        term.restorePosition()
+        toWrite = strLine[self._position:]
+        term.write(toWrite)
+        term.moveBack(len(toWrite))
+
+#        term.restorePosition()
 
 
     def _randomMessage(self):
