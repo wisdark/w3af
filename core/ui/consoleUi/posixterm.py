@@ -29,20 +29,11 @@ import sys
 #import termios
 
 from ecma48 import *
-
-KEY_UP = '\x1B[A'
-KEY_DOWN = '\x1B[B'
-KEY_RIGHT = '\x1B[C'
-KEY_LEFT = '\x1B[D'
-
 KEY_BACKSPACE = '\x7F'
 
 ctrlCodes = range(1,27)
 ctrlCodes.remove(9)
 ctrlCodes.remove(13)
-
-extKeys = [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
-longestSequence = 5
 
 def getch(buf=None):
 
@@ -54,8 +45,8 @@ def getch(buf=None):
             result = strval
         else:
             result = getch(buf)
-    elif ch == '\x1B':
-        result = getch(['\x1B'])
+    elif ch == SEQ_PREFIX:
+        result = getch([ch])
     elif ord(ch) in ctrlCodes:
         result = '^' + chr(ord(ch)+64)
     else:
@@ -186,10 +177,23 @@ def terminal_size():
 
 try:
     import tty, termios
+    
+    SEQ_PREFIX = '\x1B'
+    KEY_UP = '\x1B[A'
+    KEY_DOWN = '\x1B[B'
+    KEY_RIGHT = '\x1B[C'
+    KEY_LEFT = '\x1B[D'
+
 except:
     # We arent on unix !
     try:
         import msvcrt
+        SEQ_PREFIX = '\xE0'
+        KEY_UP = '\xE0\x48'
+        KEY_DOWN = '\xE0\x50'
+        KEY_RIGHT = '\xE0\x4B'
+        KEY_LEFT = '\xE0\x4D'
+
     except:
         # We arent on windows nor unix
         raise w3afException('w3af support for OS X aint available yet! Please contribute.')
@@ -199,3 +203,8 @@ except:
 else:
     setRawInputMode = setRawInputMode_unix
     read = read_unix
+
+extKeys = [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
+longestSequence = 5
+
+
