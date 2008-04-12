@@ -24,7 +24,6 @@ from core.ui.consoleUi.menu import *
 from core.ui.consoleUi.plugins import *
 from core.ui.consoleUi.profiles import *
 from core.ui.consoleUi.exploit import *
-import core.ui.consoleUi.posixterm as term
 import core.controllers.miscSettings as ms
 #from core.ui.consoleUi.session import *
 from core.ui.consoleUi.util import *

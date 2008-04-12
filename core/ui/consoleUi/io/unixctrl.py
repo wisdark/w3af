@@ -1,5 +1,5 @@
 '''
-consoleUi.py
+unixctrl.py
 
 Copyright 2008 Andres Riancho
 
@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import sys
-from core.ui.consoleUi.terminal.common import *
+from core.ui.consoleUi.io.common import *
 import core.controllers.outputManager as om
 import termios, tty
 

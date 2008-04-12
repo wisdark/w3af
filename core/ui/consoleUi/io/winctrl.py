@@ -1,5 +1,5 @@
 '''
-consoleUi.py
+winctrl.py
 
 Copyright 2008 Andres Riancho
 

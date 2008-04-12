@@ -27,7 +27,7 @@ import traceback
 from core.ui.consoleUi.rootMenu import *
 from core.ui.consoleUi.callbackMenu import *
 from core.ui.consoleUi.util import *
-import core.ui.consoleUi.posixterm as term
+import core.ui.consoleUi.io.console as term
 from core.ui.consoleUi.history import *
 import core.ui.consoleUi.tables as tables
 import core.controllers.w3afCore
