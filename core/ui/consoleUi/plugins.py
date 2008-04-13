@@ -156,7 +156,7 @@ class pluginsTypeMenu(menu):
             else:
                 disabling = False
 
-            if plugin not in self._plugins:
+            if plugin!='all' and plugin not in self._plugins:
                 raise w3afException("Unknown plugin: '%s'" % plugin)
 
             if disabling:
