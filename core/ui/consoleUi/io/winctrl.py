@@ -55,6 +55,7 @@ def normalizeSequence(seq):
         return win2UnixMap[seq]
     return None
 
+# TODO: Obsolete?
 def moveDelta(dx=1):
     if dx:
         if dx>0:
@@ -67,6 +68,7 @@ def moveBack(steps=1):
             sys.stdout.write('\x08')
 	pass #print CSI_CUB % steps
 
+# TODO: Obsolete?
 def moveForward(steps=1):
         for i in range(steps):
             sys.stdout.write(CTRL_RIGHT)

@@ -122,8 +122,7 @@ class pluginsTypeMenu(menu):
       
 
     def suggestCommands(self, part):
-        return suggest(self._plugins.keys() + ['all'], part, True) + \
-            suggest(self.getCommands(), part)
+        return suggest(self._plugins.keys() + ['all'], part, True)
 
     def suggestParams(self, command, params, part):
         if command in self.getCommands():

@@ -318,7 +318,7 @@ Please see http://w3af.sourceforge.net for the stable version info.")
     def _onRight(self):
         if self._position < len(self._line):
             self._position += 1
-            term.moveForward()
+            self._moveForward()
         else:
             term.bell()
 
