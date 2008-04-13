@@ -31,8 +31,8 @@ LONGEST_SEQUENCE = 2
 win2UnixMap = { 
     '\xE0\x48': KEY_UP,
     '\xE0\x50': KEY_DOWN,
-    '\xE0\x4B': KEY_RIGHT,
-    '\xE0\x4D': KEY_LEFT,
+    '\xE0\x4D': KEY_RIGHT,
+    '\xE0\x4B': KEY_LEFT,
     '\xE0\x47': KEY_HOME,
     '\xE0\x4F': KEY_END
 }
