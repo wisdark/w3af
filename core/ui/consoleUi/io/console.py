@@ -115,13 +115,12 @@ try:
     import tty, termios
     from core.ui.consoleUi.io.unixctrl import * 
 except Exception, e:
-    print str(e)
     # We arent on unix !
     try:
         import msvcrt
         from core.ui.consoleUi.io.winctrl import * 
     except Exception, a:
-        print str(a)
+        print str(e + '\n' + a)
         # We arent on windows nor unix
         raise w3afException('w3af support for OS X aint available yet! Please contribute.')
 
