@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from string import Template
 import xml.etree.ElementTree as ET
 from xml.dom.minidom import *
+import os.path
 
 class helpRepository:
     '''
@@ -30,7 +31,7 @@ class helpRepository:
     context-related help objects
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
-    def __init__(self, path='core/ui/consoleUi/help.xml'):
+    def __init__(self, path=os.path.join('core','ui','consoleUi','help.xml') ):
         self.__doc = ET.parse(path)
         self.__map = {}
         topics = self.__doc.findall('.//topic')

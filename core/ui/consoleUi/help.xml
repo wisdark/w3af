@@ -24,14 +24,14 @@ This is the central help file for the consoleUi
             <item name="keys">Display key shortcuts. </item>
             <item name="back">Go to the previous menu.  </item>
             <item name="exit">Exit w3af.  </item>
-            <item name="help">Display help. </item>
+            <item name="help">Display help.  Issuing: help [command] , prints more specific help about command</item>
             <item name="assert">Check assertion. </item>
         </category>
     </topic>
     <topic name="root">
         <category name="menu">
             <item name="start">Start the scan.  </item>
-            <item name="plugins">Configure plugins.  </item>
+            <item name="plugins">Enable and configure plugins.  </item>
             <item name="exploit">Exploit the vulnerability.  </item>
             <item name="profiles">
                 <head>List and use scan profiles.</head>

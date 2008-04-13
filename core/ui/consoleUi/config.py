@@ -1,5 +1,4 @@
 '''
-import core.controllers.outputManager as om
 config.py
 
 Copyright 2008 Andres Riancho
@@ -81,6 +80,7 @@ class configMenu(menu):
 
     def _cmd_set(self, params):
         if len(params) < 2:
+            om.out.console('Invalid call to set, please see the help:')
             self._cmd_help(['set'])
         elif not self._options.has_key(params[0]):
             raise w3afException('Unknown option: ' + params[0])
