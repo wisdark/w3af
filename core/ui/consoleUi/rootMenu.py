@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from core.ui.consoleUi.menu import *
 from core.ui.consoleUi.plugins import *
 from core.ui.consoleUi.profiles import *
-from core.ui.consoleUi.version import *
 from core.ui.consoleUi.exploit import *
 import core.controllers.miscSettings as ms
 #from core.ui.consoleUi.session import *
