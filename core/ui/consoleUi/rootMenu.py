@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from core.ui.consoleUi.menu import *
 from core.ui.consoleUi.plugins import *
 from core.ui.consoleUi.profiles import *
+from core.ui.consoleUi.version import *
 from core.ui.consoleUi.exploit import *
 import core.controllers.miscSettings as ms
 #from core.ui.consoleUi.session import *
@@ -45,7 +46,7 @@ class rootMenu(menu):
             'misc-settings' : (configMenu, ms.miscSettings()),
             'http-settings' : (configMenu, self._w3af.uriOpener.settings),
             'profiles' : profilesMenu,
-            'exploit' : exploit
+            'exploit' : exploit,
        })
     
     def _cmd_start(self, params):
@@ -56,3 +57,8 @@ class rootMenu(menu):
         except Exception, e:
             om.out.console(str(e))
  
+    def _cmd_version(self, params):
+        '''
+        Show the w3af version and exit
+        '''
+        om.out.console( self._w3af.getVersion() )

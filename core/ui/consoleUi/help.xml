@@ -43,6 +43,9 @@ This is the central help file for the consoleUi
             <item name="misc-settings">Configure w3af misc settings.  </item>
             <item name="target">Configure the target URL.  </item>
         </category>
+        <category name="information">
+            <item name="version">Show w3af version information.  </item>
+        </category>
     </topic>
     <topic name="profiles">
         <category name="menu">
