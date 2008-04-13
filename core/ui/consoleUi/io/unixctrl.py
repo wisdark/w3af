@@ -25,6 +25,8 @@ from core.ui.consoleUi.io.common import *
 import core.controllers.outputManager as om
 import termios, tty
 
+LONGEST_SEQUENCE = 5
+
 CSI = '\x1B['
 
 CSI_EL = CSI + '%iK'

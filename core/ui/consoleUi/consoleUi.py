@@ -265,7 +265,7 @@ Please see http://w3af.sourceforge.net for the stable version info.")
                 break
 
     def _toLineEnd(self):
-        term.moveDelta(len(self._line) - self._position)
+        self._moveDelta(len(self._line) - self._position)
         self._position = len(self._line)
 
     def _toLineStart(self):
@@ -379,16 +379,30 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         term.moveBack(len(tail))
         
 
-
     def _showPrompt(self):
         term.write(self._context.getPath() + ">>>")
         
     def _showLine(self):
         strLine = self._getLineStr()
         term.write(strLine)
-        term.moveDelta(self._position - len(strLine), 0)
+        self._moveDelta(self._position - len(strLine))
 
-    def _showTail(self, afterDel=False):
+    def _moveForward(self, steps=1):
+	for i in range(steps):
+            if self._position == len(self._line): term.bell()
+	    term.write(self._line[self._position])
+	    self._position += 1
+
+
+    def _moveDelta(self, steps):
+        if steps:
+            if steps>0:
+                self._moveForward(steps)
+            else:
+                term.moveBack(-steps)
+
+
+    def _showTail(self, retainPosition=True):
         '''
             reprint everything that should be after the cursor
         '''
@@ -396,7 +410,8 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         strLine = self._getLineStr()
         toWrite = strLine[self._position:]
         term.write(toWrite)
-        term.moveBack(len(toWrite))
+        if retainPosition:
+            term.moveBack(len(toWrite))
 
 #        term.restorePosition()
 

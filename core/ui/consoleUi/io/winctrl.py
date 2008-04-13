@@ -21,17 +21,20 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import sys
-import ecma48 as ut
+import msvcrt
+from core.ui.consoleUi.io.common import *
 
 
 SEQ_PREFIX = '\xE0'
+LONGEST_SEQUENCE = 2
 
 win2UnixMap = { 
-    '\xE0\x48': ut.KEY_UP,
-    '\xE0\x50': ut.KEY_DOWN,
-    '\xE0\x4B': ut.KEY_RIGHT,
-    '\xE0\x4D': ut.KEY_LEFT,
-    '\xE0\x47': '^A'
+    '\xE0\x48': KEY_UP,
+    '\xE0\x50': KEY_DOWN,
+    '\xE0\x4B': KEY_RIGHT,
+    '\xE0\x4D': KEY_LEFT,
+    '\xE0\x47': KEY_HOME,
+    '\xE0\x4F': KEY_END
 }
     
 def read( amt ):
@@ -61,7 +64,7 @@ def moveDelta(dx=1):
 
 def moveBack(steps=1):
         for i in range(steps):
-            sys.stdout.write(KEY_BACKSPACE)
+            sys.stdout.write('\x08')
 	pass #print CSI_CUB % steps
 
 def moveForward(steps=1):

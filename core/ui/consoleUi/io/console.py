@@ -52,19 +52,19 @@ def backspace():
 
 def getch(buf=None):
     ch = read(1)
-    if buf is not None:
+    if ch == SEQ_PREFIX:
+        buf = [ ch ]
+        result = getch(buf)
+    elif buf is not None:
         buf.append(ch)
         strval = ''.join(buf)
         posixVal = normalizeSequence(strval)
-        if posixVal or len(buf)>=longestSequence:
-            if posixVal:
-                return posixVal
-            print str(buf)
-        else:
+        if posixVal:
+            return posixVal
+	elif len(buf)>LONGEST_SEQUENCE:
+            return getch()
+	else:
             return getch(buf)
-    elif ch == SEQ_PREFIX:
-        buf = [ ch ]
-        result = getch(buf)
     elif ord(ch) in CTRL_CODES:
         result = '^' + chr(ord(ch)+64)
     else:
@@ -113,17 +113,17 @@ def terminal_size():
 
 try:
     import tty, termios
-    from core.ui.consoleUi.terminal.unixctrl import * 
+    from core.ui.consoleUi.io.unixctrl import * 
 except Exception, e:
     print str(e)
     # We arent on unix !
     try:
         import msvcrt
-        from core.ui.consoleUi.terminal.winctrl import * 
+        from core.ui.consoleUi.io.winctrl import * 
     except Exception, a:
         print str(a)
         # We arent on windows nor unix
         raise w3afException('w3af support for OS X aint available yet! Please contribute.')
 
 #extKeys = [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]
-longestSequence = 5
+
