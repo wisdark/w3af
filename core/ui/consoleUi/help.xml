@@ -21,14 +21,12 @@ This is the central help file for the consoleUi
 <help>
     <topic name="common">
         <category name="common">
-            <item name="keys">Display key shortcuts. </item>
             <item name="back">Go to the previous menu.  </item>
             <item name="exit">Exit w3af.  </item>
-            <item name="help">Display help.  Issuing: help [command] , prints more specific help about command</item>
             <item name="assert">Check assertion. </item>
         </category>
-    </topic>
-    <topic name="root">
+   </topic>
+   <topic name="root">
         <category name="menu">
             <item name="start">Start the scan.  </item>
             <item name="plugins">Enable and configure plugins.  </item>
@@ -44,7 +42,18 @@ This is the central help file for the consoleUi
             <item name="target">Configure the target URL.  </item>
         </category>
         <category name="information">
+            <item name="help">Display help.  Issuing: help [command] , prints more specific help about command</item>
             <item name="version">Show w3af version information.  </item>
+            <item name="keys">Display key shortcuts. </item>
+            
+         </category>
+    </topic>
+    <topic name="keys">
+        <category name="keys">
+            <item name="Ctrl-A / Ctrl-E">Move cursor to the beginning/end of the line.</item>
+            <item name="Ctrl-H">Erase the character before the cursor.</item>
+            <item name="Ctrl-W">Erase the word before the cursor.</item>
+            <item name="Ctrl-D, Ctrl-C">Return to the previous menu or exit w3af.</item>
         </category>
     </topic>
     <topic name="profiles">

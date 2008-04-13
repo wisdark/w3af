@@ -63,6 +63,7 @@ class menu:
         self._history = history()
         
         self._help = help()
+        self._keysHelp = help()
         self._w3af = w3af
         self._handlers = {}
         self._parent = parent
@@ -70,7 +71,8 @@ class menu:
         self._children = {}
 
         self._loadHelp('common')
-        self._keysHelp = {} 
+        helpMainRepository.loadHelp('keys', self._keysHelp)
+#        self._keysHelp = {} 
 
         self._initHandlers()
 
