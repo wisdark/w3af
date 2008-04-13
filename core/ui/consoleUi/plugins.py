@@ -182,7 +182,7 @@ class pluginsTypeMenu(menu):
             raise w3afException("Unknown plugin: '%s'" % p)
 
         plugin = self._w3af.getPluginInstance(pluginName, self._name)
-        om.out.console( str(plugin.getDesc()) )
+        om.out.console( str(plugin.getLongDesc()) )
 
 
     def _para_desc(self, params, part):
