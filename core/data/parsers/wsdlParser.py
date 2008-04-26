@@ -31,7 +31,8 @@ except:
         import SOAPpy
         om.out.debug('wsdlParser is using the systems SOAPpy library')
     except:
-        raise w3afException('You have to install SOAPpy lib.')
+        pass
+#        raise w3afException('You have to install SOAPpy lib.')
 
 '''
 This module parses WSDL documents.

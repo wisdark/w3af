@@ -23,6 +23,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from core.controllers.basePlugin.baseOutputPlugin import baseOutputPlugin
 import sys
+# options
+from core.data.options.option import option
+from core.data.options.optionList import optionList
+# severity constants for vuln messages
+import core.data.constants.severity as severity
 
 class console(baseOutputPlugin):
     '''
@@ -44,7 +49,7 @@ class console(baseOutputPlugin):
             toPrint = unicode ( message )
             if newLine == True:
                 toPrint += '\r\n'
-            sys.stdout.write( toPrint )
+            sys.stdout.write( self._cleanString(toPrint) )
             sys.stdout.flush()
 
     
@@ -56,7 +61,7 @@ class console(baseOutputPlugin):
         toPrint = unicode ( message )
         if newLine == True:
             toPrint += '\r\n'
-        sys.stdout.write( toPrint )
+        sys.stdout.write( self._cleanString(toPrint) )
         sys.stdout.flush()
 
 
@@ -68,10 +73,10 @@ class console(baseOutputPlugin):
         toPrint = unicode ( message )
         if newLine == True:
             toPrint += '\r\n'
-        sys.stderr.write( toPrint )
+        sys.stderr.write( self._cleanString(toPrint) )
         sys.stdout.flush()
 
-    def vulnerability(self, message , newLine = True ):
+    def vulnerability(self, message , newLine=True, severity=severity.MEDIUM ):
         '''
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action when a vulnerability is found.
@@ -79,7 +84,7 @@ class console(baseOutputPlugin):
         toPrint = unicode ( message )
         if newLine == True:
             toPrint += '\r\n'
-        sys.stdout.write( toPrint )
+        sys.stdout.write( self._cleanString(toPrint) )
         sys.stdout.flush()
         
     def console( self, message, newLine = True ):
@@ -89,7 +94,7 @@ class console(baseOutputPlugin):
         toPrint = unicode( message )
         if newLine == True:
             toPrint += '\r\n'
-        sys.stdout.write( toPrint )
+        sys.stdout.write( self._cleanString(toPrint) )
         sys.stdout.flush()
 
     def logHttp( self, request, response):
@@ -102,3 +107,26 @@ class console(baseOutputPlugin):
         return '''
         This plugin writes the framework messages to the console.
         '''
+
+    def setOptions( self, OptionList ):
+        '''
+        Sets the Options given on the OptionList to self. The options are the result of a user
+        entering some data on a window that was constructed using the XML Options that was
+        retrieved from the plugin using getOptions()
+        
+        This method MUST be implemented on every plugin. 
+        
+        @return: No value is returned.
+        ''' 
+        self.verbosity = OptionList['verbosity']
+
+    def getOptions( self ):
+        '''
+        @return: A list of option objects for this plugin.
+        '''
+        d1 = 'Verbosity level for this plugin.'
+        o1 = option('verbosity', self.verbosity, d1, 'integer')
+        
+        ol = optionList()
+        ol.add(o1)
+        return ol

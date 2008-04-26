@@ -31,12 +31,24 @@ import core.data.kb.config as cf
 
 import Queue
 
-# The database
+# The database handler class
 from extlib.buzhug.buzhug import Base
+
+from core.controllers.misc.homeDir import getHomeDir
 
 # Only to be used with care.
 import core.controllers.outputManager as om
 import os
+
+# I'm timestamping the messages
+import time
+
+# options
+from core.data.options.option import option
+from core.data.options.optionList import optionList
+
+# severity constants
+import core.data.constants.severity as severity
 
 class gtkOutput(baseOutputPlugin):
     '''
@@ -51,24 +63,33 @@ class gtkOutput(baseOutputPlugin):
         baseOutputPlugin.__init__(self)
         
         sessionName = cf.cf.getData('sessionName')
-        db_req_res_dirName = os.path.join('sessions', 'db_req_' + sessionName )
+        db_req_res_dirName = os.path.join(getHomeDir(), 'sessions', 'db_req_' + sessionName )
         
+        try:
+            os.mkdir(os.path.join(getHomeDir() , 'sessions'))
+        except OSError, oe:
+            # [Errno 17] File exists
+            if oe.errno != 17:
+                raise w3afException('Unable to write to the user home directory: ' + getHomeDir() )
+            
         try:
             self._del_dir(db_req_res_dirName)
         except Exception, e:
             # I get here when the session directory for this db wasn't created
             # and when the user has no permissions to remove the directory
+            # FIXME: handle those errors!
             pass
-            
-        try:
-            self._db_req_res = Base( db_req_res_dirName )
-            # Create the database
-            #CREATE TABLE request_response (id INTEGER PRIMARY KEY, method TEXT, uri TEXT, http_version TEXT, headers TEXT, data TEXT, http_version TEXT, code INTEGER, msg TEXT, headers TEXT, body TEXT)
-            self._db_req_res.create( ('id',int), ('method', str), ('uri', str), ('http_version', str), ('request_headers', str), ('postdata', str), ('code', int), ('msg', str), ('response_headers', str), ('body', str) )
-        except Exception, e:
-            raise w3afException('An exception was raised while creating the gtkOutput database: ' + str(e) )
-        else:
-            kb.kb.save('gtkOutput', 'db', self._db_req_res )
+        
+        if not kb.kb.getData('gtkOutput', 'db'):
+            try:
+                self._db_req_res = Base( db_req_res_dirName )
+                # Create the database
+                self._db_req_res.create( ('id',int), ('method', str), ('uri', str), ('http_version', str), ('request_headers', str), ('postdata', str), 
+                                                    ('code', int), ('msg', str), ('response_headers', str), ('body', str), ('time',float) )
+            except Exception, e:
+                raise w3afException('An exception was raised while creating the gtkOutput database: ' + str(e) )
+            else:
+                kb.kb.save('gtkOutput', 'db', self._db_req_res )
     
     def _del_dir(self,path):
         for file in os.listdir(path):
@@ -88,7 +109,7 @@ class gtkOutput(baseOutputPlugin):
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action for debug messages.
         '''
-        m = message( 'debug', msgString , newLine )
+        m = message( 'debug', self._cleanString(msgString), time.time(), newLine )
         self._addToQueue( m )
     
     def information(self, msgString , newLine = True ):
@@ -96,7 +117,7 @@ class gtkOutput(baseOutputPlugin):
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action for informational messages.
         ''' 
-        m = message( 'information', msgString , newLine )
+        m = message( 'information', self._cleanString(msgString), time.time(), newLine )
         self._addToQueue( m )
 
     def error(self, msgString , newLine = True ):
@@ -104,22 +125,23 @@ class gtkOutput(baseOutputPlugin):
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action for error messages.
         '''     
-        m = message( 'error', msgString , newLine )
+        m = message( 'error', self._cleanString(msgString), time.time(), newLine )
         self._addToQueue( m )
 
-    def vulnerability(self, msgString , newLine = True ):
+    def vulnerability(self, msgString , newLine=True, severity=severity.MEDIUM ):
         '''
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action when a vulnerability is found.
         '''     
-        m = message( 'vulnerability', msgString , newLine )
+        m = message( 'vulnerability', self._cleanString(msgString), time.time(), newLine )
+        m.setSeverity( severity )
         self._addToQueue( m )
         
     def console( self, msgString, newLine = True ):
         '''
         This method is used by the w3af console to print messages to the outside.
         '''
-        m = message( 'console', msgString , newLine )
+        m = message( 'console', self._cleanString(msgString), time.time(), newLine )
         self._addToQueue( m )
     
     def _addToQueue( self, m ):
@@ -130,8 +152,7 @@ class gtkOutput(baseOutputPlugin):
     
     def logHttp( self, request, response):
         try:
-            #CREATE TABLE request_response (id INTEGER PRIMARY KEY, method TEXT, uri TEXT, http_version TEXT, headers TEXT, data TEXT, http_version TEXT, code INTEGER, msg TEXT, headers TEXT, body TEXT)
-            self._db_req_res.insert(response.id, request.getMethod(), request.getURI(), '1.1', request.dumpHeaders(), request.getData(), response.getCode(), response.getMsg(), response.dumpHeaders(), response.getBody() )
+            self._db_req_res.insert(response.id, request.getMethod(), request.getURI(), '1.1', request.dumpHeaders(), request.getData(), response.getCode(), response.getMsg(), response.dumpHeaders(), response.getBody(), response.getWaitTime() )
         except KeyboardInterrupt, k:
             raise k
         except Exception, e:
@@ -146,30 +167,37 @@ class gtkOutput(baseOutputPlugin):
         Saves messages to kb.kb.getData('gtkOutput', 'queue'), messages are saved in the form of objects. This plugin
         was created to be able to communicate with the gtkUi and should be enabled if you are using it.
         '''
-
-    def getOptionsXML(self):
-        '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/display.xsd
         
-        This method MUST be implemented on every plugin. 
-        
-        @return: XML String
-        @see: core/display.xsd
+    def getOptions( self ):
         '''
-        return  '<?xml version="1.0" encoding="ISO-8859-1"?>\
-        <OptionList>\
-        </OptionList>\
-        '
-
+        @return: A list of option objects for this plugin.
+        '''    
+        ol = optionList()
+        return ol
+    
+    def setOptions( self, OptionList ):
+        pass
+        
 class message:
-    def __init__( self, type, msg , newLine=True ):
+    def __init__( self, type, msg , time, newLine=True ):
+        '''
+        @parameter type: console, information, vulnerability, etc
+        @parameter msg: The message itself
+        @parameter time: The time when the message was produced
+        @parameter newLine: Should I print a newline ? True/False
+        '''
         self._type = type
         self._msg = unicode(msg)
         self._newLine = newLine
+        self._time = time
+        self._severity = None
+    
+    def getSeverity( self ):
+        return self._severity
         
+    def setSeverity( self, s ):
+        self._severity = s
+    
     def getMsg( self ):
         return self._msg
     
@@ -179,3 +207,8 @@ class message:
     def getNewLine( self ):
         return self._newLine
         
+    def getRealTime( self ):
+        return self._time
+
+    def getTime( self ):
+        return time.strftime("%c", time.localtime(self._time))

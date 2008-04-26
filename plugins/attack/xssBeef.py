@@ -27,6 +27,9 @@ from core.controllers.basePlugin.baseAttackPlugin import baseAttackPlugin
 import core.data.kb.knowledgeBase as kb
 import core.data.parsers.urlParser as urlParser
 from core.controllers.w3afException import w3afException
+# options
+from core.data.options.option import option
+from core.data.options.optionList import optionList
 
 class xssBeef(baseAttackPlugin):
     '''
@@ -61,7 +64,7 @@ class xssBeef(baseAttackPlugin):
     def getVulnName2Exploit( self ):
         return 'xss'
                 
-    def exploit(self ):
+    def exploit( self, vuln ):
         '''
         Exploits a remoteFileInclude vuln that was found and stored in the kb.
 

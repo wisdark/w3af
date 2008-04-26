@@ -41,7 +41,7 @@ import urllib
 
 import time
 import os
-import user
+from core.controllers.misc.homeDir import getHomeDir
 
 # for better debugging of handlers
 import traceback
@@ -81,7 +81,7 @@ class xUrllib:
         This method is called when the xUrllib is not going to be used anymore.
         '''
         try:
-            cacheLocation = user.home + os.path.sep + '.w3af' + os.path.sep + 'urllib2cache' + os.path.sep + str(os.getpid())
+            cacheLocation = getHomeDir() + os.path.sep + 'urllib2cache' + os.path.sep + str(os.getpid())
             if os.path.exists(cacheLocation):
                 for f in os.listdir(cacheLocation):
                     os.unlink( cacheLocation + os.path.sep + f)
@@ -486,7 +486,7 @@ class xUrllib:
                 # Correct control+c handling...
                 raise
             except Exception, e:
-                om.out.error( 'Error in grep plugin, "' + grepPlugin.getName() + '" raised the exception: ' + str(e) + '. Please report this bug.' )
+                om.out.error( 'Error in grep plugin, "' + grepPlugin.getName() + '" raised the exception: ' + str(e) + '. Please report this bug. Exception: ' + str(traceback.format_exc(1)) )
                 om.out.debug( str(traceback.format_exc()) )
         
         om.out.debug('Finished grepWorker for response: ' + repr(response) )

@@ -21,7 +21,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 from core.controllers.basePlugin.basePlugin import basePlugin
+# import inspect to get the caller
 import inspect
+# severity constants for vuln messages
+import core.data.constants.severity as severity
 
 class baseOutputPlugin(basePlugin):
     '''
@@ -68,7 +71,7 @@ class baseOutputPlugin(basePlugin):
         '''
         raise w3afException('Plugin is not implementing required method error' )
 
-    def vulnerability(self, message ):
+    def vulnerability(self, message , newLine=True, severity=severity.MEDIUM ):
         '''
         This method is called from the output managerobject. The OM object was called from a plugin
         or from the framework. This method should take an action for vulnerability messages.
@@ -94,49 +97,21 @@ class baseOutputPlugin(basePlugin):
         @return: No value is returned.
         '''
         raise w3afException('Plugin is not implementing required method logHttp.' )
-        
-    def setOptions( self, OptionList ):
-        '''
-        Sets the Options given on the OptionList to self. The options are the result of a user
-        entering some data on a window that was constructed using the XML Options that was
-        retrieved from the plugin using getOptionsXML()
-        
-        This method MUST be implemented on every plugin. 
-        
-        @return: No value is returned.
-        ''' 
-        if 'verbosity' in OptionList.keys():
-            self.verbosity = OptionList['verbosity']
-        
 
-    def getOptionsXML(self):
-        '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/display.xsd
-        
-        This method MUST be implemented on every plugin. 
-        
-        @return: XML String
-        @see: core/display.xsd
-        '''
-        return  '<?xml version="1.0" encoding="ISO-8859-1"?>\
-        <OptionList>\
-            <Option name="verbosity">\
-                <default>0</default>\
-                <desc>Verbosity level for this plugin.</desc>\
-                <type>integer</type>\
-            </Option>\
-        </OptionList>\
-        '
-        
     def getPluginDeps( self ):
         '''
         @return: A list with the names of the plugins that should be 
         runned before the current one.
         '''
         return []
+    
+    def _cleanString( self, stringToClean ):
+        '''
+        @parameter stringToClean: A string that should be cleaned before using it in a message object.
+        '''
+        for char, replace in [('\0','\\0'),('\t','\\t')]: #('\n','\\n'),('\r','\\r'),
+            stringToClean = stringToClean.replace(char,replace)
+        return stringToClean
 
     def getCaller( self, whatStackItem=4 ):
         '''

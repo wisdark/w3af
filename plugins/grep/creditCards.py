@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 import core.controllers.outputManager as om
+# options
+from core.data.options.option import option
+from core.data.options.optionList import optionList
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
@@ -70,8 +73,10 @@ class creditCards(baseGrepPlugin):
     def __init__(self):
         baseGrepPlugin.__init__(self)
         self._cardResponses = []
-        regex = '(?:^|[^\d])(\d{4}[\- ]?\d{4}[\- ]?\d{2}[\- ]?\d{2}[\- ]?\d{1,4})(?:[^\d]|$)'
+        regex = '(?:^|[^\d])((?:<.*>)?\d{4}(?:</.*>)?[\- ]?(?:</.*>)?\d{4}(?:</.*>)?[\- ]?(?:<.*>)?\d{2}(?:</.*>)?[\- ]?(?:<.*>)?\d{2}(?:</.*>)?[\- ]?(?:<.*>)?\d{1,4}(?:</.*>)?)(?:[^\d]|$)'
+        markupRegex = '(<.*?>)|(</.*?>)|\-'
         self._regex = re.compile(regex)
+        self._markupRegex = re.compile(markupRegex)
         
     def _testResponse(self, request, response):
         
@@ -86,8 +91,15 @@ class creditCards(baseGrepPlugin):
                 kb.kb.append( self, 'creditCards', v )
      
     def _findCard(self, body):
-        res = self._regex.search(body)
-        return res and luhnCheck(res.group(1))
+        res = self._regex.findall(body)
+         
+        for c in res:
+            payload = self._markupRegex.sub('', c)
+            if luhnCheck(payload):
+                return True
+
+        return False
+
     
     def end(self):
         '''
@@ -97,17 +109,15 @@ class creditCards(baseGrepPlugin):
         self.printUniq( kb.kb.getData( 'creditCards', 'creditCards' ), 'URL' )
 
 
-    def getOptionsXML(self):
+    def getOptions( self ):
         '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/output.xsd
-        '''
-        return  '<?xml version="1.0" encoding="ISO-8859-1"?>\
-        <OptionList>\
-        </OptionList>\
-        '
+        @return: A list of option objects for this plugin.
+        '''    
+        ol = optionList()
+        return ol
+        
+    def setOptions( self, opt ):
+        pass
      
     def getLongDesc( self ):
         '''

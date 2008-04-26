@@ -75,6 +75,7 @@ class consoleUi:
 
     def __initRoot(self):
         self._w3af = core.controllers.w3afCore.w3afCore()
+        self._w3af.setPlugins(['console'], 'output')
        
     def __initFromParent(self, parent):
         self._context = parent._context

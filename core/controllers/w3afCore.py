@@ -30,7 +30,8 @@ dependencyCheck()
 import core.controllers.miscSettings as miscSettings
 
 import os,sys
-import user
+
+from core.controllers.misc.homeDir import createHomeDir, getHomeDir
 from core.controllers.misc.factory import factory
 from core.controllers.misc.parseOptions import parseOptions
 from core.data.url.xUrllib import xUrllib
@@ -68,15 +69,13 @@ class w3afCore:
         self.uriOpener = xUrllib()
 
         # Create .w3af inside home directory
-        self._homeLocation = user.home + os.path.sep + '.w3af'
-        if not os.path.exists(self._homeLocation):
-            os.makedirs(self._homeLocation)
+        createHomeDir()
     
     def getHomePath( self ):
         '''
         @return: The location of the w3af directory inside the home directory of the current user.
         '''
-        return self._homeLocation
+        return getHomeDir()
         
     def _initializeInternalVariables(self):
         '''
@@ -84,7 +83,7 @@ class w3afCore:
         '''
         # A dict with plugin types as keys and a list of plugin names as values
         self._strPlugins = {'audit':[],'grep':[],'bruteforce':[],'discovery':[],\
-        'evasion':[], 'mangle':[], 'output':['console']}
+        'evasion':[], 'mangle':[], 'output':[]}
         
         # A dict with plugin types as keys and a list of plugin instances as values
         self._plugins = {'audit':[],'grep':[],'bruteforce':[],'discovery':[],\
@@ -104,18 +103,18 @@ class w3afCore:
         self._paused = False
         self._mustStop = False
     
-    def _rPlugFactory( self, strReqPlugins, PluginType ):
+    def _rPlugFactory( self, strReqPlugins, pluginType ):
         '''
         This method creates the requested modules list.
         
         @parameter strReqPlugins: A string list with the requested plugins to be executed.
-        @parameter PluginType: [audit|discovery|grep]
+        @parameter pluginType: [audit|discovery|grep]
         @return: A list with plugins to be executed, this list is ordered using the exec priority.
         '''     
         requestedPluginsList = []
         
         if 'all' in strReqPlugins:
-            fileList = [ f for f in os.listdir('plugins' + os.path.sep+ PluginType + os.path.sep ) ]    
+            fileList = [ f for f in os.listdir('plugins' + os.path.sep+ pluginType + os.path.sep ) ]    
             allPlugins = [ os.path.splitext(f)[0] for f in fileList if os.path.splitext(f)[1] == '.py' ]
             allPlugins.remove ( '__init__' )
             
@@ -129,11 +128,11 @@ class w3afCore:
             
             # Update the plugin list
             # This update is usefull for cases where the user selected "all" plugins,
-            # the self._strPlugins[PluginType] is useless if it says 'all'.
-            self._strPlugins[PluginType] = strReqPlugins
+            # the self._strPlugins[pluginType] is useless if it says 'all'.
+            self._strPlugins[pluginType] = strReqPlugins
                 
         for pluginName in strReqPlugins:
-            plugin = factory( 'plugins.' + PluginType + '.' + pluginName )
+            plugin = factory( 'plugins.' + pluginType + '.' + pluginName )
 
             # Now we are going to check if the plugin dependencies are met
             for dep in plugin.getPluginDeps():
@@ -142,11 +141,11 @@ class w3afCore:
                 except:
                     raise w3afException('Plugin dependencies must be indicated using pluginType.pluginName notation.\
                     This is an error in ' + pluginName +'.getPluginDeps() .')
-                if depType == PluginType:
+                if depType == pluginType:
                     if depPlugin not in strReqPlugins:
                         if cf.cf.getData('autoDependencies'):
                             strReqPlugins.append( depPlugin )
-                            om.out.information('Auto-enabling plugin: ' + PluginType + '.' + depPlugin)
+                            om.out.information('Auto-enabling plugin: ' + pluginType + '.' + depPlugin)
                             # nice recursive call, this solves the "dependency of dependency" problem =)
                             return self._rPlugFactory( strReqPlugins, depType )
                         else:
@@ -168,9 +167,9 @@ class w3afCore:
                         self._strPlugins[depType].insert( 0, depPlugin )
             
             # Now we set the plugin options
-            pOptions = self.getPluginOptions(PluginType, pluginName)
-            if pOptions:
-                plugin.setOptions( self.getPluginOptions(PluginType, pluginName) )
+            if pluginName in self._pluginsOptions[ pluginType ]:
+                pOptions = self._pluginsOptions[ pluginType ][ pluginName ]
+                plugin.setOptions( pOptions )
                 
             # This sets the url opener for each module that is called inside the for loop
             plugin.setUrlOpener( self.uriOpener )
@@ -187,7 +186,7 @@ class w3afCore:
             if len( deps ) != 0:
                 # This plugin has dependencies, I should add the plugins in order
                 for plugin2 in requestedPluginsList:
-                    if PluginType+'.'+plugin2.getName() in deps and plugin2 not in orderedPluginList:
+                    if pluginType+'.'+plugin2.getName() in deps and plugin2 not in orderedPluginList:
                         orderedPluginList.insert( 1, plugin2)
 
             # Check if I was added because of a dep, if I wasnt, add me.
@@ -197,7 +196,7 @@ class w3afCore:
         # This should never happend.
         if len(orderedPluginList) != len(requestedPluginsList):
             om.out.error('There is an error in the way w3afCore orders plugins. The ordered plugin list length is not equal to the requested plugin list. ', newLine=False)
-            om.out.error('The error was found sorting plugins of type: '+ PluginType +'.')
+            om.out.error('The error was found sorting plugins of type: '+ pluginType +'.')
             om.out.error('Please report this bug to the developers including a complete list of commands that you run to get to this error.')
 
             om.out.error('Ordered plugins:')
@@ -663,8 +662,19 @@ class w3afCore:
             
         @return: No value is returned.
         '''
-        pluginName, PluginsOptions = parseOptions( pluginName, PluginsOptions )         
-        self._pluginsOptions[ pluginType ][ pluginName ] = PluginsOptions
+        pluginName, PluginsOptions = parseOptions( pluginName, PluginsOptions )
+        
+        # The following lines make sure that the plugin will accept the options
+        # that the user is setting to it.
+        pI = self.getPluginInstance( pluginName, pluginType )
+        try:
+            pI.setOptions( PluginsOptions )
+        except Exception, e:
+            raise e
+        else:
+            # Now that we are sure that this options are valid, lets save them
+            # so we can use them later!
+            self._pluginsOptions[ pluginType ][ pluginName ] = PluginsOptions
     
     def getPluginOptions(self, pluginType, pluginName):
         '''
@@ -855,36 +865,104 @@ class w3afCore:
                 
         raise w3afException('Plugin not found')
     
+    def saveCurrentToNewProfile( self, profileName, profileDesc='' ):
+        '''
+        Saves current config to a newly created profile.
+        
+        @parameter profileName: The profile to cloneProfile
+        @parameter profileDesc: The description of the new profile
+        
+        @return: True if the profile was successfully saved. Else, raise a w3afException.
+        '''
+        # Create the new profile.
+        profileInstance = profile()
+        profileInstance.setDesc( profileDesc )
+        profileInstance.setName( profileName )
+        profileInstance.save( profileName )
+        
+        # Save current to profile
+        return self.saveCurrentToProfile( profileName, profileDesc )
+
+    def saveCurrentToProfile( self, profileName, profileDesc='' ):
+        '''
+        Save the current configuration of the core to the profile called profileName.
+        
+        @return: True if the profile was successfully saved. Else, raise a w3afException.
+        '''
+        # Open the already existing profile
+        newProfile = profile(profileName)
+        
+        # Config the enabled plugins
+        for pType in self.getPluginTypes():
+            enabledPlugins = []
+            for pName in self.getEnabledPlugins(pType):
+                enabledPlugins.append( pName )
+            newProfile.setEnabledPlugins( pType, enabledPlugins )
+        
+        # Config the profile options
+        for pType in self.getPluginTypes():
+            for pName in self.getEnabledPlugins(pType):
+                pOptions = self.getPluginOptions( pType, pName )
+                if pOptions:
+                    newProfile.setPluginOptions( pType, pName, pOptions )
+                
+        # Config the profile target
+        if cf.cf.getData('targets'):
+            newProfile.setTarget( ' , '.join(cf.cf.getData('targets')) )
+        
+        # Config the profile name and description
+        newProfile.setDesc( profileDesc )
+        newProfile.setName( profileName )
+        
+        # Save the profile to the file
+        newProfile.save( profileName )
+        
+        return True
+        
+    def removeProfile( self, profileName ):
+        '''
+        @return: True if the profile was successfully removed. Else, raise a w3afException.
+        '''
+        profileInstance = profile( profileName )
+        profileInstance.remove()
+        return True
+        
     def useProfile( self, profileName ):
         '''
         Gets all the information from the profile, and runs it.
+        Raise a w3afException if the profile to load has some type of problem.
         '''
         # Clear all enabled plugins if profileName is None
         if profileName == None:
             self._initializeInternalVariables()
             return
         
-        # Do something with the profile if it is specified
-        if not profileName.endswith('.ini'):
-            profileName += '.ini'
-        if not profileName.startswith('profiles' + os.path.sep):
-            profileName = 'profiles' + os.path.sep + profileName
-            
-        profileInstance = profile( profileName ) 
-        for pluginType in self._plugins.keys():
-            pluginNames = profileInstance.getEnabledPlugins( pluginType )
-            self.setPlugins( pluginNames, pluginType )
-            '''
-            def setPluginOptions(self, pluginType, pluginName, PluginsOptions ):
-                @parameter PluginsOptions: A dict with the options for a plugin. For example:\
-                { 'script':'AAAA', 'timeout': 10 }
-            '''
-            for pluginName in profileInstance.getEnabledPlugins( pluginType ):
-                pluginOptions = profileInstance.getPluginOptions( pluginType, pluginName )
-                self.setPluginOptions( pluginType, pluginName, pluginOptions )
-                
-        # Set the target settings of the profile to the core
-        self.target.setOptions( profileInstance.getTarget() )
+        try:            
+            profileInstance = profile( profileName ) 
+        except w3afException, w3:
+            # The profile doesn't exist!
+            raise w3
+        else:
+            # It exists, work with it!
+            for pluginType in self._plugins.keys():
+                pluginNames = profileInstance.getEnabledPlugins( pluginType )
+                self.setPlugins( pluginNames, pluginType )
+                '''
+                def setPluginOptions(self, pluginType, pluginName, PluginsOptions ):
+                    @parameter PluginsOptions: A dict with the options for a plugin. For example:\
+                    { 'script':'AAAA', 'timeout': 10 }
+                '''
+                for pluginName in profileInstance.getEnabledPlugins( pluginType ):
+                    pluginOptions = profileInstance.getPluginOptions( pluginType, pluginName )
+                    try:
+                        self.setPluginOptions( pluginType, pluginName, pluginOptions )
+                    except Exception, e:
+                        # This is because of an invalid plugin, or something like that...
+                        # Added as a part of the fix of bug #1937272
+                        raise w3afException('The profile you are trying to load seems to be corrupt, or one of the enabled plugins has a bug. If your profile is ok, please report this as a bug to the w3af sourceforge page: Exception while setting '+ pluginName +' plugin options: "' + str(e) + '"' )
+                    
+            # Set the target settings of the profile to the core
+            self.target.setOptions( profileInstance.getTarget() )
     
     def getVersion( self ):
         # Let's check if the user is using a version from SVN
@@ -900,9 +978,10 @@ class w3afCore:
             pass
     
         res = 'w3af - Web Application Attack and Audit Framework'
-        res += '\nVersion: beta6'
-        res += '\nRevision: ' + str(revision)
-        res += '\nAuthor: Andres Riancho'
+        res += '\nVersion: beta7'
+        if revision != 0:
+            res += '\nRevision: ' + str(revision)
+        res += '\nAuthor: Andres Riancho and the w3af team.'
         return res
     
 # """"Singleton""""

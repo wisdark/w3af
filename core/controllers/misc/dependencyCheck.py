@@ -33,7 +33,8 @@ def dependencyCheck():
     om.out.debug('Checking dependencies:')
     
     try:
-        import extlib.pygoogle.google as pygoogle
+        pass
+#        import extlib.pygoogle.google as pygoogle
     except:
         try:
             import google as pygoogle
@@ -53,7 +54,8 @@ def dependencyCheck():
         
 
     try:
-        import extlib.SOAPpy.SOAPpy as SOAPpy
+        pass
+#        import extlib.SOAPpy.SOAPpy as SOAPpy
     except:
         try:
             import SOAPpy
@@ -62,7 +64,7 @@ def dependencyCheck():
             sys.exit( 1 )
         
     try:
-        from OpenSSL import SSL
+        pass #from OpenSSL import SSL
     except:
         print 'You have to install pyOpenSSL library. On Debian based distributions: apt-get install python-pyopenssl'
         sys.exit( 1 )

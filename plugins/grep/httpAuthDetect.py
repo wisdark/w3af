@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import core.data.parsers.htmlParser as htmlParser
 import core.controllers.outputManager as om
+# options
+from core.data.options.option import option
+from core.data.options.optionList import optionList
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
@@ -74,38 +77,33 @@ class httpAuthDetect(baseGrepPlugin):
                 v.setName( 'Basic HTTP credentials' )
                 
                 kb.kb.append( self , 'userPassUri' , v )
-                om.out.vulnerability( v.getDesc() )
+                om.out.vulnerability( v.getDesc(), severity=v.getSeverity() )
                 
             # I also search for authentication URI's in the body
             # I know that by doing this I loose the chance of finding hashes in PDF files, but...
             # This is much faster
             if isTextOrHtml( response.getHeaders() ):
-                for authURI in re.findall( '\w{2,10}://(.*?):(.*?)@' , response.getBody() ):
+                for authURI in re.findall( '\w{2,10}://.*?:.*?@' , response.getBody() ):
                     v = vuln.vuln()
                     v.setURL( response.getURL() )
                     v.setId( response.id )
-                    v.setDesc( 'The resource: '+ response.getURL() + ' has a user and password in the body. The offending code is: "' + authURI + '".')
+                    v.setDesc( 'The resource: '+ response.getURL() + ' has a user and password in the body. The offending URL is: "' + authURI + '".')
                     
                     v.setSeverity(severity.HIGH)
                     v.setName( 'Basic HTTP credentials' )
                     
                     kb.kb.append( self , 'userPassUri' , v )
-                    om.out.vulnerability( v.getDesc() )
+                    om.out.vulnerability( v.getDesc(), severity=v.getSeverity() )
             
     def setOptions( self, OptionList ):
         pass
     
-    def getOptionsXML(self):
+    def getOptions( self ):
         '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/output.xsd
-        '''
-        return  '<?xml version="1.0" encoding="ISO-8859-1"?>\
-        <OptionList>\
-        </OptionList>\
-        '
+        @return: A list of option objects for this plugin.
+        '''    
+        ol = optionList()
+        return ol
 
     def getPluginDeps( self ):
         '''

@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 import core.controllers.outputManager as om
+# options
+from core.data.options.option import option
+from core.data.options.optionList import optionList
 from core.controllers.basePlugin.baseAttackPlugin import baseAttackPlugin
 from core.controllers.w3afException import w3afException
 from core.controllers.daemons.proxy import *
@@ -201,6 +204,9 @@ class googleProxy(baseAttackPlugin):
         </OptionList>\
         '
 
+    def getExploitableVulns( self ):
+        return []
+        
     def getPluginDeps( self ):
         '''
         @return: A list with the names of the plugins that should be runned before the

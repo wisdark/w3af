@@ -169,6 +169,11 @@ class pluginsTypeMenu(menu):
             elif plugin not in enabled:
                 enabled.append(plugin)
         
+        if self._name == 'output' and 'console' not in enabled:
+            om.out.console("Warning: it's not allowed to disable \
+                console output plugin in the console UI")
+            enabled.append('console')
+            
         self._w3af.setPlugins(enabled, self._name)
 
     def _cmd_desc(self, params):

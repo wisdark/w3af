@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+# options
+from core.data.options.option import option
+from core.data.options.optionList import optionList
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
@@ -58,6 +61,8 @@ class errorPages(baseGrepPlugin):
         # ASP error I found during a pentest, the ASP used a foxpro db, not a SQL injection
         mesg.append('<font face="Arial" size=2>error \'800a0005\'</font>')
         mesg.append('<h2> <i>Runtime Error</i> </h2></span>')
+        # ASPX
+        mesg.append('<b> Description: </b>An unhandled exception occurred during the execution of the current web request. Please review the stack trace')
         
         # Struts
         mesg.append('] does not contain handler parameter named')
@@ -66,7 +71,12 @@ class errorPages(baseGrepPlugin):
         mesg.append('<b>Warning</b>: ')
         mesg.append('No row with the given identifier')
         mesg.append("eval()'d code</b> on line <b>")
-
+        
+        # python
+        mesg.append("PythonHandler django.core.handlers.modpython")
+        mesg.append("t = loader.get_template(template_name) # You need to create a 404.html template.")
+        mesg.append('<h2>Traceback <span>(innermost last)</span></h2>')
+        
         # Java
         mesg.append('[java.lang.')
         mesg.append('class java.lang.')
@@ -135,17 +145,12 @@ class errorPages(baseGrepPlugin):
     def setOptions( self, OptionList ):
         pass
     
-    def getOptionsXML(self):
+    def getOptions( self ):
         '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/output.xsd
-        '''
-        return  '<?xml version="1.0" encoding="ISO-8859-1"?>\
-        <OptionList>\
-        </OptionList>\
-        '
+        @return: A list of option objects for this plugin.
+        '''    
+        ol = optionList()
+        return ol
 
     def end(self):
         '''

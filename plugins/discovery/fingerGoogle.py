@@ -21,6 +21,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+# options
+from core.data.options.option import option
+from core.data.options.optionList import optionList
+
 from core.controllers.w3afException import w3afException
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
@@ -87,20 +91,32 @@ class fingerGoogle(baseDiscoveryPlugin):
         '''
         Only search for mail addresses in the google result page.
         '''
-        resultPageObjects = self._google.getNResultPages( '@'+ self._domainRoot , self._resultLimit )
-        
-        for result in resultPageObjects:
-            self._parseDocument( result )
+        try:
+            resultPageObjects = self._google.getNResultPages( '@'+ self._domainRoot , self._resultLimit )
+        except w3afException, w3:
+            om.out.error(str(w3))
+            # If I found an error, I don't want to be run again
+            raise w3afRunOnce()
+        else:
+            # Happy happy joy, no error here!
+            for result in resultPageObjects:
+                self._parseDocument( result )
         
     def _doCompleteSearch( self, domain ):
         '''
         Performs a complete search for email addresses.
         '''
-        results = self._google.getNResults( '@'+ self._domainRoot , self._resultLimit )
-        
-        for result in results:
-            targs = (result,)
-            self._tm.startFunction( target=self._findAccounts, args=targs, ownerObj=self )
+        try:
+            resultPageObjects = self._google.getNResultPages( '@'+ self._domainRoot , self._resultLimit )
+        except w3afException, w3:
+            om.out.error(str(w3))
+            # If I found an error, I don't want to be run again
+            raise w3afRunOnce()
+        else:
+            # Happy happy joy, no error here!
+            for result in resultPageObjects:
+                targs = (result,)
+                self._tm.startFunction( target=self._findAccounts, args=targs, ownerObj=self )
             
     def _findAccounts(self, googlePage ):
         '''
@@ -142,43 +158,31 @@ class fingerGoogle(baseDiscoveryPlugin):
                 kb.kb.append( 'mails', 'mails', i )
                 kb.kb.append( self, 'mails', i )
     
-    def getOptionsXML(self):
+    def getOptions( self ):
         '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/ui/userInterface.dtd
+        @return: A list of option objects for this plugin.
+        '''
+        d1 = 'Google API License key'
+        h1 = 'To use this plugin you have to own your own google API license key OR you can directly use the search engine using clasic HTTP. If this parameter is left blank, the search engine will be used, otherwise the google webservice will be used.Go to http://www.google.com/apis/ to get more information.'
+        o1 = option('key', self._key, d1, 'string', help=h1)
         
-        @return: XML with the plugin options.
-        ''' 
-        return  '<?xml version="1.0" encoding="ISO-8859-1"?>\
-        <OptionList>\
-            <Option name="key">\
-                <default>'+self._key+'</default>\
-                <desc>Google API License key</desc>\
-                <type>string</type>\
-                <help>To use this plugin you have to own your own google API license key OR you can directly use the search engine using clasic HTTP. If this parameter is left blank, the search engine will be used, otherwise the google webservice will be used.Go to http://www.google.com/apis/ to get more information.</help>\
-            </Option>\
-            <Option name="resultLimit">\
-                <default>'+str(self._resultLimit)+'</default>\
-                <desc>Fetch the first "resultLimit" results from the Google search</desc>\
-                <type>integer</type>\
-                <help></help>\
-            </Option>\
-            <Option name="fastSearch">\
-                <default>'+str(self._fastSearch)+'</default>\
-                <desc>Do a fast search, when this feature is enabled, not all mail addresses are found</desc>\
-                <type>boolean</type>\
-                <help>This method is faster, because it only searches for emails in the small page snippet that google shows\
-                to the user after performing a common search.</help>\
-            </Option>\
-        </OptionList>\
-        '
-
+        d2 = 'Fetch the first "resultLimit" results from the Google search'
+        o2 = option('resultLimit', self._resultLimit, d2, 'integer')
+        
+        d3 = 'Do a fast search, when this feature is enabled, not all mail addresses are found'
+        h3 = 'This method is faster, because it only searches for emails in the small page snippet that google shows to the user after performing a common search.'
+        o3 = option('fastSearch', self._fastSearch, d3, 'boolean', help=h3)
+        
+        ol = optionList()
+        ol.add(o1)
+        ol.add(o2)
+        ol.add(o3)
+        return ol
+        
     def setOptions( self, optionsMap ):
         '''
         This method sets all the options that are configured using the user interface 
-        generated by the framework using the result of getOptionsXML().
+        generated by the framework using the result of getOptions().
         
         @parameter OptionList: A dictionary with the options for the plugin.
         @return: No value is returned.
