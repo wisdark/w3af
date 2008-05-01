@@ -52,6 +52,7 @@ class consoleUi:
         self._position = 0 # cursor position
         self._history = historyTable() # each menu has array of (array, positionInArray)
         self._trace = []
+        self._disableConsole = False
 
         self._handlers = { '\t' : self._onTab, \
             '\r' : self._onEnter, \
@@ -80,13 +81,27 @@ class consoleUi:
     def __initFromParent(self, parent):
         self._context = parent._context
         self._w3af = parent._w3af
+
+    def disableConsoleIfNeed(self):
+        if self._disableConsole:
+            plugins = self._w3af.getEnabledPlugins('output')
+            if 'console' in plugins:
+                del plugins[plugins.index('console')]
+                self._w3af.setPlugins(plugins, 'output')
+
+    def enableConsole(self):
+        plugins = self._w3af.getEnabledPlugins('output')
+        if 'console' not in plugins:
+            plugins.append('console')
+            self._w3af.setPlugins(plugins, 'output')
+
         
     def sh(self, name='w3af', callback=None):
         '''
         Main cycle
         '''
 
-        om.out.console("WARNING: This branch is under development and unstable. \n \
+        om.out.console("WARNING: This branch is under development and unstable. \n\
 Please see http://w3af.sourceforge.net for the stable version info.")
         if callback:
             if hasattr(self, '_context'):

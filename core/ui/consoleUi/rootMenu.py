@@ -52,9 +52,12 @@ class rootMenu(menu):
         try:
             self._w3af.initPlugins()
             self._w3af.verifyEnvironment()
+            self._console.disableConsoleIfNeed()
             self._w3af.start()
         except Exception, e:
             om.out.console(str(e))
+        finally:
+            self._console.enableConsole()
  
     def _cmd_version(self, params):
         '''

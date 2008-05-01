@@ -122,7 +122,8 @@ class pluginsTypeMenu(menu):
       
 
     def suggestCommands(self, part):
-        return suggest(self._plugins.keys() + ['all'], part, True)
+        return suggest(self._plugins.keys() + ['all'], part, True) \
+            + suggest(['config'], part, False)
 
     def suggestParams(self, command, params, part):
         if command in self.getCommands():
@@ -145,7 +146,8 @@ class pluginsTypeMenu(menu):
             return self
 
     def _enablePlugins(self, list):
-        enabled = copy.copy(self._w3af.getEnabledPlugins(self._name))
+        prevEnabled = self._w3af.getEnabledPlugins(self._name)
+        enabled = copy.copy(prevEnabled)
         
         for plugin in list:
             if plugin=='':
@@ -169,11 +171,17 @@ class pluginsTypeMenu(menu):
             elif plugin not in enabled:
                 enabled.append(plugin)
         
-        if self._name == 'output' and 'console' not in enabled:
-            om.out.console("Warning: it's not allowed to disable \
-                console output plugin in the console UI")
-            enabled.append('console')
-            
+        if self._name == 'output':
+            if 'console' not in enabled:
+                self._console._disableConsole = True
+
+                om.out.console("Warning: console output plugin will be \
+disabled during the scan.")
+
+                enabled.append('console')
+            else:
+                self._console._disableConsole = False
+    
         self._w3af.setPlugins(enabled, self._name)
 
     def _cmd_desc(self, params):
