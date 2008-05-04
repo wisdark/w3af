@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Project SYSTEM "Project-3.9.dtd">
 <!-- Project file for project w3af -->
-<!-- Saved: 2008-02-02, 17:12:09 -->
+<!-- Saved: 2008-05-03, 12:54:17 -->
 <!-- Copyright (C) 2008 Andres Riancho, andres.riancho@gmail.com -->
 <Project version="3.9">
   <ProgLanguage mixed="0">Python</ProgLanguage>
@@ -184,13 +184,6 @@
       <Dir>data</Dir>
       <Dir>url</Dir>
       <Dir>handlers</Dir>
-      <Name>idHandler.py</Name>
-    </Source>
-    <Source>
-      <Dir>core</Dir>
-      <Dir>data</Dir>
-      <Dir>url</Dir>
-      <Dir>handlers</Dir>
       <Name>certHTTPSHandler.py</Name>
     </Source>
     <Source>
@@ -365,11 +358,6 @@
       <Dir>core</Dir>
       <Dir>controllers</Dir>
       <Name>w3afException.py</Name>
-    </Source>
-    <Source>
-      <Dir>core</Dir>
-      <Dir>controllers</Dir>
-      <Name>sessionManager.py</Name>
     </Source>
     <Source>
       <Dir>core</Dir>
@@ -646,11 +634,6 @@
       <Dir>plugins</Dir>
       <Dir>discovery</Dir>
       <Name>phishtank.py</Name>
-    </Source>
-    <Source>
-      <Dir>plugins</Dir>
-      <Dir>discovery</Dir>
-      <Name>error404page.py</Name>
     </Source>
     <Source>
       <Dir>plugins</Dir>
@@ -2455,14 +2438,6 @@
       <Name>script-spiderMan.w3af</Name>
     </Source>
     <Source>
-      <Dir>scripts</Dir>
-      <Name>script-resume.w3af</Name>
-    </Source>
-    <Source>
-      <Dir>scripts</Dir>
-      <Name>script-save.w3af</Name>
-    </Source>
-    <Source>
       <Dir>plugins</Dir>
       <Dir>audit</Dir>
       <Name>phishingVector.py</Name>
@@ -2491,10 +2466,6 @@
     <Source>
       <Dir>scripts</Dir>
       <Name>script-pyktoMutate.w3af</Name>
-    </Source>
-    <Source>
-      <Dir>scripts</Dir>
-      <Name>script-save-2.w3af</Name>
     </Source>
     <Source>
       <Dir>scripts</Dir>
@@ -2912,11 +2883,6 @@
     </Source>
     <Source>
       <Dir>plugins</Dir>
-      <Dir>discovery</Dir>
-      <Name>mailer.py</Name>
-    </Source>
-    <Source>
-      <Dir>plugins</Dir>
       <Dir>grep</Dir>
       <Name>codeDisclosure.py</Name>
     </Source>
@@ -3153,11 +3119,6 @@
       <Dir>extlib</Dir>
       <Dir>pyrijndael</Dir>
       <Name>__init__.py</Name>
-    </Source>
-    <Source>
-      <Dir>plugins</Dir>
-      <Dir>discovery</Dir>
-      <Name>web20Spider.py</Name>
     </Source>
     <Source>
       <Dir>plugins</Dir>
@@ -3601,12 +3562,6 @@
       <Name>TODO</Name>
     </Source>
     <Source>
-      <Dir>core</Dir>
-      <Dir>controllers</Dir>
-      <Dir>misc</Dir>
-      <Name>progressBar.py</Name>
-    </Source>
-    <Source>
       <Dir>plugins</Dir>
       <Dir>grep</Dir>
       <Name>motw.py</Name>
@@ -3720,12 +3675,6 @@
       <Dir>core</Dir>
       <Dir>ui</Dir>
       <Dir>consoleUi</Dir>
-      <Name>ecma48.py</Name>
-    </Source>
-    <Source>
-      <Dir>core</Dir>
-      <Dir>ui</Dir>
-      <Dir>consoleUi</Dir>
       <Name>history.py</Name>
     </Source>
     <Source>
@@ -3733,12 +3682,6 @@
       <Dir>ui</Dir>
       <Dir>consoleUi</Dir>
       <Name>menu.py</Name>
-    </Source>
-    <Source>
-      <Dir>core</Dir>
-      <Dir>ui</Dir>
-      <Dir>consoleUi</Dir>
-      <Name>posixterm.py</Name>
     </Source>
     <Source>
       <Dir>core</Dir>
@@ -3757,6 +3700,59 @@
       <Dir>ui</Dir>
       <Dir>consoleUi</Dir>
       <Name>util.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Dir>io</Dir>
+      <Name>common.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Dir>io</Dir>
+      <Name>console.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Dir>io</Dir>
+      <Name>__init__.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Dir>io</Dir>
+      <Name>unixctrl.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Dir>io</Dir>
+      <Name>winctrl.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>callbackMenu.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>help.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>consoleUi</Dir>
+      <Name>help.xml</Name>
     </Source>
   </Sources>
   <Forms>
