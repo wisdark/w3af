@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Tasks SYSTEM "Tasks-4.1.dtd">
 <!-- eric4 tasks file for project w3af -->
-<!-- Saved: 2009-03-16, 00:44:22 -->
+<!-- Saved: 2009-03-27, 18:59:16 -->
 <Tasks version="4.1">
   <Task priority="1" completed="False" bugfix="True">
     <Summary>FIXME: review this, I'm not sure *when* activate this</Summary>
@@ -419,20 +419,6 @@
       <Linenumber>292</Linenumber>
     </Resource>
   </Task>
-  <Task priority="1" completed="False" bugfix="False">
-    <Summary>TODO: Update this, it changes</Summary>
-    <Description></Description>
-    <Created>2008-12-24, 21:32:55</Created>
-    <Resource>
-      <Filename>
-        <Dir>core</Dir>
-        <Dir>data</Dir>
-        <Dir>searchEngines</Dir>
-        <Name>googleSearchEngine.py</Name>
-      </Filename>
-      <Linenumber>156</Linenumber>
-    </Resource>
-  </Task>
   <Task priority="1" completed="False" bugfix="True">
     <Summary>FIXME: This method sucks, I should do something like</Summary>
     <Description></Description>
@@ -457,19 +443,6 @@
         <Name>hashFind.py</Name>
       </Filename>
       <Linenumber>108</Linenumber>
-    </Resource>
-  </Task>
-  <Task priority="1" completed="False" bugfix="False">
-    <Summary>TODO: develop more plugins, there is a nice ( all python ) metadata reader named hachoir-metadata</Summary>
-    <Description></Description>
-    <Created>2008-12-31, 00:18:13</Created>
-    <Resource>
-      <Filename>
-        <Dir>plugins</Dir>
-        <Dir>grep</Dir>
-        <Name>passwordProfiling.py</Name>
-      </Filename>
-      <Linenumber>52</Linenumber>
     </Resource>
   </Task>
   <Task priority="1" completed="False" bugfix="True">
@@ -644,19 +617,6 @@
         <Name>phpinfo.py</Name>
       </Filename>
       <Linenumber>110</Linenumber>
-    </Resource>
-  </Task>
-  <Task priority="1" completed="False" bugfix="False">
-    <Summary>TODO: review this code !!</Summary>
-    <Description></Description>
-    <Created>2009-01-26, 10:38:10</Created>
-    <Resource>
-      <Filename>
-        <Dir>plugins</Dir>
-        <Dir>discovery</Dir>
-        <Name>urlFuzzer.py</Name>
-      </Filename>
-      <Linenumber>159</Linenumber>
     </Resource>
   </Task>
   <Task priority="1" completed="False" bugfix="True">
@@ -1055,20 +1015,6 @@
       <Linenumber>204</Linenumber>
     </Resource>
   </Task>
-  <Task priority="1" completed="False" bugfix="True">
-    <Summary>FIXME: Not 100% sure about this...</Summary>
-    <Description></Description>
-    <Created>2009-03-05, 09:52:56</Created>
-    <Resource>
-      <Filename>
-        <Dir>core</Dir>
-        <Dir>data</Dir>
-        <Dir>options</Dir>
-        <Name>option.py</Name>
-      </Filename>
-      <Linenumber>137</Linenumber>
-    </Resource>
-  </Task>
   <Task priority="1" completed="False" bugfix="False">
     <Summary>TODO: For some reason this method failed to work:</Summary>
     <Description></Description>
@@ -1109,20 +1055,6 @@
         <Name>reqResViewer.py</Name>
       </Filename>
       <Linenumber>367</Linenumber>
-    </Resource>
-  </Task>
-  <Task priority="1" completed="False" bugfix="True">
-    <Summary>FIXME: What about repeated parameter names?!</Summary>
-    <Description></Description>
-    <Created>2009-03-10, 15:12:39</Created>
-    <Resource>
-      <Filename>
-        <Dir>core</Dir>
-        <Dir>data</Dir>
-        <Dir>request</Dir>
-        <Name>fuzzableRequest.py</Name>
-      </Filename>
-      <Linenumber>98</Linenumber>
     </Resource>
   </Task>
   <Task priority="1" completed="False" bugfix="False">
@@ -1166,23 +1098,51 @@
     </Resource>
   </Task>
   <Task priority="1" completed="False" bugfix="True">
-    <Summary>FIXME: What if we have something like this: &amp;aacute ?!?!</Summary>
+    <Summary>FIXME: What about repeated parameter names?!</Summary>
     <Description></Description>
-    <Created>2009-03-10, 17:39:47</Created>
+    <Created>2009-03-11, 08:30:02</Created>
     <Resource>
       <Filename>
         <Dir>core</Dir>
         <Dir>data</Dir>
-        <Dir>parsers</Dir>
-        <Name>encode_decode.py</Name>
+        <Dir>request</Dir>
+        <Name>fuzzableRequest.py</Name>
       </Filename>
-      <Linenumber>39</Linenumber>
+      <Linenumber>98</Linenumber>
+    </Resource>
+  </Task>
+  <Task priority="1" completed="False" bugfix="False">
+    <Summary>TODO: Update this, it changes</Summary>
+    <Description></Description>
+    <Created>2009-03-11, 08:53:55</Created>
+    <Resource>
+      <Filename>
+        <Dir>core</Dir>
+        <Dir>data</Dir>
+        <Dir>searchEngines</Dir>
+        <Name>googleSearchEngine.py</Name>
+      </Filename>
+      <Linenumber>156</Linenumber>
+    </Resource>
+  </Task>
+  <Task priority="1" completed="False" bugfix="True">
+    <Summary>FIXME: Not 100% sure about this...</Summary>
+    <Description></Description>
+    <Created>2009-03-11, 09:45:41</Created>
+    <Resource>
+      <Filename>
+        <Dir>core</Dir>
+        <Dir>data</Dir>
+        <Dir>options</Dir>
+        <Name>option.py</Name>
+      </Filename>
+      <Linenumber>137</Linenumber>
     </Resource>
   </Task>
   <Task priority="1" completed="False" bugfix="True">
     <Summary>FIXME: hmmm I think that we are missing something here... what about self._select values. See FIXME below.</Summary>
     <Description></Description>
-    <Created>2009-03-10, 17:55:46</Created>
+    <Created>2009-03-11, 09:55:05</Created>
     <Resource>
       <Filename>
         <Dir>core</Dir>
@@ -1196,7 +1156,7 @@
   <Task priority="1" completed="False" bugfix="True">
     <Summary>FIXME: how do you maintain the same value in self._selects[name] and in self[name] ?</Summary>
     <Description></Description>
-    <Created>2009-03-10, 17:55:46</Created>
+    <Created>2009-03-11, 09:55:05</Created>
     <Resource>
       <Filename>
         <Dir>core</Dir>
@@ -1204,13 +1164,13 @@
         <Dir>dc</Dir>
         <Name>form.py</Name>
       </Filename>
-      <Linenumber>199</Linenumber>
+      <Linenumber>198</Linenumber>
     </Resource>
   </Task>
   <Task priority="1" completed="False" bugfix="True">
     <Summary>FIXME: Needs to support repeated parameter names</Summary>
     <Description></Description>
-    <Created>2009-03-10, 17:55:46</Created>
+    <Created>2009-03-11, 09:55:05</Created>
     <Resource>
       <Filename>
         <Dir>core</Dir>
@@ -1218,13 +1178,56 @@
         <Dir>dc</Dir>
         <Name>form.py</Name>
       </Filename>
-      <Linenumber>297</Linenumber>
+      <Linenumber>296</Linenumber>
+    </Resource>
+  </Task>
+  <Task priority="1" completed="False" bugfix="True">
+    <Summary>FIXME: What if we have something like this: &amp;aacute ?!?!</Summary>
+    <Description></Description>
+    <Created>2009-03-11, 10:42:24</Created>
+    <Resource>
+      <Filename>
+        <Dir>core</Dir>
+        <Dir>data</Dir>
+        <Dir>parsers</Dir>
+        <Name>encode_decode.py</Name>
+      </Filename>
+      <Linenumber>39</Linenumber>
+    </Resource>
+  </Task>
+  <Task priority="1" completed="False" bugfix="True">
+    <Summary>FIXME: This is a kludge. Should we get lists as attr?!</Summary>
+    <Description></Description>
+    <Created>2009-03-12, 13:13:57</Created>
+    <Resource>
+      <Filename>
+        <Dir>core</Dir>
+        <Dir>data</Dir>
+        <Dir>parsers</Dir>
+        <Name>htmlParser.py</Name>
+      </Filename>
+      <Linenumber>179</Linenumber>
+    </Resource>
+  </Task>
+  <Task priority="1" completed="False" bugfix="True">
+    <Summary>FIXME: What if the user doesn't want to add these headers?</Summary>
+    <Description></Description>
+    <Created>2009-03-13, 08:43:37</Created>
+    <Resource>
+      <Filename>
+        <Dir>core</Dir>
+        <Dir>data</Dir>
+        <Dir>url</Dir>
+        <Dir>handlers</Dir>
+        <Name>logHandler.py</Name>
+      </Filename>
+      <Linenumber>122</Linenumber>
     </Resource>
   </Task>
   <Task priority="1" completed="False" bugfix="False">
     <Summary>TODO: THIS SUCKS</Summary>
     <Description></Description>
-    <Created>2009-03-16, 00:39:40</Created>
+    <Created>2009-03-13, 09:23:12</Created>
     <Resource>
       <Filename>
         <Dir>core</Dir>
@@ -1238,7 +1241,7 @@
   <Task priority="1" completed="False" bugfix="False">
     <Summary>TODO: The problem is that the urllib2 library fails even if i do this tests, it fails if it finds javascript: in some part of the URL</Summary>
     <Description></Description>
-    <Created>2009-03-16, 00:39:40</Created>
+    <Created>2009-03-13, 09:23:12</Created>
     <Resource>
       <Filename>
         <Dir>core</Dir>
@@ -1247,6 +1250,32 @@
         <Name>xUrllib.py</Name>
       </Filename>
       <Linenumber>418</Linenumber>
+    </Resource>
+  </Task>
+  <Task priority="1" completed="False" bugfix="False">
+    <Summary>TODO: review this code !!</Summary>
+    <Description></Description>
+    <Created>2009-03-13, 09:48:19</Created>
+    <Resource>
+      <Filename>
+        <Dir>plugins</Dir>
+        <Dir>discovery</Dir>
+        <Name>urlFuzzer.py</Name>
+      </Filename>
+      <Linenumber>159</Linenumber>
+    </Resource>
+  </Task>
+  <Task priority="1" completed="False" bugfix="False">
+    <Summary>TODO: develop more plugins, there is a nice ( all python ) metadata reader named hachoir-metadata</Summary>
+    <Description></Description>
+    <Created>2009-03-23, 19:01:56</Created>
+    <Resource>
+      <Filename>
+        <Dir>plugins</Dir>
+        <Dir>grep</Dir>
+        <Name>passwordProfiling.py</Name>
+      </Filename>
+      <Linenumber>52</Linenumber>
     </Resource>
   </Task>
 </Tasks>
