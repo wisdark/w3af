@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from core.data.parsers.urlParser import uri2url
 import core.data.constants.severity as severity
-
+import core.data.vulnReferences.vulnReferences as vr
 
 class info(dict):
     '''
@@ -40,6 +40,9 @@ class info(dict):
         self._id = None
         self._name = ''
         self._dc = None
+        self._w3afid = ''    
+        self._refsource = []
+        self._refurl = []             
         self._string_matches = set()
             
         # Clone the info object!
@@ -50,6 +53,7 @@ class info(dict):
             self.setVar( dataObj.getVar() )
             self.setId( dataObj.getId() )
             self.setName( dataObj.getName() )
+            self.setW3afId( dataObj.getW3afId() )            
             self.setDc( dataObj.getDc() )
             for k in dataObj.keys():
                 self[ k ] = dataObj[ k ]
@@ -63,6 +67,26 @@ class info(dict):
     def setName( self, name ):
         self._name = name
         
+    def setW3afId( self, w3afid ):
+        self._w3afid = w3afid
+        self.setRefSource(vr.vr.getRefInfo(self._w3afid, "source"))
+        self.setRefUrl(vr.vr.getRefInfo(self._w3afid, "url"))
+          
+    def getW3afId(self):
+        return self._w3afid
+
+    def getRefSource(self):
+        return self._refsource
+    
+    def setRefSource(self, refsource):
+        self._refsource = refsource
+        
+    def getRefUrl(self):
+        return self._refurl
+    
+    def setRefUrl(self,refurl):
+        self._refurl = refurl
+             
     def getName( self ):
         return self._name
     

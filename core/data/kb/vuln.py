@@ -40,6 +40,9 @@ class vuln(info):
         self._severity = None
         self._variable = None
         self._mutant = None
+        self._w3afid = None     
+        self._refsource = []
+        self._refurl = []          
         
         if isinstance( dataObj, mutant ) or isinstance( dataObj, vuln):
             self.setMethod( dataObj.getMethod() )

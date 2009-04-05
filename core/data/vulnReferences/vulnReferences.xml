@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<w3afvulnmap>
+    <vulnerability>
+        <vulnid>00001</vulnid>
+        <vulnname>Cross site tracing vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>www.owasp.org/index.php/Cross_Site_Tracing</url>
+        </reference>
+        <reference>
+                <source>0001CGI Security</source>
+                <url>http://www.cgisecurity.com/whitehat-mirror/WH-WhitePaper_XST_ebook.pdf</url>
+        </reference>
+        <reference>
+                <source>OSVDB</source>
+                <url>http://osvdb.org/show/osvdb/877</url>
+        </reference>            
+    </vulnerability>
+    <vulnerability>
+        <vulnid>0002</vulnid>
+        <vulnname>Cross site tracing vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>www.owasp.org/index.php/Cross_Site_Tracing</url>
+        </reference>
+        <reference>
+                <source>CGI Security</source>
+                <url>http://www.cgisecurity.com/whitehat-mirror/WH-WhitePaper_XST_ebook.pdf</url>
+        </reference>
+        <reference>
+                <source>0002OSVDB</source>
+                <url>0002http://osvdb.org/show/osvdb/877</url>
+        </reference>            
+    </vulnerability>
+</w3afvulnmap>

@@ -207,13 +207,30 @@ class xmlFile(baseOutputPlugin):
             messageNode.setAttribute("method", str(i.getMethod()))
             messageNode.setAttribute("url", str(i.getURL()))
             messageNode.setAttribute("var", str(i.getVar()))
+            messageNode.setAttribute("w3afid", str(i.getW3afId())) 
             if i.getId():
                 messageNode.setAttribute("id", str(i.getId()))
-            messageNode.setAttribute("name", str(i.getName()))
+            messageNode.setAttribute("name", str(i.getName()))    
             description = self._xmldoc.createTextNode(i.getDesc())
             messageNode.appendChild(description)
             self._topElement.appendChild(messageNode)
-        
+
+            #add reference information for documented vulns
+            reference = self._xmldoc.createElement("reference")
+            messageNode.appendChild(reference)                                    
+            source = i.getRefSource()
+            url = i.getRefUrl()
+            if source:
+                for j in range(len(source)):
+                    sourcetag = self._xmldoc.createElement("source")
+                    sourcetext = self._xmldoc.createTextNode(str(source[j]))
+                    reference.appendChild(sourcetag)
+                    sourcetag.appendChild(sourcetext)
+                    urltag = self._xmldoc.createElement("refurl")
+                    urltext = self._xmldoc.createTextNode(str(url[j]))
+                    reference.appendChild(urltag)
+                    urltag.appendChild(urltext)
+           
           # Add the information results
           infos = kb.kb.getAllInfos()
           for i in infos:
