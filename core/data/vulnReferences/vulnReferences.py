@@ -34,7 +34,7 @@ class vulnReferences:
 
     def __init__(self):
         self._xmlfilename = 'core' + os.path.sep + 'data' + os.path.sep
-        self._ghdb_file += 'vulnReferences' + os.path.sep + 'vulnReferences.xml'        
+        self._xmlfilename += 'vulnReferences' + os.path.sep + 'vulnReferences.xml'        
         self._vulnarray = []
         self._findingsource = []
         self._w3afid=''
