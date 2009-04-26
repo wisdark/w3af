@@ -1,5 +1,5 @@
 '''
-xmlFile.py
+vulnReferences.py
 
 Copyright 2006 Andres Riancho
 
