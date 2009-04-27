@@ -110,6 +110,7 @@ class dotNetErrors(baseDiscoveryPlugin):
             v.setId( response.id )
             v.setSeverity(severity.LOW)
             v.setName( 'Information disclosure' )
+            v.setW3afId('00005')
             msg = 'Detailed information about ASP.NET error messages can be viewed from remote'
             msg += '  sites. The URL: "' + response.getURL() + '" discloses detailed error'
             msg += ' messages.'

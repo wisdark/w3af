@@ -102,6 +102,7 @@ class crossDomain(baseDiscoveryPlugin):
                             v.setURL( response.getURL() )
                             v.setMethod( 'GET' )
                             v.setName( 'Insecure crossdomain.xml settings' )
+                            v.setW3afId('00004')
                             v.setSeverity(severity.LOW)
                             msg = 'The crossdomain.xml file at "' + cross_domain_url + '" allows'
                             msg += ' flash access from any site.'

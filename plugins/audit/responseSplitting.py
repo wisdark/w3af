@@ -103,6 +103,7 @@ class responseSplitting(baseAuditPlugin):
             v.setId( response.id )
             v.setSeverity(severity.MEDIUM)
             v.setName( 'Response splitting vulnerability' )
+            v.setW3afId('00033')
             kb.kb.append( self, 'responseSplitting', v )
     
     def end(self):

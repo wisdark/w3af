@@ -1,35 +1,79 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <w3afvulnmap>
     <vulnerability>
-        <vulnid>00001</vulnid>
-        <vulnname>Cross site tracing vulnerability</vulnname>
+        <vulnid>00004</vulnid>
+        <vulnname>Insecure crossdomain.xml settings</vulnname>
         <reference>
-                <source>OWASP</source>
-                <url>www.owasp.org/index.php/Cross_Site_Tracing</url>
-        </reference>
-        <reference>
-                <source>0001CGI Security</source>
-                <url>http://www.cgisecurity.com/whitehat-mirror/WH-WhitePaper_XST_ebook.pdf</url>
-        </reference>
-        <reference>
-                <source>OSVDB</source>
-                <url>http://osvdb.org/show/osvdb/877</url>
-        </reference>            
+                <source>Adobe</source>
+                <url>http://kb.adobe.com/selfservice/viewContent.do?externalId=tn_14213</url>
+        </reference>        
     </vulnerability>
     <vulnerability>
-        <vulnid>0002</vulnid>
-        <vulnname>Cross site tracing vulnerability</vulnname>
+        <vulnid>00005</vulnid>
+        <vulnname>Information disclosure</vulnname>
         <reference>
                 <source>OWASP</source>
-                <url>www.owasp.org/index.php/Cross_Site_Tracing</url>
-        </reference>
+                <url>http://www.owasp.org/index.php/ASP.NET_Misconfigurations</url>
+        </reference>        
+    </vulnerability>    
+    <vulnerability>
+        <vulnid>00032</vulnid>
+        <vulnname>Unidentified vulnerability</vulnname>
         <reference>
-                <source>CGI Security</source>
-                <url>http://www.cgisecurity.com/whitehat-mirror/WH-WhitePaper_XST_ebook.pdf</url>
-        </reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Improper_Data_Validation</url>
+        </reference>        
+    </vulnerability>     
+    <vulnerability>
+        <vulnid>00033</vulnid>
+        <vulnname>Response splitting vulnerability</vulnname>
         <reference>
-                <source>0002OSVDB</source>
-                <url>0002http://osvdb.org/show/osvdb/877</url>
-        </reference>            
-    </vulnerability>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/HTTP_Response_Splitting</url>
+        </reference>        
+        <reference>
+                <source>WebAppSec</source>
+                <url>http://www.webappsec.org/projects/threat/classes/http_response_splitting.shtml</url>
+        </reference>          
+    </vulnerability>      
+    <vulnerability>
+        <vulnid>00034</vulnid>
+        <vulnname>Secure content over insecure channel</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Insecure_Transport</url>
+        </reference>                 
+    </vulnerability>          
+    <vulnerability>
+        <vulnid>00036</vulnid>
+        <vulnname>SQL injection vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/SQL_injection</url>
+        </reference>                 
+    </vulnerability>     
+    <vulnerability>
+        <vulnid>00037</vulnid>
+        <vulnname>Cross site scripting vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Cross_site_scripting</url>
+        </reference>                 
+    </vulnerability>      
+    <vulnerability>
+        <vulnid>00038</vulnid>
+        <vulnname>Permanent cross site scripting vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Cross_site_scripting</url>
+        </reference>                 
+    </vulnerability>       
+    <vulnerability>
+        <vulnid>00038</vulnid>
+        <vulnname>eval() input injection vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Direct_Dynamic_Code_Evaluation_('Eval_Injection')</url>
+        </reference>                 
+    </vulnerability>         
 </w3afvulnmap>

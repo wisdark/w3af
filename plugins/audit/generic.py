@@ -121,6 +121,7 @@ class generic(baseAuditPlugin):
                 v.setId( error_response.id )
                 v.setSeverity(severity.MEDIUM)
                 v.setName( 'Unidentified vulnerability' )
+                v.setW3afId('00032')
                 v.setDesc( 'An unidentified vulnerability was found at: ' + mutant.foundAt() )
                 kb.kb.append( self, 'generic', v )
             else:

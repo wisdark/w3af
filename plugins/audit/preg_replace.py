@@ -77,6 +77,7 @@ class preg_replace(baseAuditPlugin):
                 v.setId( response.id )
                 v.setSeverity(severity.HIGH)
                 v.setName( 'Unsafe usage of preg_replace' )
+                v.setW3afId('00035')
                 v.setDesc( 'Unsafe usage of preg_replace was found at: ' + mutant.foundAt() )
                 kb.kb.append( self, 'preg_replace', v )
         

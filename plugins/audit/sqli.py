@@ -78,6 +78,7 @@ class sqli(baseAuditPlugin):
                 v = vuln.vuln( mutant )
                 v.setId( response.id )
                 v.setName( 'SQL injection vulnerability' )
+                v.setW3afId('00036')
                 v.setSeverity(severity.HIGH)
                 v['error'] = sql_error[0]
                 v['db'] = sql_error[1]

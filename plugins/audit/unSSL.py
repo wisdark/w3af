@@ -94,6 +94,7 @@ class unSSL(baseAuditPlugin):
                     if http_response.getBody() == https_response.getBody():
                         v = vuln.vuln( freq )
                         v.setName( 'Secure content over insecure channel' )
+                        v.setW3afId('00034')
                         v.setSeverity(severity.MEDIUM)
                         msg = 'Secure content can be accesed using the insecure protocol HTTP.'
                         msg += ' The vulnerable URLs are: "' + secure + '" - "' + insecure + '" .'
