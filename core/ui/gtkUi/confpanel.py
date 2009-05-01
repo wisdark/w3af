@@ -240,12 +240,14 @@ class OnlyOptions(gtk.VBox):
         self.w3af.mainwin.profiles.profileChanged(changed=True)
         
         # Status bar
+        self.parentwidg.configSaved()
         self.w3af.mainwin.sb("Plugin configuration saved successfully")
 
     def _revertPanel(self, *vals):
         '''Revert all widgets to their initial state.'''
         for widg in self.widgets_status:
             widg.revertValue()
+        self.parentwidg.configReverted()
         self.w3af.mainwin.sb("The plugin configuration was reverted to its last saved state")
 
 

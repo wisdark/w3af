@@ -91,6 +91,12 @@ class OptionsPanel(gtk.VBox):
         '''
         self.plugin_tree.configChanged(like_initial)
 
+    def configSaved(self):
+        self.plugin_tree.configSaved()
+
+    def configReverted(self):
+        self.plugin_tree.configReverted()
+
 
 
 class ConfigPanel(gtk.VBox):
@@ -199,6 +205,8 @@ class PluginTree(gtk.TreeView):
         self.mainwin = w3af.mainwin 
         self.w3af = w3af
         self.config_panel = config_panel
+        self._unsaved_plugin = None
+        self._current_path = None
 
         # create the TreeStore, with the following columns:
         # 1. the plugin name, to show it
@@ -301,6 +309,12 @@ class PluginTree(gtk.TreeView):
         options = plugin.getOptions()
         return bool(len(options))
 
+    def configSaved(self):
+        self._unsaved_plugin = None
+
+    def configReverted(self):
+        self._unsaved_plugin = None
+
     def configChanged(self, like_initial):
         '''Shows in the tree when a plugin configuration changed.
 
@@ -319,6 +333,7 @@ class PluginTree(gtk.TreeView):
             plugin = self._getPluginInstance(path)
             self.mainwin.profiles.profileChanged(plugin)
         else:
+            self._unsaved_plugin = self._getPluginInstance(path)
             row[0] = "<b>%s</b>" % row[3]
 
         # update the general config status, and check if the plugin
@@ -418,8 +433,27 @@ class PluginTree(gtk.TreeView):
         @param tv: the treeview.
         '''
         (path, column) = self.get_cursor()
+
         if path is None:
             return
+
+        if self._unsaved_plugin is not None \
+                and self._unsaved_plugin is not self._getPluginInstance(path):
+            diag = gtk.MessageDialog()
+            diag.set_title(_("Configuration is not saved!"))
+            diag.set_markup(_("You have not saved the plugin configuration. Before running the scan either save the configuration or revert it."))
+            diag.add_button(gtk.STOCK_OK, gtk.RESPONSE_OK)
+            diag.add_button(_("Back to this plugin"), gtk.RESPONSE_CANCEL)
+            response = diag.run()
+            diag.destroy()
+            if response == gtk.RESPONSE_OK:
+                self._unsaved_plugin = None
+            else:
+                path, column = self._current_path
+                self.set_cursor(*self._current_path)
+
+        self._current_path = (path, column)
+
 
         if len(path) == 1:
             pluginType = self.treestore[path][3]
