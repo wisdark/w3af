@@ -21,34 +21,40 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
-import core.data.parsers.urlParser as urlParser
 from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
-import core.data.kb.knowledgeBase as kb
-from core.data.getResponseType import *
 from core.controllers.w3afException import w3afException
+from core.controllers.misc.levenshtein import relative_distance
+import core.data.parsers.urlParser as urlParser
+
+from core.data.db.temp_persist import disk_list
+
+import core.data.kb.knowledgeBase as kb
+
 import re
+
 
 class digitSum(baseDiscoveryPlugin):
     '''
-    Take an URL with a number ( index2.asp ) and try to find related files ( index1.asp , index3.asp ).
+    Take an URL with a number ( index2.asp ) and try to find related files (index1.asp, index3.asp).
     @author: Andres Riancho ( andres.riancho@gmail.com )  
     '''
 
     def __init__(self):
         baseDiscoveryPlugin.__init__(self)
-        self._alreadyVisited = []
-        self._firstTime = True
+        self._already_visited = disk_list()
+        self._first_time = True
         
         # This is for the Referer
         self._headers = {}
         
         # User options
-        self._fuzzImages = False
-        self._maxDigitSections = 3
+        self._fuzz_images = False
+        self._max_digit_sections = 4
         
     def discover(self, fuzzableRequest ):
         '''
@@ -61,40 +67,59 @@ class digitSum(baseDiscoveryPlugin):
         url = fuzzableRequest.getURL()
         self._headers = {'Referer':url}
         
-        if self._firstTime:
-            self._firstTime = False
+        if self._first_time:
+            self._first_time = False
             self.is404 = kb.kb.getData( 'error404page', '404' )
         
         om.out.debug('digitSum is testing ' + fuzzableRequest.getURL() )
-        self._ores = originalResponse = self._urlOpener.GET( fuzzableRequest.getURL(), useCache=True, headers=self._headers )
+        original_response = self._urlOpener.GET( fuzzableRequest.getURL(), \
+                                                            useCache=True, headers=self._headers )
         
-        if isTextOrHtml( originalResponse.getHeaders() ) or self._fuzzImages:
-            
-            for fr in self._mangleDigits( fuzzableRequest ):
-                if fr.getURL() not in self._alreadyVisited:
-                    self._alreadyVisited.append( fr.getURI() )
+        if original_response.is_text_or_html() or self._fuzz_images:
+            for fr in self._mangle_digits( fuzzableRequest ):
+                if fr.getURL() not in self._already_visited:
+                    self._already_visited.append( fr.getURI() )
                     
-                    targs = ( fr, )
-                    self._tm.startFunction( target=self._doRequest, args=targs , ownerObj=self )
+                    targs = ( fr, original_response)
+                    self._tm.startFunction( target=self._do_request, args=targs , ownerObj=self )
             
             self._tm.join( self )
             # I add myself so the next call to this plugin wont find me ...
             # Example: index1.html ---> index2.html --!!--> index1.html
-            self._alreadyVisited.append( fuzzableRequest.getURI() )
+            self._already_visited.append( fuzzableRequest.getURI() )
                 
         return self._fuzzableRequests
 
-    def _doRequest( self, fr ):
+    def _do_request( self, fuzzableRequest, original_response ):
+        '''
+        Send the request.
+        @parameter fuzzableRequest: The fuzzable request object to modify.
+        @parameter original_response: The response for the original request that was sent.
+        '''
         try:
-            response = self._urlOpener.GET( fr.getURI(), useCache=True, headers=self._headers )
+            response = self._urlOpener.GET( fuzzableRequest.getURI(), useCache=True,
+                                                            headers=self._headers )
         except KeyboardInterrupt,e:
             raise e
         else:
-            if not self.is404( response ) and response.getBody() != self._ores.getBody():
-                self._fuzzableRequests.append( fr )
-                om.out.debug('digitSum plugin found new URI: ' + fr.getURI() )
+            if not self.is404( response ):
+                # We have two different cases:
+                # - If the URL's are different, then there is nothing to think about, we simply found
+                # something new!
+                #
+                # - If we changed the query string parameters, we have to check the content
+                is_new = False
+                if response.getURL() != original_response.getURL():
+                    is_new = True
+                elif relative_distance(response.getBody(), original_response.getBody()) < 0.70:
+                    is_new = True
+                
+                # Add it to the result.
+                if is_new:
+                    self._fuzzableRequests.extend( self._createFuzzableRequests( response ) )
+                    om.out.debug('digitSum plugin found new URI: "' + fuzzableRequest.getURI() + '".')
     
-    def _mangleDigits(self, fuzzableRequest):
+    def _mangle_digits(self, fuzzableRequest):
         '''
         Mangle those digits.
         @param fuzzableRequest: The original fuzzableRequest
@@ -103,25 +128,29 @@ class digitSum(baseDiscoveryPlugin):
         res = []
         # First i'll mangle the digits in the URL file
         filename = urlParser.getFileName( fuzzableRequest.getURL() )
-        dp = urlParser.getDomainPath( fuzzableRequest.getURL() )
-        for fname in self._doCombinations( filename ):
-            copiedFr = fuzzableRequest.copy()
-            copiedFr.setURL( dp + fname)
-            res.append( copiedFr )
+        domain_path = urlParser.getDomainPath( fuzzableRequest.getURL() )
+        for fname in self._do_combinations( filename ):
+            fr_copy = fuzzableRequest.copy()
+            fr_copy.setURL( domain_path + fname)
+            res.append( fr_copy )
         
         # Now i'll mangle the query string variables
         if fuzzableRequest.getMethod() == 'GET':
-            for parameter in fuzzableRequest.getDc().keys():
-                for moddedVariable in self._doCombinations( fuzzableRequest.getDc()[ parameter ] ):
-                    copiedFr = fuzzableRequest.copy()
-                    newDc = copiedFr.getDc()
-                    newDc[ parameter ] = moddedVariable
-                    copiedFr.setDc( newDc )
-                    res.append( copiedFr )
+            for parameter in fuzzableRequest.getDc():
+                
+                # to support repeater parameter names...
+                for element_index in xrange(len(fuzzableRequest.getDc()[parameter])):
                     
+                    for modified_value in self._do_combinations( fuzzableRequest.getDc()[ parameter ][element_index] ):
+                        fr_copy = fuzzableRequest.copy()
+                        new_dc = fr_copy.getDc()
+                        new_dc[ parameter ][ element_index ] = modified_value
+                        fr_copy.setDc( new_dc )
+                        res.append( fr_copy )
+        
         return res
         
-    def _doCombinations( self, aString ):
+    def _do_combinations( self, a_string ):
         '''
         Example:
             - input: 'abc123'
@@ -133,8 +162,8 @@ class digitSum(baseDiscoveryPlugin):
         
         '''
         res = []
-        splitted = self._findDigits( aString )
-        if len( splitted ) < 2 * self._maxDigitSections:
+        splitted = self._find_digits( a_string )
+        if len( splitted ) <= 2 * self._max_digit_sections:
             for i in xrange( len( splitted ) ):
                 if splitted[ i ].isdigit():
                     splitted[ i ] = str( int(splitted[ i ]) + 1 )
@@ -142,9 +171,10 @@ class digitSum(baseDiscoveryPlugin):
                     splitted[ i ] = str( int(splitted[ i ]) - 2 )
                     res.append( ''.join(splitted) )
                     splitted[ i ] = str( int(splitted[ i ]) + 1 )
+                    
         return res
                 
-    def _findDigits( self, aString ):
+    def _find_digits( self, a_string ):
         '''
         Finds digits in a string and returns a list with string sections.
         For example:
@@ -159,7 +189,7 @@ class digitSum(baseDiscoveryPlugin):
         '''
         
         # regexes are soooooooooooooo cool !
-        return [ x for x in re.split( r'(\d+)', aString ) if x != '' ]
+        return [ x for x in re.split( r'(\d+)', a_string ) if x != '' ]
         
     def getOptions( self ):
         '''
@@ -167,11 +197,12 @@ class digitSum(baseDiscoveryPlugin):
         '''
         d1 = 'Apply URL fuzzing to all URLs, including images, videos, zip, etc.'
         h1 = 'It\'s safe to leave this option as the default.'
-        o1 = option('fuzzImages', self._fuzzImages, d1, 'boolean', help=h1)
+        o1 = option('fuzzImages', self._fuzz_images, d1, 'boolean', help=h1)
         
         d2 = 'Set the top number of sections to fuzz'
-        h2 = 'It\'s safe to leave this option as the default. For example, with maxDigitSections = 1, this string wont be fuzzed: abc123def234 ; but this one will abc23ldd.'
-        o2 = option('maxDigitSections', self._maxDigitSections, d2, 'integer', help=h2)
+        h2 = 'It\'s safe to leave this option as the default. For example, with maxDigitSections'
+        h2 += ' = 1, this string wont be fuzzed: abc123def234 ; but this one will abc23ldd.'
+        o2 = option('maxDigitSections', self._max_digit_sections, d2, 'integer', help=h2)
 
         ol = optionList()
         ol.add(o1)
@@ -186,8 +217,8 @@ class digitSum(baseDiscoveryPlugin):
         @parameter OptionList: A dictionary with the options for the plugin.
         @return: No value is returned.
         ''' 
-        self._fuzzImages = optionsMap['fuzzImages']
-        self._maxDigitSections = optionsMap['maxDigitSections']
+        self._fuzz_images = optionsMap['fuzzImages'].getValue()
+        self._max_digit_sections = optionsMap['maxDigitSections'].getValue()
     
     def getPluginDeps( self ):
         '''
@@ -208,12 +239,12 @@ class digitSum(baseDiscoveryPlugin):
             - maxDigitSections
         
         An example will clarify what this plugin does, let's suppose that the input for this plugin is:
-            - http://a/index1.asp
+            - http://host.tld/index1.asp
             
         This plugin will request:
-            - http://a/index0.asp
-            - http://a/index2.asp
+            - http://host.tld/index0.asp
+            - http://host.tld/index2.asp
             
-        If the response for the newly generated URL's ain't a 404 error, then the new URL is a valid one that
+        If the response for the newly generated URL's is not an 404 error, then the new URL is a valid one that
         can contain more information and injection points.      
         '''

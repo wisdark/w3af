@@ -115,6 +115,7 @@ DEBUG = None
 MAXCONNECTIONS = 500
 
 import sys
+from core.controllers.w3afException import w3afException
 if sys.version_info < (2, 4): HANDLE_ERRORS = 1
 else: HANDLE_ERRORS = 0
     
@@ -206,7 +207,14 @@ class HTTPResponse(httplib.HTTPResponse):
     def read(self, amt=None):
         # w3af does always read all the content of the response...
         # and I also need to do multiple reads to this response...
+        # BUGBUG: Is this OK? What if a HEAD method actually returns something?!
         if self._method == 'HEAD':
+            # This indicates that we have read all that we needed from the socket
+            # and that the socket can be reused!
+            #
+            # This like fixes the bug with title "GET is much faster than HEAD".
+            #https://sourceforge.net/tracker2/?func=detail&aid=2202532&group_id=170274&atid=853652
+            self.close()
             return ''
             
         if self._multiread == None:
@@ -520,14 +528,22 @@ class HTTPSHandler(KeepAliveHandler, urllib2.HTTPSHandler):
     def __init__(self, proxy):
         KeepAliveHandler.__init__(self)
         self._proxy = proxy
+        host = port = ''
+        try:
+            host, port = self._proxy.split(':')
+        except:
+            raise w3afException('The proxy you are specifying is invalid! (' + self._proxy + '), IP:Port is expected.')
+
+        if not host or not port:
+            self._proxy = None
             
     def https_open(self, req):
         return self.do_open(req)
 
     def _get_connection(self, host):
         if self._proxy:
-            host, port = self._proxy.split(':')
-            return ProxyHTTPSConnection(host, port)
+            proxyHost, port = self._proxy.split(':')
+            return ProxyHTTPSConnection(proxyHost, port)
         else:
             return HTTPSConnection(host)
 

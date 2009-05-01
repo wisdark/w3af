@@ -22,10 +22,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from core.controllers.w3afException import w3afException
 import ConfigParser
-from core.controllers.misc.parseOptions import *
 from core.controllers.misc.factory import *
 import os
 import shutil
+from core.controllers.misc.homeDir import create_home_dir, get_home_dir, home_dir_is_writable
+
 
 class profile:
     '''
@@ -55,13 +56,16 @@ class profile:
             # Verify if I can find the file
             if not os.path.exists(profile_file_name):
 
-                # The file isn't there, let's try with a .ini ...
-                if not profile_file_name.endswith('.ini'):
-                    profile_file_name += '.ini'
-                if not os.path.exists(profile_file_name):
+                # The file isn't there, let's try with a .pw3af ...
+                if not profile_file_name.endswith('.pw3af'):
+                    profile_file_name += '.pw3af'
                 
-                    # Search in the default path...        
-                    profile_file_name = 'profiles' + os.path.sep + profile_file_name
+                if not os.path.exists(profile_file_name):
+                    
+                    # Search in the default path...
+                    profile_home = get_home_dir() + os.path.sep + 'profiles' + os.path.sep
+                    profile_file_name = profile_home + profile_file_name
+                    
                     if not os.path.exists(profile_file_name):
                         raise w3afException('The profile "' + profile_file_name + '" wasn\'t found.')
            
@@ -71,7 +75,13 @@ class profile:
                 raise w3afException('Unknown format in profile: ' + profile_file_name )
             else:
                 # Save the profile_file_name variable
-                self._profile_file_name = profile_file_name            
+                self._profile_file_name = profile_file_name
+    
+    def get_profile_file(self):
+        '''
+        @return: The path and name of the file that contains the profile definition.
+        '''
+        return self._profile_file_name
     
     def remove( self ):
         '''
@@ -96,8 +106,8 @@ class profile:
             newProfilePathAndName = os.path.join( dir, copyProfileName )
         
         # Check extension
-        if not newProfilePathAndName.endswith('.ini'):
-            newProfilePathAndName += '.ini'
+        if not newProfilePathAndName.endswith('.pw3af'):
+            newProfilePathAndName += '.pw3af'
         
         try:
             shutil.copyfile( self._profile_file_name, newProfilePathAndName )
@@ -105,9 +115,9 @@ class profile:
             raise w3afException('An exception ocurred while copying the profile. Exception: ' + str(e))
         else:
             # Now I have to change the data inside the copied profile, to reflect the changes.
-            pNew = profile(newProfilePathAndName)
+            pNew = profile( newProfilePathAndName )
             pNew.setName( copyProfileName )
-            pNew.save(newProfilePathAndName)
+            pNew.save( newProfilePathAndName )
             
             return True
     
@@ -154,15 +164,15 @@ class profile:
         Set the plugin options.
         @parameter pluginType: 'audit', 'output', etc.
         @parameter pluginName: 'xss', 'sqli', etc.
-        @parameter options: {'a':True, 'b':1}
+        @parameter options: an optionList object
         @return: None
         '''
         section = pluginType + "." + pluginName
         if section not in self._config.sections():
             self._config.add_section( section )
             
-        for option in options.keys():
-            self._config.set( section, option, options[ option ] )
+        for option in options:
+            self._config.set( section, option.getName(), option.getValueStr() )
     
     def getPluginOptions( self, pluginType, pluginName ):
         '''
@@ -170,8 +180,7 @@ class profile:
         '''
         # Get the plugin defaults with their types
         pluginInstance = factory('plugins.' + pluginType + '.' + pluginName )
-        optionsXML = pluginInstance.getOptionsXML()
-        parsedOptions = parseXML( optionsXML )
+        optionsMap = pluginInstance.getOptions()
         
         for section in self._config.sections():
             # Section is something like audit.xss or discovery.webSpider
@@ -183,12 +192,86 @@ class profile:
                 if type == pluginType and name == pluginName:
                     for option in self._config.options(section):
                         try:
-                            parsedOptions[option]['default'] = self._config.get(section, option)
+                            value = self._config.get(section, option)
                         except KeyError,k:
+                            # We should never get here...
                             raise w3afException('The option "' + option + '" is unknown for the "'+ pluginName + '" plugin.')
+                        else:
+                            optionsMap[option].setValue(value)
 
-        return parsedOptions
-    
+        return optionsMap
+        
+    def setMiscSettings( self, options ):
+        '''
+        Set the misc settings options.
+        @parameter options: an optionList object
+        @return: None
+        '''
+        self._set_x_settings('misc-settings', options)
+
+    def setHttpSettings( self, options ):
+        '''
+        Set the http settings options.
+        @parameter options: an optionList object
+        @return: None
+        '''
+        self._set_x_settings('http-settings', options)    
+        
+    def _set_x_settings( self, section, options ):
+        '''
+        Set the section options.
+        
+        @parameter section: The section name
+        @parameter options: an optionList object
+        @return: None
+        '''
+        if section not in self._config.sections():
+            self._config.add_section( section )
+            
+        for option in options:
+            self._config.set( section, option.getName(), option.getValueStr() )
+
+    def getMiscSettings( self ):
+        '''
+        Get the misc settings options.
+        @return: The misc settings in an optionList object
+        '''
+        import core.controllers.miscSettings as miscSettings
+        misc_settings = miscSettings.miscSettings()
+        return self._get_x_settings('misc-settings', misc_settings)
+
+    def getHttpSettings( self ):
+        '''
+        Get the http settings options.
+        @return: The http settings in an optionList object
+        '''
+        # I just need the xUrllib configuration, but I import all the core
+        # because I want to use the singleton
+        from core.controllers.w3afCore import wCore
+        return self._get_x_settings('http-settings', wCore.uriOpener.settings)
+        
+    def _get_x_settings( self, section, configurable_instance ):
+        '''
+        @return: An optionList object with the options for a configurable object.
+        '''
+        optionsMap = configurable_instance.getOptions()
+
+        try:
+            for option in self._config.options(section):
+                try:
+                    value = self._config.get(section, option)
+                except KeyError,k:
+                    # We should never get here...
+                    raise w3afException('The option "' + option + '" is unknown for the "'+ section + '" section.')
+                else:
+                    optionsMap[option].setValue(value)
+        except:
+            # This is for back compatibility with old profiles
+            # that don't have a http-settings nor misc-settings section 
+            return optionsMap
+
+        return optionsMap
+
     def setName( self, name ):
         '''
         Set the name of the profile.
@@ -232,17 +315,16 @@ class profile:
         '''
         # Get the plugin defaults with their types
         targetInstance = factory('core.controllers.targetSettings')
-        optionsXML = targetInstance.getOptionsXML()
-        parsedOptions = parseXML( optionsXML )
+        options = targetInstance.getOptions()
 
         for section in self._config.sections():
             # Section is something like audit.xss or discovery.webSpider
             # or [profile] or [target]
             if section == 'target':
                 for option in self._config.options(section):
-                    parsedOptions[option]['default'] = self._config.get(section, option)
+                    options[option].setValue( self._config.get(section, option) )
         
-        return parsedOptions
+        return options
     
     def setDesc( self, desc ):
         '''
@@ -270,24 +352,26 @@ class profile:
         # Something went wrong
         return None
     
-    def save( self, fileName = '' ):
+    def save( self, file_name = '' ):
         '''
-        Saves the profile to fileName
+        Saves the profile to file_name.
+        
         @return: None
         '''
-        if fileName == '' and self._profile_file_name == None:
-            raise w3afException('Error while saving profile, you didn\'t specified the filename.')
-        elif fileName != '' and self._profile_file_name == None:
-            # The user is specifiyng a filename!
-            if not fileName.endswith('.ini'):
-                fileName += '.ini'
-            if os.path.sep not in fileName:
-                fileName = 'profiles' + os.path.sep + fileName
-            self._profile_file_name = fileName
+        if file_name == '' and self._profile_file_name == None:
+            raise w3afException('Error while saving profile, you didn\'t specified the file name.')
+        elif file_name != '' and self._profile_file_name == None:
+            # The user is specifiyng a file_name!
+            if not file_name.endswith('.pw3af'):
+                file_name += '.pw3af'
+                
+            if os.path.sep not in file_name:
+                file_name = os.path.join(get_home_dir(), 'profiles', file_name )
+            self._profile_file_name = file_name
             
         try:
-            f = open( self._profile_file_name, 'w')
+            file_handler = open( self._profile_file_name, 'w')
         except:
             raise w3afException('Failed to open profile file: ' + self._profile_file_name)
         else:
-            self._config.write( f )
+            self._config.write( file_handler )

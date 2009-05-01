@@ -37,6 +37,7 @@ class w3afRunOnce(Exception):
     A small class that defines an exception to be raised by plugins that dont want to be runned anymore.
     '''
     def __init__(self, value=''):
+        Exception.__init__( self )
         self.value = value
     
     def __str__(self):
@@ -45,6 +46,13 @@ class w3afRunOnce(Exception):
 class w3afFileException(Exception):
     '''
     A small class that defines a w3af File Exception.
+    '''
+    pass
+    
+class w3afMustStopException(Exception):
+    '''
+    If this exception is catched by the core, then it should stop the whole process. This exception is raised in
+    a few places. NOT to be used extensively.
     '''
     pass
     

@@ -22,40 +22,39 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
-from core.data.getResponseType import *
-import re
 import core.data.constants.severity as severity
+
+import re
 
 
 def luhnCheck(value):
     '''
     The Luhn check against the value which can be an array of digits, 
     numeric string or a positive integer.
+    
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
-
-    if type(value) == int:
-        value = str(value)
-
-    if type(value) == list:
-        arr = value
-    else:
-        arr = []
-        for c in value:
+    # Prepare the value to be analyzed.
+    arr = []
+    for c in value:
+        if c.isdigit():
             arr.append(int(c))
-
     arr.reverse()
-    even = False
+    
+    # Analyze
     for idx in [i for i in range(len(arr)) if i%2]:
         d = arr[idx] * 2
         if d > 9:
-            d = d/10 + d%10
+            d = d/10 + d % 10
         arr[idx] = d
 
     sm = sum(arr)
@@ -73,32 +72,48 @@ class creditCards(baseGrepPlugin):
     def __init__(self):
         baseGrepPlugin.__init__(self)
         self._cardResponses = []
-        regex = '(?:^|[^\d])((?:<.*>)?\d{4}(?:</.*>)?[\- ]?(?:</.*>)?\d{4}(?:</.*>)?[\- ]?(?:<.*>)?\d{2}(?:</.*>)?[\- ]?(?:<.*>)?\d{2}(?:</.*>)?[\- ]?(?:<.*>)?\d{1,4}(?:</.*>)?)(?:[^\d]|$)'
+
+        regex = '(?:^|[^\d])((?:<.*>)?\d{4}(?:</.*>)?[\- ]?(?:</.*>)?'
+        regex += '\d{4}(?:</.*>)?[\- ]?(?:<.*>)?\d{2}(?:</.*>)?[\- ]?'
+        regex += '(?:<.*>)?\d{2}(?:</.*>)?[\- ]?(?:<.*>)?\d{1,4}(?:</.*>)?)(?:[^\d]|$)'
         markupRegex = '(<.*?>)|(</.*?>)|\-'
+
         self._regex = re.compile(regex)
         self._markupRegex = re.compile(markupRegex)
         
-    def _testResponse(self, request, response):
-        
-        if isTextOrHtml(response.getHeaders()) and response.getCode()==200:
-            if self._findCard(response.getBody()):
+    def grep(self, request, response):
+        '''
+        Plugin entry point, search for the credit cards.
+        @return: None
+        '''
+        if response.is_text_or_html() and response.getCode() == 200:
+            found_cards = self._find_card(response.getBody())
+            for card in found_cards:
                 v = vuln.vuln()
                 v.setURL( response.getURL() )
                 v.setId( response.id )
                 v.setSeverity(severity.LOW)
                 v.setName( 'Credit card number disclosure' )
-                v.setDesc( "The URL: " + v.getURL() + " discloses credit card numbers." )
+                v.addToHighlight(card)
+                msg = 'The URL: "' + v.getURL() + '" discloses the credit card number: "'
+                msg += card + '".'
+                v.setDesc( msg )
                 kb.kb.append( self, 'creditCards', v )
      
-    def _findCard(self, body):
-        res = self._regex.findall(body)
-         
-        for c in res:
-            payload = self._markupRegex.sub('', c)
-            if luhnCheck(payload):
-                return True
+    def _find_card(self, body):
+        '''
+        @return: A list of matching credit card numbers
+        '''
+        res = []
 
-        return False
+        matches = self._regex.findall(body)
+
+        for possible_cc in matches:
+            possible_cc = self._markupRegex.sub('', possible_cc)
+            if luhnCheck(possible_cc):
+                res.append(possible_cc)
+
+        return res
 
     
     def end(self):
@@ -125,9 +140,10 @@ class creditCards(baseGrepPlugin):
         '''
         return '''
         This plugins scans every response page to find the strings that are likely to be 
-        the credit card numbers. It can be tested against URL 
-        https://www.paypal.com/en_US/vhelp/paypalmanager_help/credit_card_numbers.htm         
+        credit card numbers. It can be tested against the following URL:
+            - https://www.paypal.com/en_US/vhelp/paypalmanager_help/credit_card_numbers.htm
         '''
+
     def getPluginDeps( self ):
         '''
         @return: A list with the names of the plugins that should be runned before the

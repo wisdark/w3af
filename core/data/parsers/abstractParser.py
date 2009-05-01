@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 abstractParser.py
 
@@ -21,12 +22,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+import core.data.parsers.urlParser as urlParser
+from core.data.parsers.encode_decode import htmldecode
 from core.controllers.w3afException import w3afException
 
-import core.data.dc.form as form
-import core.data.parsers.urlParser as urlParser
-import string
 import re
+import urllib
+
 
 class abstractParser:
     '''
@@ -34,52 +36,141 @@ class abstractParser:
     
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__( self, baseUrl ):
+    def __init__( self, httpResponse ):
         # "setBaseUrl"
-        self._baseUrl = baseUrl
-        self._baseDomain = urlParser.getDomain(baseUrl)
-        self._rootDomain = urlParser.getRootDomain(baseUrl)
+        url = httpResponse.getURL()
+        redirURL = httpResponse.getRedirURL()
+        if redirURL:
+            url = redirURL
+        self._baseUrl = url
+        self._baseDomain = urlParser.getDomain(url)
+        self._rootDomain = urlParser.getRootDomain(url)
+        
+        # A nice default
+        self._encoding = 'utf-8'
+        
+        # To store results
+        self._emails = []
+        self._re_URLs = []
     
-    def findAccounts( self , documentString ):
+    def findEmails( self , documentString ):
         '''
         @return: A list with all mail users that are present in the documentString.
         '''
+        # First, we decode all chars. I have found some strange sites where they encode the @... some other
+        # sites where they encode the email, or add some %20 padding... strange stuff... so better be safe...
+        documentString = urllib.unquote_plus( documentString )
+        
+        # Now we decode the html special characters...
+        documentString = htmldecode( documentString )
+        
+        # Perform a fast search for the @. In w3af, if we don't have an @ we don't have an email
+        # We don't support mails like myself <at> gmail !dot! com
         if documentString.find('@') != -1:
-            # This two for loops were taken from Sergio Alvarez fingergoogle.py
-            # FIXME: Replace this with a re.sub, it should be faster
-            for i in ('=','"', '\'','<br>', '[', ']', '<', '>', ':', ';', '&', '(', ')', '{', '}'):
-                documentString = string.replace(documentString, i, ' ')
-            documentString = string.split(documentString, '\n')
-            for line in documentString:
-                if line.count('@'+self._rootDomain):
-                    split = string.split(line, ' ')
-                    for i in split:
-                        if i.count('@'+self._rootDomain):
-                            if i[0] == '@':
-                                continue
-                            if string.split(i, '@')[1] != self._rootDomain:
-                                continue
-                            i = i[:-(len(self._rootDomain)+1)]
-                            if len(i) > 1:
-                                if i[-1] == '@':
-                                    i = i[:-1]
-                            # If account aint in account list , then add
-                            if self._accounts.count(i) == 0:
-                                self._accounts.append(i)
+            documentString = re.sub( '[^\w@\\.]', ' ', documentString )
+            
+            # Now we have a clean documentString; and we can match the mail addresses!
+            emailRegex = '([A-Z0-9\._%-]{1,45}@([A-Z0-9\.-]{1,45}\.){1,10}[A-Z]{2,4})'
+            for email, domain in re.findall(emailRegex, documentString,  re.IGNORECASE):
+                if email not in self._emails:
+                    self._emails.append( email )
+                    
+        return self._emails
 
-    def getAccounts( self ):
-        raise Exception('You should create your own parser class and implement the getAccounts() method.')
-    
+    def _regex_url_parse(self, httpResponse):
+        '''
+        Use regular expressions to find new URLs.
+        
+        @parameter httpResponse: The http response object that stores the response body and the URL.
+        @return: None. The findings are stored in self._re_URLs.
+        '''
+        #url_regex = '((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|%[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)'
+        url_regex = '((http|https)://([\w\./]*?)/[^ \n\r\t"<>]*)'
+        for url in re.findall(url_regex, httpResponse.getBody() ):
+            # This try is here because the _decode_URL method raises an exception
+            # whenever it fails to decode a url.
+            try:
+                decoded_url = self._decode_URL(url[0], self._encoding)
+            except w3afException:
+                pass
+            else:
+                self._re_URLs.append(decoded_url)
+        
+        # Now detect some relative URL's ( also using regexs )
+        def find_relative( doc ):
+            res = []
+            # TODO: Also matches //foo/bar.txt , which is bad
+            # I'm removing those matches manually below
+            relative_regex = re.compile('[A-Z0-9a-z%_~\./]+([\/][A-Z0-9a-z%_~\.]+)+\.[A-Za-z0-9]{1,5}(((\?)([a-zA-Z0-9]*=\w*)){1}((&)([a-zA-Z0-9]*=\w*))*)?')
+            
+            while True:
+                regex_match = relative_regex.search( doc )
+                if not regex_match:
+                    break
+                else:
+                    s, e = regex_match.span()
+                    match_string = doc[s:e]
+                    if not match_string.startswith('//'):
+                        domainPath = urlParser.getDomainPath(httpResponse.getURL())
+                        url = urlParser.urlJoin( domainPath , match_string )
+                        url = self._decode_URL(url, self._encoding)
+                        res.append( url )
+                    
+                    # continue
+                    doc = doc[e:]
+            return res
+        
+        relative_URLs = find_relative( httpResponse.getBody() )
+        self._re_URLs.extend( relative_URLs )
+        self._re_URLs = [ urlParser.normalizeURL(i) for i in self._re_URLs ]
+        self._re_URLs = list(set(self._re_URLs))
+        
+        '''
+        om.out.debug('Relative URLs found using regex:')
+        for u in self._re_URLs:
+            if '8_' in u:
+                om.out.information('! ' + u )
+        '''    
+
+    def getEmails( self, domain=None ):
+        '''
+        @parameter domain: Indicates what email addresses I want to retrieve:   "*@domain".
+        @return: A list of email accounts that are inside the document.
+        '''
+        if domain:
+            return [ i for i in self._emails if domain in i.split('@')[1] ]
+        else:
+            return self._emails
     def getForms( self ):
+        '''
+        @return: A list of forms.
+        '''        
         raise Exception('You should create your own parser class and implement the getForms() method.')
         
     def getReferences( self ):
+        '''
+        Searches for references on a page. w3af searches references in every html tag, including:
+            - a
+            - forms
+            - images
+            - frames
+            - etc.
+        
+        @return: Two sets, one with the parsed URLs, and one with the URLs that came out of a
+        regular expression. The second list if less trustworthy.
+        '''
         raise Exception('You should create your own parser class and implement the getReferences() method.')
         
     def getComments( self ):
+        '''
+        @return: A list of comments.
+        '''        
         raise Exception('You should create your own parser class and implement the getComments() method.')
     
     def getScripts( self ):
+        '''
+        @return: A list of scripts (like javascript).
+        '''        
         raise Exception('You should create your own parser class and implement the getScripts() method.')
         
     def getMetaRedir( self ):
@@ -94,3 +185,60 @@ class abstractParser:
         '''
         raise Exception('You should create your own parser class and implement the getMetaTags() method.')
         
+    def _decode_URL(self, url_to_decode, encoding):
+        '''
+        This is one of the most important methods, because it will decode any URL
+        and return an utf-8 encoded string. In other words, this methods does c14n (Canonicalization)
+        (http://en.wikipedia.org/wiki/Canonicalization) and allows all layers of w3af to simply ignore the
+        encoding of the HTTP body (if that's what they want).
+        
+        This method is very related to httpResponse._charset_handling(), which decodes the HTTP
+        body of the response. The "problem" is that the body of the response is decoded as expected,
+        but URLs aren't... why? Let's see an example:
+        
+        - HTTP Body: <a href="http://host.tld/%05%44">Click m\x05\x44!</a>
+        - HTTP response header indicated encoding: xyz
+        - After running _charset_handling() and supposing that "\x05\x44" decodes to "é" in xyz,
+        the response is: <a href="http://host.tld/%05%44">Click mé!</a>
+        
+        As you may have noticed, the %05%44 (which in URL means "\x05\x44") wasn't decoded
+        (as expected because the decoding method doesn't handle URL encoding AND xyz encoding at the
+        same time!).
+        
+        So, when we use _decode_URL() we take as input "http://host.tld/%05%44", we decode the
+        URL encoding to get "http://host.tld/\x05\x44" and finally we decode that with the xyz encoding
+        to get "http://host.tld/é".
+        
+        Something small to remember:
+        >>> print urllib.unquote('ind%c3%a9x.html').decode('utf-8').encode('utf-8')
+        indéx.html
+        '''
+        
+        # Avoid the double decoding performed by httpResponse._charset_handling() and
+        # by this function in the cases like this link:
+        #
+        #   http://host.tld/é.html
+        #
+        # Which is written without URL encoding.
+        if urllib.unquote(url_to_decode) == url_to_decode:
+            return url_to_decode
+            
+        try:
+            return urllib.unquote(url_to_decode).decode(encoding).encode('utf-8')
+        except UnicodeDecodeError, ude:
+            # This error could have been produced by the buggy choice of encoding
+            # done by the user when calling _decode_URL with two parameters, 
+            # or "selected by default". So, now we are going to test something different
+            if encoding == 'utf-8':
+                # Test an encoding that only uses one byte:
+                return urllib.unquote(url_to_decode).decode('iso-8859-1').encode('utf-8')
+            elif encoding != 'utf-8':
+                # Sometimes, the web app developers, their editors, or some other component
+                # makes a mistake, and they are really encoding it with utf-8 and they say they are
+                # doing it with some other encoding; this is why I perform this last test:
+                try:
+                    return urllib.unquote(url_to_decode).decode('utf-8').encode('utf-8')
+                except UnicodeDecodeError, ude:
+                    msg = 'Failed to _decode_URL: "' + url_to_decode +'" using encoding: "' + encoding + '".'
+                    om.out.error(msg)
+                    raise ude

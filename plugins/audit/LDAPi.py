@@ -20,8 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-import core.data.kb.vuln as vuln
-from core.data.fuzzer.fuzzer import *
+
+from core.data.fuzzer.fuzzer import createMutants
 import core.controllers.outputManager as om
 # options
 from core.data.options.option import option
@@ -29,9 +29,10 @@ from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
 import core.data.kb.knowledgeBase as kb
-from core.controllers.w3afException import w3afException
-import core.data.parsers.urlParser as urlParser
+import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
+
+from core.controllers.w3afException import w3afException
 import re
 
 class LDAPi(baseAuditPlugin):
@@ -43,7 +44,7 @@ class LDAPi(baseAuditPlugin):
     def __init__(self):
         baseAuditPlugin.__init__(self)
         
-    def _fuzzRequests(self, freq ):
+    def audit(self, freq ):
         '''
         Tests an URL for LDAP injection vulnerabilities.
         
@@ -52,25 +53,25 @@ class LDAPi(baseAuditPlugin):
         om.out.debug( 'LDAPi plugin is testing: ' + freq.getURL() )
         
         oResponse = self._sendMutant( freq , analyze=False ).getBody()
-        ldapiStrings = self._getLDAPiStrings()
+        ldapiStrings = self._get_LDAPi_strings()
         mutants = createMutants( freq , ldapiStrings, oResponse=oResponse )
             
         for mutant in mutants:
-            if self._hasNoBug( 'LDAPi','LDAPi',mutant.getURL() , mutant.getVar() ):
+            if self._hasNoBug( 'LDAPi', 'LDAPi', mutant.getURL(), mutant.getVar() ):
                 # Only spawn a thread if the mutant has a modified variable
                 # that has no reported bugs in the kb
-                targs = (mutant,)
-                self._tm.startFunction( target=self._sendMutant, args=targs , ownerObj=self )
+                targs = (mutant, )
+                self._tm.startFunction( target=self._sendMutant, args=targs, ownerObj=self )
             
-    def _getLDAPiStrings( self ):
+    def _get_LDAPi_strings( self ):
         '''
         Gets a list of strings to test against the web app.
         
         @return: A list with all LDAPi strings to test.
         '''
-        LDAPstr = []
-        LDAPstr.append("^(#$!@#$)(()))******")
-        return LDAPstr
+        ldap_strings = []
+        ldap_strings.append("^(#$!@#$)(()))******")
+        return ldap_strings
 
     def _analyzeResult( self, mutant, response ):
         '''
@@ -83,7 +84,7 @@ class LDAPi(baseAuditPlugin):
                 v.setId( response.id )
                 v.setSeverity(severity.HIGH)
                 v.setName( 'LDAP injection vulnerability' )
-                v.setDesc( 'LDAP injection was found at: ' + response.getURL() + ' . Using method: ' + v.getMethod() + '. The data sent was: ' + str(mutant.getDc()) )
+                v.setDesc( 'LDAP injection was found at: ' + mutant.foundAt() )
                 kb.kb.append( self, 'LDAPi', v )
     
     def end(self):
@@ -104,15 +105,58 @@ class LDAPi(baseAuditPlugin):
         for ldapError in self._getLDAPErrors():
             match = re.search( ldapError, response.getBody() , re.IGNORECASE )
             if  match:
-                om.out.information('Found LDAP injection. The error returned by the web application is (only a fragment is shown): "' + response.getBody()[match.start():match.end()] + '". The error was found on response with id ' + str(response.id) + '.')
+                msg = 'Found LDAP error string. '
+                msg += 'The error returned by the web application is (only a fragment is shown): "'
+                msg += response.getBody()[match.start():match.end()] + '". The error was found on '
+                msg += 'response with id ' + str(response.id) + '.'
+                om.out.information(msg)
                 res.append( ldapError )
         return res
         
     def _getLDAPErrors( self ):
-        errorStr = []
-        errorStr.append('supplied argument is not a valid ldap')
-        errorStr.append('javax.naming.NameNotFoundException'.lower())
-        return errorStr
+        error_strings = []
+        
+        # Not sure which lang or LDAP engine
+        error_strings.append('supplied argument is not a valid ldap')
+        
+        # Java
+        error_strings.append('javax.naming.NameNotFoundException')
+        error_strings.append('LDAPException')
+        error_strings.append('com.sun.jndi.ldap')
+        
+        # http://support.microsoft.com/kb/218185
+        error_strings.append('Protocol error occurred')
+        error_strings.append('Size limit has exceeded')
+        error_strings.append('An inappropriate matching occurred')
+        error_strings.append('A constraint violation occurred')
+        error_strings.append('The syntax is invalid')
+        error_strings.append('Object does not exist')
+        error_strings.append('The alias is invalid')
+        error_strings.append('The distinguished name has an invalid syntax')
+        error_strings.append('The server does not handle directory requests')
+        error_strings.append('There was a naming violation')
+        error_strings.append('There was an object class violation')
+        error_strings.append('Results returned are too large')
+        error_strings.append('Unknown error occurred')
+        error_strings.append('Local error occurred')
+        error_strings.append('The search filter is incorrect')
+        error_strings.append('The search filter is invalid')
+        error_strings.append('The search filter cannot be recognized')
+        
+        # OpenLDAP
+        error_strings.append('Invalid DN syntax')
+        error_strings.append('No Such Object')
+        
+        # IPWorks LDAP
+        # http://www.tisc-insight.com/newsletters/58.html
+        error_strings.append('IPWorksASP.LDAP')
+        
+        # ???
+        # https://entrack.enfoldsystems.com/browse/SERVERPUB-350
+        error_strings.append('Module Products.LDAPMultiPlugins')
+        
+
+        return [ e.lower() for e in error_strings ]
         
     def getOptions( self ):
         '''
@@ -136,12 +180,13 @@ class LDAPi(baseAuditPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return []
+        return ['grep.error500']
     
     def getLongDesc( self ):
         '''
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin will find LDAP injections.
+        This plugin will find LDAP injections by sending a specially crafted string to every
+        parameter and analyzing the response for LDAP errors.
         '''

@@ -26,12 +26,14 @@ import urllib2
 import httplib
 import unittest
 import md5
-from core.controllers.misc.homeDir import getHomeDir
+from core.controllers.misc.homeDir import get_home_dir
 
 import StringIO
 import core.controllers.outputManager as om
 import os.path
 from core.controllers.w3afException import w3afException
+
+CACHE_METHODS = [ 'GET' , 'HEAD' ]
 
 def getId( request ):
     '''
@@ -54,23 +56,19 @@ class CacheHandler(urllib2.BaseHandler):
     @author: Version 0.1 by Staffan Malmgren <staffan@tomtebo.org>
     @author: Version 0.2 by Andres Riancho
     '''
-    
     def __init__( self ):
-        self.cacheLocation = getHomeDir() + os.path.sep + 'urllib2cache'
+        self.cacheLocation = get_home_dir() + os.path.sep + 'urllib2cache'
         if not os.path.exists(self.cacheLocation):
             os.makedirs(self.cacheLocation)
         
         self.cacheLocation += os.path.sep + str(os.getpid())
         if not os.path.exists(self.cacheLocation):
             os.mkdir(self.cacheLocation)
-        
-    def _getMethods( self ):
-        return [ 'GET' , 'HEAD' ]
                 
     def default_open(self,request):
         
         method = request.get_method().upper()
-        if ( ( method in self._getMethods() ) and 
+        if ( ( method in CACHE_METHODS ) and 
             (CachedResponse.ExistsInCache(self.cacheLocation, getId( request ) ))):
             om.out.debug("CacheHandler: Returning CACHED response for %s" % request.get_full_url() )
             return CachedResponse(self.cacheLocation, request ) 
@@ -80,7 +78,7 @@ class CacheHandler(urllib2.BaseHandler):
     def http_response(self, request, response):
         method = request.get_method().upper()
         
-        if method in self._getMethods() :
+        if method in CACHE_METHODS :
             id = getId( request )
             CachedResponse.StoreInCache(self.cacheLocation, id, response)
         

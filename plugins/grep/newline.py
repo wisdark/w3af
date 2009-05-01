@@ -21,15 +21,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
-import core.data.parsers.urlParser as uparser
-from core.data.getResponseType import *
+
 import re
+
 
 class newline(baseGrepPlugin):
     '''
@@ -40,14 +43,25 @@ class newline(baseGrepPlugin):
     
     def __init__(self):
         baseGrepPlugin.__init__(self)
+
+        # User configured parameters
+        self._mixed_only = True
+
+        # New line style
         self._unix = re.compile( '[^\r]\n' )
         self._windows = re.compile( '\r\n' )
         self._mac = re.compile( '\r[^\n]' )
         
-    def _testResponse(self, request, response):
-        self.is404 = kb.kb.getData( 'error404page', '404' )
-        if isTextOrHtml(response.getHeaders()) and request.getMethod() in ['GET','POST']\
-        and not self.is404( response ):
+    def grep(self, request, response):
+        '''
+        Plugin entry point. Analyze the new line convention of the site.
+        @return: None
+        '''
+
+        is404 = kb.kb.getData( 'error404page', '404' )
+
+        if response.is_text_or_html() and request.getMethod() in ['GET', 'POST']\
+        and not is404( response ):
             unix = self._unix.findall( response.getBody() )
             windows = self._windows.findall( response.getBody() )
             mac = self._mac.findall( response.getBody() )
@@ -59,52 +73,62 @@ class newline(baseGrepPlugin):
             
             msg = ''
             if len( unix ) > 0 and len(unix) >= len(windows) and len(unix) >= len(mac):
-                if len( windows ) == 0 and len( mac ) == 0:
-                    msg = 'The body of the URL: '  + response.getURL() + ' was created using a unix editor.'
+                if len( windows ) == 0 and len( mac ) == 0 and not self._mixed_only:
+                    msg = 'The body of the URL: "'  + response.getURL() + '"'
+                    msg += ' was created using a unix editor.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'unix', i )
                 if len( windows ) != 0 and len( unix ) > len( windows ):
-                    msg = 'The body of the URL: '  + response.getURL() + ' was mainly created using a unix editor but newlines with windows style also were found.'
+                    msg = 'The body of the URL: "'  + response.getURL() + '" was mainly created'
+                    msg += ' using a unix editor but newlines with windows style also were found.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'unix_windows', i )
                 if len( mac ) != 0 and len( unix ) > len( mac ):
-                    msg = 'The body of the URL: '  + response.getURL() + ' was mainly created using a unix editor but newlines with mac style also were found.'
+                    msg = 'The body of the URL: "'  + response.getURL() + '" was mainly created'
+                    msg += ' using a unix editor but newlines with mac style also were found.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'unix_mac', i )
             
             # Maybe I should think about doing this in a for loop or something...
             
             elif len( windows ) > 0 and len(windows) >= len(unix) and len(windows) >= len(mac):
-                if len( unix ) == 0 and len( mac ) == 0:
-                    msg = 'The body of the URL: '  + response.getURL() + ' was created using a windows editor.'
+                if len( unix ) == 0 and len( mac ) == 0  and not self._mixed_only:
+                    msg = 'The body of the URL: "'  + response.getURL() + '" was created '
+                    msg += 'using a windows editor.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'windows', i )
                 if len( unix ) != 0 and len( windows ) > len( unix ):
-                    msg = 'The body of the URL: '  + response.getURL() + ' was mainly created using a windows editor but newlines with unix style also were found.'
+                    msg = 'The body of the URL: "'  + response.getURL() + '" was mainly created'
+                    msg += ' using a windows editor but newlines with unix style also were found.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'windows_unix', i )
                 elif len( mac ) != 0 and len( windows ) > len( mac ):
-                    msg = 'The body of the URL: '  + response.getURL() + ' was mainly created using a windows editor but newlines with mac style also were found.'
+                    msg = 'The body of the URL: "'  + response.getURL() + '" was mainly created'
+                    msg += ' using a windows editor but newlines with mac style also were found.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'windows_mac', i )
             
             elif len( mac ) > 0 and len(mac) >= len(unix) and len(mac) >= len(windows):
-                if len( windows ) == 0 and len( unix ) == 0:
-                    msg = 'The body of the URL: '  + response.getURL() + ' was created using a mac editor.'
+                if len( windows ) == 0 and len( unix ) == 0  and not self._mixed_only:
+                    msg = 'The body of the URL: "'  + response.getURL() + '" was created using '
+                    msg += 'a mac editor.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'mac', i )
                 if len( windows ) != 0 and len( mac ) > len( windows ):
-                    msg = 'The body of the URL: '  + response.getURL() + ' was mainly created using a mac editor but newlines with windows style also were found.'
+                    msg = 'The body of the URL: "'  + response.getURL() + '" was mainly created '
+                    msg += 'using a mac editor but newlines with windows style also were found.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'mac_windows', i )
                 elif len( unix ) != 0 and len( mac ) > len( unix ):
-                    msg = 'The body of the URL: '  + response.getURL() + ' was mainly created using a mac editor but newlines with unix style also were found.'
+                    msg = 'The body of the URL: "'  + response.getURL() + '" was mainly created '
+                    msg += 'using a mac editor but newlines with unix style also were found.'
                     i.setDesc( msg )
                     kb.kb.append( self, 'mac_unix', i )
 
             # This is a mess!            
             if len( mac ) > 0 and len( windows ) > 0 and len( unix ) > 0:
-                msg = 'The body of the URL: '  + response.getURL() + ' has the three types of newline style, unix, mac and windows.'
+                msg = 'The body of the URL: "'  + response.getURL() + '" has the '
+                msg += 'three types of newline style, unix, mac and windows.'
                 i.setDesc( msg )
                 kb.kb.append( self, 'all', i )
 
@@ -116,7 +140,14 @@ class newline(baseGrepPlugin):
         '''
         @return: A list of option objects for this plugin.
         '''    
+        d1 = 'Only report mixed newlines.'
+        h1 = 'If "mixedOnly" is enabled this plugin will only create objects in the knowledge base'
+        h1 += ' when the page under analysis has mixed new lines (i.e windows/unix).'
+        o1 = option('mixedOnly', self._mixed_only , d1, 'boolean', help=h1)
+        
         ol = optionList()
+        ol.add(o1)
+        
         return ol
 
     def end(self):
@@ -124,27 +155,41 @@ class newline(baseGrepPlugin):
         This method is called when the plugin wont be used anymore.
         '''
         # Print the results to the user
-        prettyMsg = {}
-        prettyMsg['unix'] = 'The body of the following URLs was created using a unix editor:'
-        prettyMsg['unix_mac'] = 'The body of the following URLs was mainly created using a unix editor but newlines with mac style also were found:'
-        prettyMsg['unix_windows']= 'The body of the following URLs was mainly created using a unix editor but newlines with windows style also were found:'
-        prettyMsg['windows'] = 'The body of the following URLs was created using a windows editor:'
-        prettyMsg['windows_unix'] = 'The body of the following URLs was mainly created using a windows editor but newlines with unix style also were found:'
-        prettyMsg['windows_mac'] = 'The body of the following URLs was mainly created using a windows editor but newlines with mac style also were found:'
-        prettyMsg['mac'] = 'The body of the following URLs was created using a mac editor:'
-        prettyMsg['mac_windows'] = 'The body of the following URLs was mainly created using a mac editor but newlines with windows style also were found:'
-        prettyMsg['mac_unix'] = 'The body of the following URLs was mainly created using a mac editor but newlines with unix style also were found:'
-        prettyMsg['all'] = 'The body of the following URLs has the three types of newline style, unix, mac and windows:'
+        pretty_msg = {}
+        pretty_msg['unix'] = 'The body of the following URLs was created using a unix editor:'
+        pretty_msg['unix_mac'] = 'The body of the following URLs was mainly created using a '
+        pretty_msg['unix_mac'] += 'unix editor but newlines with mac style also were found:'
+
+        pretty_msg['unix_windows'] = 'The body of the following URLs was mainly created using a '
+        pretty_msg['unix_windows'] += 'unix editor but newlines with windows style also were found:'
+
+        pretty_msg['windows'] = 'The body of the following URLs was created using a windows editor:'
+
+        pretty_msg['windows_unix'] = 'The body of the following URLs was mainly created using a '
+        pretty_msg['windows_unix'] += 'windows editor but newlines with unix style also were found:'
+
+        pretty_msg['windows_mac'] = 'The body of the following URLs was mainly created using a '
+        pretty_msg['windows_mac'] += 'windows editor but newlines with mac style also were found:'
+
+        pretty_msg['mac'] = 'The body of the following URLs was created using a mac editor:'
+        pretty_msg['mac_windows'] = 'The body of the following URLs was mainly created using a '
+        pretty_msg['mac_windows'] += 'mac editor but newlines with windows style also were found:'
+
+        pretty_msg['mac_unix'] = 'The body of the following URLs was mainly created using a '
+        pretty_msg['mac_unix'] += 'mac editor but newlines with unix style also were found:'
+
+        pretty_msg['all'] = 'The body of the following URLs has the three types of newline '
+        pretty_msg['all'] += 'style, unix, mac and windows:'
     
-        for type in prettyMsg.keys():
+        for new_line_type in pretty_msg.keys():
             inform = []
-            for v in kb.kb.getData( 'newline', type ):
+            for v in kb.kb.getData( 'newline', new_line_type ):
                 inform.append( v.getURL() )
             
             inform = list( set( inform ) )
             
             if len( inform ):
-                om.out.information( prettyMsg[ type ] )
+                om.out.information( pretty_msg[ new_line_type ] )
                 inform.sort()
                 for i in inform:
                     om.out.information( '- ' + i )

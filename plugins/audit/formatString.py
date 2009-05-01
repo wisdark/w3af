@@ -20,19 +20,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-
-from core.data.fuzzer.fuzzer import *
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
+
 from core.controllers.w3afException import w3afException
-import core.data.parsers.urlParser as urlParser
+from core.data.fuzzer.fuzzer import createMutants, createFormatString
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
+
 
 class formatString(baseAuditPlugin):
     '''
@@ -43,7 +45,7 @@ class formatString(baseAuditPlugin):
     def __init__(self):
         baseAuditPlugin.__init__(self)
 
-    def _fuzzRequests(self, freq ):
+    def audit(self, freq ):
         '''
         Tests an URL for format string vulnerabilities.
         
@@ -51,8 +53,9 @@ class formatString(baseAuditPlugin):
         '''
         om.out.debug( 'formatString plugin is testing: ' + freq.getURL() )
         
-        strList = self._getStringList()
-        mutants = createMutants( freq , strList )
+        string_list = self._get_string_list()
+        oResponse = self._sendMutant( freq , analyze=False ).getBody()
+        mutants = createMutants( freq , string_list, oResponse=oResponse )
             
         for mutant in mutants:
             targs = (mutant,)
@@ -62,19 +65,29 @@ class formatString(baseAuditPlugin):
         '''
         Analyze results of the _sendMutant method.
         '''
-        for error in self._getErrors():
-            # hmmm...
-            if response.getBody().count( error ):
-                v = vuln.vuln( mutant )
-                v.setId( response.id )
-                v.setSeverity(severity.MEDIUM)
-                v.setName( 'Format string vulnerability' )
-                v.setDesc( 'A possible (detection is really hard...) format string was found at: ' + response.getURL() + ' . Using method: ' + v.getMethod() + '. The data sent was: ' + str(mutant.getDc()) )
-                kb.kb.append( self, 'formatString', v )
+        for error in self._get_errors():
+            # Check if the error string is in the response
+            if error in response:
+                # And not in the originally requested (non fuzzed) request
+                if not error not in mutant.getOriginalResponseBody():
+                    # vuln, vuln!
+                    v = vuln.vuln( mutant )
+                    v.setId( response.id )
+                    v.setSeverity(severity.MEDIUM)
+                    v.setName( 'Format string vulnerability' )
+                    msg = 'A possible (detection is really hard...) format string was found at: '
+                    msg += mutant.foundAt()
+                    v.setDesc( msg )
+                    kb.kb.append( self, 'formatString', v )
     
-    def _getErrors( self ):
+    def _get_errors( self ):
+        '''
+        @return: A list of error strings.
+        '''
         res = []
-        res.append('<html><head>\n<title>500 Internal Server Error</title>\n</head><body>\n<h1>Internal Server Error</h1>')
+        msg = '<html><head>\n<title>500 Internal Server Error</title>\n</head><body>\n<h1>'
+        msg += 'Internal Server Error</h1>'
+        res.append(msg)
         return res
         
     def end(self):
@@ -84,14 +97,14 @@ class formatString(baseAuditPlugin):
         self._tm.join( self )
         self.printUniq( kb.kb.getData( 'formatString', 'formatString' ), 'VAR' )
         
-    def _getStringList( self ):
+    def _get_string_list( self ):
         '''
         @return: This method returns a list of format strings.
         '''
         strings = []
         lengths = [ 1 , 10 , 25, 50, 100 ]
-        for l in lengths:
-            strings.append( createFormatString( l ) )   
+        for i in lengths:
+            strings.append( createFormatString( i ) )
         return strings
 
     def getOptions( self ):
@@ -116,14 +129,14 @@ class formatString(baseAuditPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return []
+        return ['grep.error500']
     
     def getLongDesc( self ):
         '''
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin will find format string bugs.
+        This plugin finds format string bugs.
         
         Users have to know that detecting a format string vulnerability will be only possible if the server is configured
         to return errors, and the application is developed in cgi-c or some other language that allows the programmer to

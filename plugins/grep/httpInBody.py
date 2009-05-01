@@ -20,14 +20,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
-import core.data.parsers.urlParser as uparser
-from core.data.getResponseType import *
+
 import re
 
 class httpInBody (baseGrepPlugin):
@@ -40,7 +42,7 @@ class httpInBody (baseGrepPlugin):
         
         # re that searches for
         #GET / HTTP/1.0
-        self._re_request = re.compile('[a-zA-Z] .*? HTTP/1.[01]')
+        self._re_request = re.compile('[a-zA-Z]{3,6} .*? HTTP/1.[01]')
         
         # re that searches for
         #HTTP/1.1 200 OK
@@ -49,33 +51,44 @@ class httpInBody (baseGrepPlugin):
         # re that remove tags
         self._re_removeTags = re.compile('(<.*?>|</.*?>)')
         
-    def _testResponse(self, request, response):
+    def grep(self, request, response):
+        '''
+        Plugin entry point.
+        
+        @return: None, all results are saved in the kb.
+        '''
         # 501 Code is "Not Implemented" which in some cases responds with this in the body:
         # <body><h2>HTTP/1.1 501 Not Implemented</h2></body>
         # Which creates a false positive.
-        if response.getCode() != 501 and isTextOrHtml(response.getHeaders()):
+        if response.getCode() != 501 and response.is_text_or_html():
             
             # First if, mostly for performance.
-            if 'HTTP/1.' in response.getBody():
+            # Remember that httpResponse objects have a faster "__in__" than
+            # the one in strings; so string in response.getBody() is slower than
+            # string in response
+            if 'HTTP' in response:
                 
                 # Now, remove tags
-                bodyWithoutTags = self._re_removeTags.sub('', response.getBody() )
+                body_without_tags = self._re_removeTags.sub('', response.getBody() )
                 
-                if self._re_request.search( bodyWithoutTags ):
+                res = self._re_request.search( body_without_tags )
+                if res:
                     i = info.info()
                     i.setName('HTTP Request in HTTP body')
                     i.setURI( response.getURI() )
                     i.setId( response.id )
-                    i.setDesc( 'A HTTP request was found in the HTTP body of a response' )
-                    kb.kb.append( self, 'httpInBody', i )
+                    i.setDesc( 'An HTTP request was found in the HTTP body of a response' )
+                    i.addToHighlight(res.group(0))
+                    kb.kb.append( self, 'request', i )
                     
-                if self._re_response.search( bodyWithoutTags ):
+                res = self._re_response.search( body_without_tags )
+                if res:
                     i = info.info()
                     i.setName('HTTP Response in HTTP body')
                     i.setURI( response.getURI() )
                     i.setId( response.id )
-                    i.setDesc( 'A HTTP response was found in the HTTP body of a response' )
-                    kb.kb.append( self, 'httpInBody', i )
+                    i.setDesc( 'An HTTP response was found in the HTTP body of a response' )
+                    kb.kb.append( self, 'response', i )
 
     def setOptions( self, optionsMap ):
         pass
@@ -91,12 +104,14 @@ class httpInBody (baseGrepPlugin):
         '''
         This method is called when the plugin wont be used anymore.
         '''
-        if kb.kb.getData('httpInBody', 'httpInBody'):
-            om.out.information('The following URLs have a HTTP request or response in the HTTP response body:')
-            for i in kb.kb.getData('httpInBody', 'httpInBody'):
-                om.out.information('- ' + i.getURI() + '  (id:' + str(i.getId()) + ')' )
+        for info_type in ['request', 'response']:
             
-    
+            if kb.kb.getData('httpInBody', info_type):
+                msg = 'The following URLs have an HTTP '+ info_type +' in the HTTP response body:'
+                om.out.information(msg)
+                for i in kb.kb.getData('httpInBody', info_type):
+                    om.out.information('- ' + i.getURI() + '  (id:' + str(i.getId()) + ')' )
+        
     def getPluginDeps( self ):
         '''
         @return: A list with the names of the plugins that should be runned before the

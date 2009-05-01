@@ -26,7 +26,8 @@ import core.data.request.fuzzableRequest as fuzzableRequest
 import core.data.url.httpResponse as httpResponse
 from core.data.url.handlers.keepalive import HTTPResponse as kaHTTPResponse
 import core.data.url.handlers.logHandler
-from core.data.parsers.urlParser import *
+from core.data.parsers.urlParser import getDomain
+
 
 class mangleHandler(urllib2.BaseHandler):
     """
@@ -103,7 +104,14 @@ class mangleHandler(urllib2.BaseHandler):
             for plugin in self._pluginList:
                 plugin.mangleResponse( httpRes )
             
-            response = self._httpResponse2httplib( response, httpRes )
+            if response._connection.sock == None:
+                # This fixes bug #1982106
+                # https://sourceforge.net/tracker/index.php?func=detail&aid=1982106&group_id=170274&atid=853652
+                # Returning None is like saying "I don't know what to do with this, let the next handler manage it".
+                ### FIXME: Does this work?
+                return None
+            else:
+                response = self._httpResponse2httplib( response, httpRes )
         return response
 
     def _httpResponse2httplib( self, originalResponse, mangledResponse ):

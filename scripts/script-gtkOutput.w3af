@@ -7,7 +7,7 @@ output console,gtkOutput, textFile
 output
 
 output config textFile
-set verbosity 10
+set verbose True
 back
 
 discovery pykto
@@ -19,8 +19,8 @@ back
 
 start
 
-assert len(kb.kb.getData('pykto','vuln')) == 3
-assert len(kb.kb.getData('urls','urlList')) == 3
+assert len(kb.kb.getData('pykto','vuln')) >= 3
+assert len(kb.kb.getData('urls','urlList')) >= 3
 
 # Check that message objects are stored here...
 assert kb.kb.getData('gtkOutput','queue').get().getMsg()

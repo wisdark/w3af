@@ -25,6 +25,8 @@ from core.data.request.httpPostDataRequest import httpPostDataRequest
 from core.data.request.httpQsRequest import httpQsRequest
 import core.data.parsers.urlParser as urlParser
 from core.data.request.frFactory import createFuzzableRequestRaw
+import core.controllers.outputManager as om
+from core.controllers.w3afException import *
 
 class baseManglePlugin(basePlugin):
     '''
@@ -33,7 +35,7 @@ class baseManglePlugin(basePlugin):
         1. mangleRequest( request )
         2. mangleResponse( request )
         3. setOptions( OptionList )
-        4. getOptionsXML()
+        4. getOptions()
 
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''

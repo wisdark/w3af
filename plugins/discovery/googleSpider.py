@@ -21,15 +21,20 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
+from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
 from core.controllers.w3afException import w3afException
 from core.controllers.w3afException import w3afRunOnce
-from core.data.searchEngines.google import google as google
-from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
+from core.data.searchEngines.googleSearchEngine import googleSearchEngine as google
+
+from core.controllers.misc.is_private_site import is_private_site
 import core.data.parsers.urlParser as urlParser
+
+from urllib2 import URLError
 
 
 class googleSpider(baseDiscoveryPlugin):
@@ -37,31 +42,23 @@ class googleSpider(baseDiscoveryPlugin):
     Search google using google API to get new URLs
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    
-    '''
-    Go here to get a API License : http://www.google.com/apis/
-    
-    Get pygoogle from : http://pygoogle.sourceforge.net/
-    
-    This plugin wont use proxy/proxy auth/auth/etc settings (for now)
-    
-    @author: Andres Riancho ( andres.riancho@gmail.com )
-    '''
 
     def __init__(self):
         baseDiscoveryPlugin.__init__(self)
+        
+        # Internal variables
         self._run = True
+        self._fuzzableRequests = []
         
         # User variables
         self._key = ''
-        self._resultLimit = 300
+        self._result_limit = 300
         
     def discover(self, fuzzableRequest ):
         '''
-        @parameter fuzzableRequest: A fuzzableRequest instance that contains (among other things) the URL to test.
+        @parameter fuzzableRequest: A fuzzableRequest instance that contains 
+                                                    (among other things) the URL to test.
         '''
-        newUrls = []
-        self._fuzzableRequests = []
         if not self._run:
             # This will remove the plugin from the discovery plugins to be runned.
             raise w3afRunOnce()
@@ -69,14 +66,16 @@ class googleSpider(baseDiscoveryPlugin):
             # I will only run this one time. All calls to googleSpider return the same url's
             self._run = False
             
-            self._google = google( self._urlOpener, self._key )
+            google_se = google( self._urlOpener, self._key )
             
             domain = urlParser.getDomain( fuzzableRequest.getURL() )
-            if self._google.isPrivate( domain ):
-                raise w3afException('There is no point in searching google for "site:'+ domain + '" . Google doesnt index private pages.')
+            if is_private_site( domain ):
+                msg = 'There is no point in searching google for "site:'+ domain + '".'
+                msg += ' Google doesnt index private pages.'
+                raise w3afException( msg )
 
             try:
-                results = self._google.getNResults('site:'+ domain, self._resultLimit)
+                results = google_se.getNResults('site:'+ domain, self._result_limit)
             except w3afException, w3:
                 om.out.error(str(w3))
                 # If I found an error, I don't want to be run again
@@ -85,32 +84,42 @@ class googleSpider(baseDiscoveryPlugin):
                 # Happy happy joy, no error here!
                 for res in results:
                     targs = (res.URL,)
-                    self._tm.startFunction( target=self._generateFuzzableRequests, args=targs, ownerObj=self )          
+                    self._tm.startFunction( target=self._generateFuzzableRequests, 
+                                                        args=targs, ownerObj=self )
                 self._tm.join( self )
         return self._fuzzableRequests
     
     def _generateFuzzableRequests( self, url ):
+        '''
+        Generate the fuzzable requests based on the URL, which is a result from google search.
+        
+        @parameter url: A URL from google.
+        '''
         try:
             response = self._urlOpener.GET( url, useCache=True, getSize=True )
         except KeyboardInterrupt, k:
             raise k
         except w3afException, w3:
-            pass
-        except URLError, ue:
-            om.out.debug('URL Error while fetching page in googleSpider, error: ' + str(ue) )
-        fuzzReqs = self._createFuzzableRequests( response )
-        self._fuzzableRequests.extend( fuzzReqs )
+            om.out.debug('w3afException while fetching page in googleSpider: ' + str(w3) )
+        except URLError, url_error:
+            om.out.debug('URL Error while fetching page in googleSpider, error: ' + str(url_error) )
+        else:
+            fuzzReqs = self._createFuzzableRequests( response )
+            self._fuzzableRequests.extend( fuzzReqs )
     
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
         '''
         d1 = 'Google API License key'
-        h1 = 'To use this plugin you have to own your own google API license key OR you can directly use the search engine using clasic HTTP. If this parameter is left blank, the search engine will be used, otherwise the google webservice will be used.Go to http://www.google.com/apis/ to get more information.'
+        h1 = 'To use this plugin you have to own your own google API license key OR you can'
+        h1 += ' directly use the search engine using clasic HTTP. If this parameter is left blank,'
+        h1 += ' the search engine will be used, otherwise the google webservice will be used.'
+        h1 += ' Go to http://www.google.com/apis/ to get more information.'
         o1 = option('key', self._key, d1, 'string', help=h1)
         
         d2 = 'Fetch the first "resultLimit" results from the Google search'
-        o2 = option('resultLimit', self._resultLimit, d2, 'integer')
+        o2 = option('resultLimit', self._result_limit, d2, 'integer')
 
         ol = optionList()
         ol.add(o1)
@@ -125,8 +134,8 @@ class googleSpider(baseDiscoveryPlugin):
         @parameter OptionList: A dictionary with the options for the plugin.
         @return: No value is returned.
         ''' 
-        self._key = optionsMap['key']
-        self._resultLimit = optionsMap['resultLimit']
+        self._key = optionsMap['key'].getValue()
+        self._result_limit = optionsMap['resultLimit'].getValue()
 
     def getPluginDeps( self ):
         '''
@@ -140,10 +149,12 @@ class googleSpider(baseDiscoveryPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin finds new URL's using google. It will search for "site:domain.com" and do GEt requests
-        all the URL's found in the result.
+        This plugin finds new URL's using google. It will search for "site:domain.com" and do GET
+        requests all the URL's found in the result.
         
         Two configurable parameters exist:
             - resultLimit
             - key
+        
+        Valid google API licenses are only the *old ones*.
         '''

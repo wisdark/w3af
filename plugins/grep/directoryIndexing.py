@@ -20,17 +20,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-import core.data.parsers.htmlParser as htmlParser
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+import core.data.parsers.urlParser as urlParser
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
-from core.data.parsers.urlParser import *
-from core.data.getResponseType import *
 import core.data.constants.severity as severity
+
+from core.data.db.temp_persist import disk_list
+
+import re
+
 
 class directoryIndexing(baseGrepPlugin):
     '''
@@ -41,22 +47,44 @@ class directoryIndexing(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
+        
+        self._already_visited = disk_list()
+        
+        # Added performance by compiling all the regular expressions
+        # before using them. The setup time of the whole plugin raises,
+        # but the execution time is lowered *a lot*.
+        self._compiled_regex_list = [ re.compile(regex, re.IGNORECASE | re.DOTALL) for regex in self._get_indexing_regex() ]
 
-    def _testResponse(self, request, response):
-
-        if isTextOrHtml(response.getHeaders()):
-            htmlString = response.getBody()
-            for directoryIndexingString in self._getdirectoryIndexingStrings():
-                if htmlString.find( directoryIndexingString ) != -1:
-                    v = vuln.vuln()
-                    v.setURL( response.getURL() )
-                    v.setDesc( 'The URL : ' + response.getURL() + ' has a directory indexing problem.' )
-                    v.setId( response.id )
-                    v.setSeverity(severity.LOW)
-                    v.setName( 'Directory indexing' )                  
-                    
-                    kb.kb.append( self , 'directory' , v )
-                    break
+    def grep(self, request, response):
+        '''
+        Plugin entry point, search for directory indexing.
+        @return: None
+        '''
+        if response.getURL() in self._already_visited:
+            # Already worked for this URL, no reason to work twice
+            return
+        
+        else:
+            # Save it,
+            self._already_visited.append( response.getURL() )
+            
+            # Work,
+            if response.is_text_or_html():
+                html_string = response.getBody()
+                for indexing_regex in self._compiled_regex_list:
+                    if indexing_regex.search( html_string ):
+                        v = vuln.vuln()
+                        v.setURL( response.getURL() )
+                        msg = 'The URL: "' + response.getURL() + '" has a directory '
+                        msg += 'indexing vulnerability.'
+                        v.setDesc( msg )
+                        v.setId( response.id )
+                        v.setSeverity(severity.LOW)
+                        path = urlParser.getPath( response.getURL() )
+                        v.setName( 'Directory indexing - ' + path )
+                        
+                        kb.kb.append( self , 'directory' , v )
+                        break
     
     def setOptions( self, OptionList ):
         pass
@@ -68,19 +96,24 @@ class directoryIndexing(baseGrepPlugin):
         ol = optionList()
         return ol
 
-    def _getdirectoryIndexingStrings(self):
-        dirIndexStr = []
+    def _get_indexing_regex(self):
+        '''
+        @return: A list of the regular expression strings, in order to be compiled in __init__
+        '''
+        dir_indexing_regexes = []
         ### TODO: verify if I need to add more values here, IIS !!!
-        dirIndexStr.append("<title>Index of /") 
-        dirIndexStr.append('<a href="?C=N;O=D">Name</a>') 
-        dirIndexStr.append("Last modified</a>")
-        dirIndexStr.append("Parent Directory</a>")
-        dirIndexStr.append("Directory Listing for")
-        dirIndexStr.append("<TITLE>Folder Listing.")
-        dirIndexStr.append("<TITLE>Folder Listing.")
-        dirIndexStr.append("- Browsing directory ")
-        dirIndexStr.append('">[To Parent Directory]</a><br><br>') # IIS 6.0
-        return dirIndexStr
+        dir_indexing_regexes.append("<title>Index of /") 
+        dir_indexing_regexes.append('<a href="\\?C=N;O=D">Name</a>') 
+        dir_indexing_regexes.append("Last modified</a>")
+        dir_indexing_regexes.append("Parent Directory</a>")
+        dir_indexing_regexes.append("Directory Listing for")
+        dir_indexing_regexes.append("<TITLE>Folder Listing.")
+        dir_indexing_regexes.append("<TITLE>Folder Listing.")
+        dir_indexing_regexes.append('<table summary="Directory Listing" ')
+        dir_indexing_regexes.append("- Browsing directory ")
+        dir_indexing_regexes.append('">\\[To Parent Directory\\]</a><br><br>') # IIS 6.0
+        dir_indexing_regexes.append('<A HREF=".*?">.*?</A><br></pre><hr></body></html>') # IIS 5.0
+        return dir_indexing_regexes
         
     def end(self):
         '''

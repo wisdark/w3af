@@ -21,10 +21,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
-from core.controllers.w3afException import w3afException
-import core.data.kb.config as cf
 from core.data.parsers.abstractParser import abstractParser
-import extlib.pyPdf.pyPdf as pyPdf
+
+try:
+    import extlib.pyPdf.pyPdf as pyPdf
+except:
+    import pyPdf
+    
 import StringIO
 import re
 
@@ -34,25 +37,25 @@ class pdfParser(abstractParser):
     
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__(self, document, baseURL, verbose=0):
-        abstractParser.__init__(self , baseURL)
-        self._accounts = []
-        self._urlsInDocument = []
+    def __init__(self, httpResponse):
+        abstractParser.__init__(self , httpResponse)
+        self._parsed_URLs = []
+        self._re_URLs = []
         
         # work !
-        self._preParse( document )
+        self._preParse( httpResponse.getBody() )
         
     def _preParse( self, document ):
-        contentText = self.getPDFContent( document )
-        self._parse( contentText )
+        content_text = self.getPDFContent( document )
+        self._parse( content_text )
     
-    def _parse( self, contentText ):
+    def _parse( self, content_text ):
         # Get the URLs using a regex
-        urlRegex = '((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|%[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)'
-        self._urlsInDocument = [ x[0] for x in re.findall(urlRegex, contentText ) ]
+        url_regex = '((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|%[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)'
+        self._re_URLs = [ x[0] for x in re.findall(url_regex, content_text ) ]
         
         # Get the mail addys
-        self.findAccounts( contentText )
+        self.findEmails( content_text )
         
     def getPDFContent( self, documentString ):
         content = ""
@@ -73,8 +76,8 @@ class pdfParser(abstractParser):
         
         
         '''
-        hack to avoid this bug:
-        ==============
+        Added to avoid this bug:
+        ===============
         
         "/home/ulises2k/programas/w3af-svn/w3af/core/data/parsers/abstractParser.py
         ", line 52, in findAccounts
@@ -82,29 +85,36 @@ class pdfParser(abstractParser):
         UnicodeDecodeError: 'ascii' codec can't decode byte 0xc3 in position 13:
         ordinal not in range(128)
         '''
-        res = ''
-        for char in content:
-            try:
-                res += char.encode()
-            except:
-                pass
-        
+        res = unicode(content,'utf-8','ignore').encode('utf-8')
         return res
     
-    def getAccounts( self ):
-        return self._accounts
-        
     def getReferences( self ):
-        return self._urlsInDocument
-    
-    def getReferencesOfTag( self, tagType ):
         '''
-        @return: A list of the URLs that the parser found in a tag of tagType = "tagType" (i.e img, a)
+        Searches for references on a page. w3af searches references in every html tag, including:
+            - a
+            - forms
+            - images
+            - frames
+            - etc.
+        
+        @return: Two lists, one with the parsed URLs, and one with the URLs that came out of a
+        regular expression. The second list if less trustworthy.
+        '''        
+        tmp_re_URLs = set(self._re_URLs) - set( self._parsed_URLs )
+        return list(set( self._parsed_URLs )), list(tmp_re_URLs)
+        
+    def _returnEmptyList( self, *args, **kwds ):
         '''
-        # I have no tags.
+        This method is called (see below) when the caller invokes one of:
+            - getForms
+            - getComments
+            - getMetaRedir
+            - getMetaTags
+            - getReferencesOfTag
+        
+        @return: Because we are a PDF document, we don't have the same things that
+        a nice HTML document has, so we simply return an empty list.
+        '''
         return []
         
-    def _returnEmptyList( self ):
-        return []
-        
-    getForms = getComments = getMetaRedir = getMetaTags = _returnEmptyList
+    getReferencesOfTag = getForms = getComments = getMetaRedir = getMetaTags = _returnEmptyList

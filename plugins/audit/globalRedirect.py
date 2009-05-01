@@ -20,24 +20,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-from core.data.fuzzer.fuzzer import *
-import core.data.kb.vuln as vuln
-import core.data.kb.knowledgeBase as kb
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
-
-import core.data.parsers.urlParser as urlParser
-import core.data.parsers.dpCache as dpCache
-
-from core.controllers.daemons.webserver import webserver
-from core.controllers.w3afException import w3afException
-from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
+import core.data.kb.knowledgeBase as kb
+import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
 
+import core.data.parsers.dpCache as dpCache
+from core.data.fuzzer.fuzzer import createMutants
+from core.controllers.w3afException import w3afException
+from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
+
 import re
+
 
 class globalRedirect(baseAuditPlugin):
     '''
@@ -47,10 +46,12 @@ class globalRedirect(baseAuditPlugin):
 
     def __init__(self):
         baseAuditPlugin.__init__(self)
-        self._testSite = 'http://w3af.sourceforge.net/'
-        self._scriptre = re.compile('< *script.*?>(.*)< */ *script *>',re.IGNORECASE | re.DOTALL )
+        
+        # Internal variables
+        self._test_site = 'http://w3af.sourceforge.net/'
+        self._scriptre = re.compile('< *script.*?>(.*)< */ *script *>', re.IGNORECASE | re.DOTALL )
 
-    def _fuzzRequests(self, freq ):
+    def audit(self, freq ):
         '''
         Tests an URL for global redirect vulnerabilities.
         
@@ -58,25 +59,24 @@ class globalRedirect(baseAuditPlugin):
         '''
         om.out.debug( 'golbalRedirect plugin is testing: ' + freq.getURL() )
         
-        globalRedirects = [self._testSite,]
-        mutants = createMutants( freq , globalRedirects )
+        mutants = createMutants( freq , [self._test_site, ] )
             
         for mutant in mutants:
-            if self._hasNoBug( 'globalRedirect' , 'globalRedirect' , mutant.getURL() , mutant.getVar() ):
+            if self._hasNoBug( 'globalRedirect' , 'globalRedirect' , mutant.getURL()\
+            , mutant.getVar() ):
                 targs = (mutant,)
                 self._tm.startFunction( target=self._sendMutant, args=targs, ownerObj=self )
-        
-                            
+
     def _analyzeResult( self, mutant, response ):
         '''
         Analyze results of the _sendMutant method.
         '''
-        if self._findRedirect( response ):
+        if self._find_redirect( response ):
             v = vuln.vuln( mutant )
             v.setId( response.id )
             v.setName( 'Insecure redirection' )
             v.setSeverity(severity.MEDIUM)
-            v.setDesc( 'Global redirect was found at: ' + response.getURL() + ' . Using method: ' + v.getMethod() + '. The data sent was: ' + str(mutant.getDc()) )
+            v.setDesc( 'Global redirect was found at: ' + mutant.foundAt() )
             kb.kb.append( self, 'globalRedirect', v )
     
     def end(self):
@@ -86,21 +86,26 @@ class globalRedirect(baseAuditPlugin):
         self._tm.join( self )
         self.printUniq( kb.kb.getData( 'globalRedirect', 'globalRedirect' ), 'VAR' )
         
-    def _findRedirect( self, response ):
+    def _find_redirect( self, response ):
         '''
         This method checks if the browser was redirected ( using a 302 code ) 
         or is being told to be redirected by javascript or <meta http-equiv="refresh"
         '''
-        if response.getRedirURL() == self._testSite:
+        if self._test_site in response.getRedirURL():
             # The script sent a 302, and w3af followed the redirection
             # so the URL is now the test site
             return True
         else:
             # Test for http-equiv redirects
-            dp = dpCache.dpc.getDocumentParserFor( response.getBody(), response.getURL() )
-            for redir in dp.getMetaRedir():
-                if redir.count( self._testSite ):
-                    return True
+            try:
+                dp = dpCache.dpc.getDocumentParserFor( response )
+            except w3afException:
+                # Failed to find a suitable parser for the document
+                return False
+            else:
+                for redir in dp.getMetaRedir():
+                    if redir.count( self._test_site ):
+                        return True
                     
             # Test for javascript redirects
             # These are some redirects I found on google :
@@ -117,7 +122,7 @@ class globalRedirect(baseAuditPlugin):
                         code.extend( i.split(';') )
                         
                     for line in code:
-                        if re.search( '(window\.location|location\.).*' + self._testSite, line ):
+                        if re.search( '(window\.location|location\.).*' + self._test_site, line ):
                             return True
         
         return False
@@ -151,10 +156,12 @@ class globalRedirect(baseAuditPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin will find global redirection bugs. This kind of bugs are used for phishing and other identity theft
-        attacks. A common example of a global redirection would be a script that takes a "url" parameter and when 
-        requesting this page, a HTTP 302 message with the location header to the value of the url parameter is sent in
-        the response.
+        This plugin finds global redirection vulnerabilities. This kind of bugs are used for
+        phishing and other identity theft attacks. A common example of a global redirection
+        would be a script that takes a "url" parameter and when requesting this page, a HTTP
+        302 message with the location header to the value of the url parameter is sent in the
+        response.
         
-        Global redirection bugs can be found in javascript, META tags and 302 / 301 HTTP return codes.
+        Global redirection vulnerabilities can be found in javascript, META tags and 302 / 301 
+        HTTP return codes.
         '''

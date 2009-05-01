@@ -27,6 +27,8 @@ from core.data.dc.cookie import cookie as cookie
 import core.data.kb.config as cf
 from core.data.parsers.urlParser import *
 import copy
+import urllib
+
 
 class fuzzableRequest:
     '''
@@ -42,6 +44,7 @@ class fuzzableRequest:
     '''
 
     def __init__(self):
+        
         # Internal variables
         self._url = ''
         self._method = 'GET'
@@ -55,39 +58,85 @@ class fuzzableRequest:
         '''
         @return: a DETAILED str representation of this fuzzable request.
         '''
-        strRes = ''
-        strRes += self._method + ' '
-        strRes += getPathQs( self.getURI() ) + ' HTTP/1.1\n'
-        for header in self._headers:
-            strRes += header + ': ' + self._headers[ header ] + '\n'
-        strRes += '\n\n'
-        strRes += str( self.getData() )
-
-        return strRes
+        result_string = ''
+        result_string += self.dumpRequestHead()
+        result_string += '\n\n'
+        result_string += str( self.getData() )
+        return result_string
+    
+    def dumpRequestHead( self ):
+        '''
+        @return: A string with the head of the request
+        '''
+        res = ''
+        res += self.getMethod() + ' ' + self.getURI() + ' ' + 'HTTP/1.1\n'
+        res += self.dumpHeaders()
+        return res
     
     def dumpHeaders( self ):
         '''
         @return: a str representation of the headers.
         '''
-        strRes = ''
+        result_string = ''
         for header in self._headers:
-            strRes += header + ': ' + self._headers[ header ] + '\n'
-        return strRes
-        
+            result_string += header + ': ' + self._headers[ header ] + '\n'
+        return result_string
+
+    def export( self ):
+      '''
+      @return: a csv str representation of the request
+      '''
+      strRes = ''
+      strRes += self._method + ',' 
+      strRes += self._url
+ 
+      if self._method == 'GET': 
+        if self._dc:
+          strRes += '?'
+          for i in self._dc:
+            #
+            #   FIXME: What about repeated parameter names?!
+            #
+            strRes += i + '=' + urllib.quote(str(self._dc[i])) + '&'          
+          strRes = strRes[: -1]
+        strRes += ','
+      else:
+        strRes += ','
+        if self._dc:
+          for i in self._dc:
+            strRes += i + '=' + urllib.quote(str(self._dc[i])) + '&'          
+          strRes = strRes[: -1]
+      return strRes
+                
     def __str__( self ):
         '''
         Return a str representation of this fuzzable request.
         '''
-        strRes = ''
-        strRes += self._url
-        strRes += ' | Method: ' + self._method
+        result_string = ''
+        result_string += self._url
+        result_string += ' | Method: ' + self._method
+        
         if self._dc:
-            strRes += ' | Parameters: ('
-            for i in self._dc:
-                strRes += i + ','
-            strRes = strRes[: -1]
-            strRes += ')'
-        return strRes
+            result_string += ' | Parameters: ('
+            
+            # Mangle the value for printing
+            for param_name in self._dc:
+
+                #
+                # Because of repeated parameter names, we need to add this:
+                #
+                for the_value in self._dc[param_name]:
+
+                    # the_value is always a string
+                    if len(the_value) > 10:
+                        the_value = the_value[:10] + '...'
+                    the_value = '"' + the_value + '"'
+                    
+                    result_string += param_name + '=' + the_value + ', '
+                    
+            result_string = result_string[: -2]
+            result_string += ')'
+        return result_string
         
     def __eq__( self, other ):
         if self._uri == other._uri and\
@@ -137,7 +186,6 @@ class fuzzableRequest:
             om.out.error('[fuzzableRequest error] setCookie received: "' + str(type(c)) + '" , "' + repr(c) + '"'  )
             raise w3afException('Invalid call to fuzzableRequest.setCookie()')
             
-        
     def getURL( self ):
         return self._url
     
@@ -167,9 +215,10 @@ class fuzzableRequest:
         return self._headers
     
     def getReferer( self ):
-        if 'Referer' in self._fuzzable['headers']:
+        if 'Referer' in self._headers['headers']:
             return self._headers['Referer']
-        return ''
+        else:
+            return ''
     
     def getCookie( self ):
         if self._cookie:
@@ -178,7 +227,7 @@ class fuzzableRequest:
             return None
     
     def getFileVariables( self ):
-        return None
+        return []
     
     def copy( self ):
         newFr = copy.deepcopy( self )

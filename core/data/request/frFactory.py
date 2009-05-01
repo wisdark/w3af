@@ -35,10 +35,15 @@ from core.data.dc.cookie import cookie as cookie
 import cgi
 
 # for json
-from extlib.jsonpy import json as json
+try:
+    from extlib.jsonpy import json as json
+except:
+    import json
 
 from core.controllers.w3afException import w3afException
+import core.controllers.outputManager as om
 import core.data.kb.config as cf
+
 
 def createFuzzableRequests( httpResponse, addSelf=True ):
     '''
@@ -69,11 +74,17 @@ def createFuzzableRequests( httpResponse, addSelf=True ):
     if addSelf:
         res.append( qsr )
     
-    # forms
-    dp = dpCache.dpc.getDocumentParserFor( httpResponse.getBody(), httpResponse.getRedirURI() )
-    formList = dp.getForms()
+    # Try to find forms in the document
+    form_list = []
+    try:
+        dp = dpCache.dpc.getDocumentParserFor( httpResponse )
+    except w3afException:
+        # Failed to find a suitable parser for the document
+        pass
+    else:
+        form_list = dp.getForms()
     
-    if len( formList ) == 0:
+    if len( form_list ) == 0:
         
         # Check if its a wsdl file
         wsdlp = wsdlParser.wsdlParser()
@@ -95,25 +106,22 @@ def createFuzzableRequests( httpResponse, addSelf=True ):
                     res.append( wspdr )     
         
     else:
-        # create one httpPostDataRequest for each form
-        for form in formList:
-            if form.getMethod().upper() == 'GET':
-                qsr = httpQsRequest.httpQsRequest()
-                qsr.setURL( url )
-                qsr.setDc( QSObject )
-                qsr.setHeaders( headers )
-                qsr.setCookie( cookieObj )
-                res.append( qsr )
-            elif form.getMethod().upper() == 'POST':
-                pdr = httpPostDataRequest.httpPostDataRequest()
-                pdr.setURL( form.getAction() )
-                pdr.setMethod( form.getMethod() )
-                pdr.setFileVariables( form.getFileVariables() )
-                pdr.setDc( form )
-                pdr.setHeaders( headers )
-                pdr.setCookie( cookieObj )
-                res.append( pdr )
-
+        # create one httpPostDataRequest for each form variant
+        mode = cf.cf.getData('fuzzFormComboValues')
+        for form in form_list:
+            variants = form.getVariants(mode)
+            for variant in variants:
+                if form.getMethod().upper() == 'GET':
+                    r = httpQsRequest.httpQsRequest()
+                elif form.getMethod().upper() == 'POST':
+                    r = httpPostDataRequest.httpPostDataRequest()
+                    r.setMethod(variant.getMethod())
+                    r.setFileVariables(form.getFileVariables())
+                r.setURL(variant.getAction())
+                r.setDc(variant)
+                r.setHeaders(headers)
+                r.setCookie(cookieObj)
+                res.append(r)
     return res
 
 def createFuzzableRequestRaw( method, url, postData, headers ):
@@ -127,6 +135,7 @@ def createFuzzableRequestRaw( method, url, postData, headers ):
     @parameter headers: A dict that holds the headers
     '''
     res = None
+
     if postData and len( postData ):
         # Seems to be something that has post data
         pdr = httpPostDataRequest.httpPostDataRequest()
@@ -174,7 +183,7 @@ def createFuzzableRequestRaw( method, url, postData, headers ):
         qsr.setMethod( method )
         qsr.setHeaders( headers )
         dc = urlParser.getQueryString( url )
-        qsr.setDc( dc )         
+        qsr.setDc( dc )
         res = qsr
         
     return res

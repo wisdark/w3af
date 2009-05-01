@@ -38,66 +38,72 @@ class console(baseOutputPlugin):
     
     def __init__(self):
         baseOutputPlugin.__init__(self)
-        self.verbosity = 0
+        self.verbose = False
 
     def debug(self, message, newLine = True ):
         '''
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action for debug messages.
         '''
-        if int( self.verbosity ) > 5:
-            toPrint = unicode ( message )
+        if self.verbose:
+            to_print = message
             if newLine == True:
-                toPrint += '\r\n'
-            sys.stdout.write( self._cleanString(toPrint) )
+                to_print += '\r\n'
+            sys.stdout.write( self._cleanString(to_print) )
             sys.stdout.flush()
 
-    
     def information(self, message , newLine = True ):
         '''
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action for informational messages.
         ''' 
-        toPrint = unicode ( message )
+        to_print = message
         if newLine == True:
-            toPrint += '\r\n'
-        sys.stdout.write( self._cleanString(toPrint) )
+            to_print += '\r\n'
+        sys.stdout.write( self._cleanString(to_print) )
         sys.stdout.flush()
-
 
     def error(self, message , newLine = True ):
         '''
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action for error messages.
         '''     
-        toPrint = unicode ( message )
+        to_print = message
         if newLine == True:
-            toPrint += '\r\n'
-        sys.stderr.write( self._cleanString(toPrint) )
+            to_print += '\r\n'
+        sys.stderr.write( self._cleanString(to_print) )
         sys.stdout.flush()
 
     def vulnerability(self, message , newLine=True, severity=severity.MEDIUM ):
         '''
         This method is called from the output object. The output object was called from a plugin
         or from the framework. This method should take an action when a vulnerability is found.
-        '''     
-        toPrint = unicode ( message )
+        '''
+        to_print = message
         if newLine == True:
-            toPrint += '\r\n'
-        sys.stdout.write( self._cleanString(toPrint) )
+            to_print += '\r\n'
+        sys.stdout.write( self._cleanString(to_print) )
         sys.stdout.flush()
         
     def console( self, message, newLine = True ):
         '''
         This method is used by the w3af console to print messages to the outside.
         '''
-        toPrint = unicode( message )
+        to_print = message
         if newLine == True:
-            toPrint += '\r\n'
-        sys.stdout.write( self._cleanString(toPrint) )
+            to_print += '\r\n'
+        sys.stdout.write( self._cleanString(to_print) )
         sys.stdout.flush()
 
     def logHttp( self, request, response):
+        pass
+    
+    def logEnabledPlugins(self,  enabledPluginsDict,  pluginOptionsDict):
+        '''
+        This method is called from the output managerobject. 
+        This method should take an action for the enabled plugins 
+        and their configuration.
+        '''
         pass
 
     def getLongDesc( self ):
@@ -106,6 +112,9 @@ class console(baseOutputPlugin):
         '''
         return '''
         This plugin writes the framework messages to the console.
+        
+        One configurable parameter exists:
+            - verbose
         '''
 
     def setOptions( self, OptionList ):
@@ -118,14 +127,14 @@ class console(baseOutputPlugin):
         
         @return: No value is returned.
         ''' 
-        self.verbosity = OptionList['verbosity']
+        self.verbose = OptionList['verbose'].getValue()
 
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
         '''
-        d1 = 'Verbosity level for this plugin.'
-        o1 = option('verbosity', self.verbosity, d1, 'integer')
+        d1 = 'Enable if verbose output is needed'
+        o1 = option('verbose', self.verbose, d1, 'boolean')
         
         ol = optionList()
         ol.add(o1)

@@ -35,12 +35,16 @@ class pks(searchEngine):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    def __init__(self, urlOpener, key='' ):
+    def __init__(self, urlOpener ):
         searchEngine.__init__(self)
         self._urlOpener = urlOpener
         
     def search( self, hostname ):
-    
+        '''
+        Searches a PKS server, and returns all emails related to hostname.
+        
+        @parameter hostname: The hostname from which we want to get emails from.
+        '''
         if hostname.count('//'):
             raise w3afException('You must provide the pks search engine with a root domain name (as returned by urlParser.getRootDomain).')
     

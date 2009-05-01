@@ -21,15 +21,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.w3afException import w3afException
 from core.controllers.w3afException import w3afRunOnce
+
 from core.data.searchEngines.yahooSiteExplorer import yahooSiteExplorer as yse
 from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
+from core.controllers.misc.is_private_site import is_private_site
+
 import core.data.parsers.urlParser as urlParser
+
+# For URLError
+# FIXME: In the future, xUrllib should only raise w3afException
+import urllib2
 
 
 class yahooSiteExplorer(baseDiscoveryPlugin):
@@ -46,7 +54,6 @@ class yahooSiteExplorer(baseDiscoveryPlugin):
         '''
         @parameter fuzzableRequest: A fuzzableRequest instance that contains (among other things) the URL to test.
         '''
-        newUrls = []
         self._fuzzableRequests = []
         if not self._run:
             # This will remove the plugin from the discovery plugins to be runned.
@@ -57,26 +64,35 @@ class yahooSiteExplorer(baseDiscoveryPlugin):
             self._yse = yse( self._urlOpener )
             
             domain = urlParser.getDomain( fuzzableRequest.getURL() )
-            if self._yse.isPrivate( domain ):
-                raise w3afException('There is no point in searching yahoo site explorer for site:'+ domain + '" . Yahoo doesnt index private pages.')
+            if is_private_site( domain ):
+                msg = 'There is no point in searching yahoo site explorer for site: "'
+                msg += domain + '" . Yahoo doesnt index private pages.'
+                raise w3afException(msg)
 
             results = self._yse.getNResults( domain, self._resultLimit )
                 
             for res in results:
                 targs = (res.URL,)
-                self._tm.startFunction( target=self._generateFuzzableRequests, args=targs, ownerObj=self )          
+                self._tm.startFunction( target=self._generate_fuzzable_requests, \
+                                                    args=targs, ownerObj=self )
             self._tm.join( self )
         return self._fuzzableRequests
     
-    def _generateFuzzableRequests( self, url ):
+    def _generate_fuzzable_requests( self, url ):
+        '''
+        Create fuzzable requests from HTTP response.
+        
+        @parameter url: The URL to GET.
+        '''
         try:
             response = self._urlOpener.GET( url, useCache=True, getSize=True )
         except KeyboardInterrupt, k:
             raise k
         except w3afException, w3:
-            pass
-        except URLError, ue:
-            om.out.debug('URL Error while fetching page in yahooSiteExplorer, error: ' + str(ue) )
+            msg = 'w3afException while fetching page in yahooSiteExplorer, error: ' + str(w3)
+            om.out.debug( msg )
+        except urllib2.URLError, w3:
+            om.out.debug('URL Error while fetching page in yahooSiteExplorer, error: ' + str(w3) )
         else:
             fuzzReqs = self._createFuzzableRequests( response )
             self._fuzzableRequests.extend( fuzzReqs )
@@ -85,8 +101,8 @@ class yahooSiteExplorer(baseDiscoveryPlugin):
         '''
         @return: A list of option objects for this plugin.
         '''
-        d1 = 'Fetch the first "resultLimit" results from yahoo search'
-        o1 = option('resultLimit', str(self._resultLimit), d1, 'integer')
+        d1 = 'Fetch the first "resultLimit" results from Yahoo search'
+        o1 = option('resultLimit', self._resultLimit, d1, 'integer')
                 
         ol = optionList()
         ol.add(o1)
@@ -100,7 +116,7 @@ class yahooSiteExplorer(baseDiscoveryPlugin):
         @parameter OptionList: A dictionary with the options for the plugin.
         @return: No value is returned.
         ''' 
-        self._resultLimit = optionsMap['resultLimit']
+        self._resultLimit = optionsMap['resultLimit'].getValue()
 
     def getPluginDeps( self ):
         '''

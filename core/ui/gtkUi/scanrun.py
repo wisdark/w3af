@@ -19,69 +19,39 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
-import pygtk
-pygtk.require('2.0')
 import gtk, gobject
 
-import urllib2, time
-import core.ui.gtkUi.helpers as helpers
-import core.ui.gtkUi.messages as messages
+import urllib2
+import sys
+import re, Queue, threading
+from . import helpers, kbtree, httpLogTab, reqResViewer, craftedRequests, entries
 import core.data.kb.knowledgeBase as kb
-import core.data.kb
+import webbrowser
+import core.controllers.outputManager as om
+from extlib.xdot import xdot
 
-TYPES_OBJ = {
-    core.data.kb.vuln.vuln: "vuln",
-    core.data.kb.info.info: "info",
-}
+# To show request and responses
+from core.data.db.reqResDBHandler import reqResDBHandler
 
-class KBTree(gtk.TreeView):
-    '''Show the Knowledge Base in a tree.
-    
-    @param kbbrowser: the parent widget
-    @param filter: the initial filter
+RECURSION_LIMIT = sys.getrecursionlimit() - 5
+RECURSION_MSG = "Recursion limit: can't go deeper"
+
+class FullKBTree(kbtree.KBTree):
+    '''A tree showing all the info.
+
+    This also gives a long description of the element when clicked.
+
+    @param kbbrowser: The KB Browser
+    @param filter: The filter to show which elements
 
     @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
     '''
-    def __init__(self, kbbrowser, filter):
+    def __init__(self, w3af, kbbrowser, ifilter):
+        super(FullKBTree,self).__init__(w3af, ifilter, 'Knowledge Base', strict=False)
+        self._dbHandler = reqResDBHandler()
         self.kbbrowser = kbbrowser
-
-        # simple empty Tree Store
-        # first column: the string to show; second column: the long description
-        self.treestore = gtk.TreeStore(str, str)
-        gtk.TreeView.__init__(self, self.treestore)
         self.connect('cursor-changed', self._showDesc)
-        #self.set_enable_tree_lines(True)
-
-        # the TreeView column
-        tvcolumn = gtk.TreeViewColumn('Knowledge Base')
-        cell = gtk.CellRendererText()
-        tvcolumn.pack_start(cell, True)
-        tvcolumn.add_attribute(cell, "text", 0)
-        self.append_column(tvcolumn)
-
-        # this tree structure will keep the parents where to insert nodes
-        self.treeholder = {}
-
-        # initial filters
-        self.filter = filter
-
-        # get the knowledge base and go live
-        self.fullkb = kb.kb.dump()
-        gobject.timeout_add(500, self._updateTree, self.treestore, self.treeholder)
         self.show()
-
-    def setFilter(self, active):
-        '''Sets a new filter and update the tree.
-
-        @param active: which types should be shown.
-        '''
-        self.filter = active
-        new_treestore = gtk.TreeStore(str, str)
-        new_treeholder = {}
-        self._updateTree(new_treestore, new_treeholder)
-        self.set_model(new_treestore)
-        self.treestore = new_treestore
-        self.treeholder = new_treeholder
 
     def _showDesc(self, tv):
         '''Shows the description at the right
@@ -91,104 +61,91 @@ class KBTree(gtk.TreeView):
         (path, column) = tv.get_cursor()
         if path is None:
             return
-        longdesc = self.treestore[path][1]
-        if longdesc:
-            longdesc = str(longdesc)
+
+        instance = self.getInstance(path)
+        if hasattr(instance, "getDesc"):
+            longdesc = str(instance.getDesc())
+        else:
+            longdesc = ""
         self.kbbrowser.explanation.set_text(longdesc)
 
-    def _getBestObjName(self,  obj):
-        '''
-        @return: The best obj name possible
-        '''
-        if hasattr(obj, "getName"):
-            name = obj.getName()
+        success = False
+        if hasattr(instance, "getId" ):
+            if instance.getId() != None:
+                #
+                # We have two different cases:
+                #
+                # 1) The object is related to ONLY ONE request / response
+                # 2) The object is related to MORE THAN ONE request / response
+                #
+                # For 1), we show the classic view, and for 2) we show the classic
+                # view with a "page control"
+                #
+                # Work:
+                #
+                if len( instance.getId() ) == 1:
+                    # There is ONLY ONE id related to the object
+                    # This is 1)
+                    self.kbbrowser.pagesControl.deactivate()
+                    self.kbbrowser._pageChange(0)
+                    self.kbbrowser.pagesControl.hide()
+                    self.kbbrowser.title0.hide()
+
+                    # This handles a special case, where the plugin writer made a mistake and
+                    # failed to set an id to the info / vuln object:
+                    if instance.getId()[0] == None:
+                        raise Exception('Exception - The id should not be None! "' + str(instance._desc) + '".')
+                        success = False
+                    else:
+                        # ok, we don't have None in the id:
+                        search_result = self._dbHandler.searchById( instance.getId()[0] )
+                        if len(search_result) == 1:
+                            request, response = search_result[0]
+                            self.kbbrowser.rrV.request.showObject( request )
+                            self.kbbrowser.rrV.response.showObject( response )
+                            
+                            # Don't forget to highlight if neccesary
+                            severity = instance.getSeverity()
+                            for s in instance.getToHighlight():
+                                self.kbbrowser.rrV.response.highlight( s, severity )
+                            
+                            success = True
+                        else:
+                            om.out.error(_('Failed to find request/response with id: ') + str(instance.getId()) + _(' in the database.') )
+                else:
+                    # There are MORE THAN ONE ids related to the object
+                    # This is 2)
+                    self.kbbrowser.pagesControl.show()
+                    self.kbbrowser.title0.show()
+
+                    self.kbbrowser.req_res_ids = instance.getId()
+                    self.kbbrowser.pagesControl.activate(len(instance.getId()))
+                    self.kbbrowser._pageChange(0)
+                    success = True
+
+        if success:
+            self.kbbrowser.rrV.set_sensitive(True)
         else:
-            name = repr(obj)
-        return name
-        
-    def _filterKB(self):
-        '''Filters the KB and prepares the diff to then update the GUI.
-        
-        @return: A dict with the diff to update the tree.
-        '''
-        # let's filter the real kb, to see what we should add
-        filteredkb = {}
+            self.kbbrowser.rrV.request.clearPanes()
+            self.kbbrowser.rrV.response.clearPanes()
+            self.kbbrowser.rrV.set_sensitive(False)
 
-        # iterate the first layer, plugin names
-#        import pdb;pdb.set_trace()
-        for pluginname, plugvalues in self.fullkb.iteritems():
-            holdplugin = {}
-            
-            # iterate the second layer, variable names
-            for variabname, variabobjects in plugvalues.iteritems():
-                holdvariab = {}
 
-                # iterate the third layer, the variable objects
-                if isinstance(variabobjects, list):
-                    for obj in variabobjects:
-                        idobject = self._getBestObjName(obj)
-                        type_obj = TYPES_OBJ.get(type(obj), "misc")
-                        if idobject not in holdvariab and self.filter[type_obj]:
-                            if hasattr(obj, "getDesc"):
-                                longdesc = obj.getDesc()
-                            else:
-                                longdesc = ""
-                            holdvariab[idobject] = longdesc
-                else:
-                    # not a list, try to show it anyway (it's a misc)
-                    idobject = self._getBestObjName(variabobjects)
-                    if idobject not in holdvariab and self.filter["misc"]:
-                        holdvariab[idobject] = ""
-                
-                if holdvariab:
-                    holdplugin[variabname] = holdvariab
-            if holdplugin:
-                filteredkb[pluginname] = holdplugin
-        return filteredkb
-
-    def _updateTree(self, treestore, treeholder):
-        '''Updates the GUI with the KB.
-
-        @param treestore: the gui tree to updated.
-        @param treeholder: a helping structure to calculate the diff.
-
-        @return: True to keep being called by gobject.
-        '''
-        filteredKB = self._filterKB()
-
-        # iterate the first layer, plugin names
-        for pluginname, plugvalues in filteredKB.iteritems():
-            if pluginname in treeholder:
-                (treeplugin, holdplugin) = treeholder[pluginname]
-            else:
-                treeplugin = treestore.append(None, [pluginname, ""])
-                holdplugin = {}
-                treeholder[pluginname] = (treeplugin, holdplugin)
-
-            # iterate the second layer, variable names
-            for variabname, variabobjects in plugvalues.iteritems():
-                if variabname in holdplugin:
-                    (treevariab, holdvariab) = holdplugin[variabname]
-                else:
-                    treevariab = treestore.append(treeplugin, [variabname, ""])
-                    holdvariab = set()
-                    holdplugin[variabname] = (treevariab, holdvariab)
-
-                # iterate the third layer, the variable objects
-                for (name, longdesc) in variabobjects.iteritems():
-                    if name not in holdvariab:
-                        holdvariab.add(name)
-                        treestore.append(treevariab, [name, longdesc])
-        return True
-                        
-
-class KBBrowser(gtk.HPaned):
+class KBBrowser(entries.RememberingHPaned):
     '''Show the Knowledge Base, with the filter and the tree.
-    
+
     @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
     '''
-    def __init__(self):
-        super(KBBrowser,self).__init__()
+    def __init__(self, w3af):
+        super(KBBrowser,self).__init__(w3af, "pane-kbbrowser", 250)
+
+        # Internal variables:
+        #
+        # Here I save the request and response ids to be used in the page control
+        self.req_res_ids = []
+        # This is to search the DB and print the different request and responses as they are
+        # requested from the page control, "_pageChange" method.
+        self._dbHandler = reqResDBHandler()
 
         # the filter to the tree
         filterbox = gtk.HBox()
@@ -205,20 +162,20 @@ class KBBrowser(gtk.HPaned):
         makeBut("Misc", "misc", False)
         filterbox.show()
 
-        # the kb tree 
-        self.kbtree = KBTree(self, self.filters)
-
-        # the filter and tree box
-        treebox = gtk.VBox()
-        treebox.pack_start(filterbox, expand=False, fill=False)
-        treebox.pack_start(self.kbtree)
-        treebox.show()
+        # the kb tree
+        self.kbtree = FullKBTree(w3af, self, self.filters)
 
         # all in the first pane
         scrollwin21 = gtk.ScrolledWindow()
         scrollwin21.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        scrollwin21.add_with_viewport(treebox)
+        scrollwin21.add(self.kbtree)
         scrollwin21.show()
+
+        # the filter and tree box
+        treebox = gtk.VBox()
+        treebox.pack_start(filterbox, expand=False, fill=False)
+        treebox.pack_start(scrollwin21)
+        treebox.show()
 
         # the explanation
         explan_tv = gtk.TextView()
@@ -232,28 +189,186 @@ class KBBrowser(gtk.HPaned):
         scrollwin22.add_with_viewport(explan_tv)
         scrollwin22.show()
 
+        # The request/response viewer
+        self.rrV = reqResViewer.reqResViewer(w3af)
+        self.rrV.set_sensitive(False)
+
+        # Create the title label to show the request id
+        self.title0 = gtk.Label()
+        self.title0.show()
+
+        # Create page changer to handle info/vuln objects that have MORE THAN ONE
+        # related request/response
+        self.pagesControl = entries.PagesControl(w3af, self._pageChange, 0)
+        self.pagesControl.deactivate()
+        self._pageChange(0)
+        centerbox = gtk.HBox()
+        centerbox.pack_start(self.pagesControl, True, False)
+
+        # Add everything to a vbox
+        vbox_rrv_centerbox = gtk.VBox()
+        vbox_rrv_centerbox.pack_start(self.title0, False, True)
+        vbox_rrv_centerbox.pack_start(self.rrV,  True,  True)
+        vbox_rrv_centerbox.pack_start(centerbox,  False,  False)
+
+        # and show
+        vbox_rrv_centerbox.show()
+        self.pagesControl.show()
+        centerbox.show()
+
+        # And now put everything inside the vpaned
+        vpanedExplainAndView = entries.RememberingVPaned(w3af, "pane-kbbexplainview", 100)
+        vpanedExplainAndView.pack1( scrollwin22 )
+        vpanedExplainAndView.pack2( vbox_rrv_centerbox )
+        vpanedExplainAndView.show()
+
         # pack & show
-        self.pack1(scrollwin21)
-        self.pack2(scrollwin22)
-        self.set_position(150)
+        self.pack1(treebox)
+        self.pack2(vpanedExplainAndView)
         self.show()
 
-    def typeFilter(self, button, type):
+    def typeFilter(self, button, ptype):
         '''Changes the filter of the KB in the tree.'''
-        self.filters[type] = button.get_active()
+        self.filters[ptype] = button.get_active()
         self.kbtree.setFilter(self.filters)
 
+    def _pageChange(self, page):
+        '''
+        Handle the page change in the page control.
+        '''
+        # Only do something if I have a list of request and responses
+        if self.req_res_ids:
+            request_id = self.req_res_ids[page]
+            try:
+                request, response = self._dbHandler.searchById( request_id )[0]
+            except:
+                # the request brought problems
+                self.rrV.request.clearPanes()
+                self.rrV.response.clearPanes()
+                self.rrV.set_sensitive(False)
+                self.title0.set_markup( "<b>Error</b>")
+            else:
+                self.title0.set_markup( "<b>Id: %d</b>" % request_id )
+                self.rrV.request.showObject( request )
+                self.rrV.response.showObject( response )
+                self.rrV.set_sensitive(True)
+
+
+class URLsGraph(gtk.VBox):
+    '''Graph the URLs that the system discovers.
+
+    @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
+    '''
+    def __init__(self, w3af):
+        super(URLsGraph,self).__init__()
+        self.w3af = w3af
+
+        self.toolbox = gtk.HBox()
+        b = entries.SemiStockButton("", gtk.STOCK_ZOOM_IN, 'Zoom In')
+        b.connect("clicked", self._zoom, "in")
+        self.toolbox.pack_start(b, False, False)
+        b = entries.SemiStockButton("", gtk.STOCK_ZOOM_OUT, 'Zoom Out')
+        b.connect("clicked", self._zoom, "out")
+        self.toolbox.pack_start(b, False, False)
+        b = entries.SemiStockButton("", gtk.STOCK_ZOOM_FIT, 'Zoom Fit')
+        b.connect("clicked", self._zoom, "fit")
+        self.toolbox.pack_start(b, False, False)
+        b = entries.SemiStockButton("", gtk.STOCK_ZOOM_100, 'Zoom 100%')
+        b.connect("clicked", self._zoom, "100")
+        self.toolbox.pack_start(b, False, False)
+        self.pack_start(self.toolbox, False, False)
+        self.toolbox.set_sensitive(False)
+
+        # no graph yet
+        self.widget = gtk.Label(_("No info yet"))
+        self.widget.set_sensitive(False)
+
+        self.nodos_code = []
+        self._somethingnew = False
+        self.pack_start(self.widget)
+        self.show_all()
+
+        gobject.timeout_add(500, self._draw_start)
+
+    def _zoom(self, widg, what):
+        f = getattr(self.widget, "on_zoom_"+what)
+        f(None)
+
+    def _draw_start(self):
+        if not self._somethingnew:
+            return True
+
+        # let's draw!
+        q = Queue.Queue()
+        evt = threading.Event()
+        th = threading.Thread(target=self._draw_real, args=(q,evt))
+        th.start()
+        gobject.timeout_add(500, self._draw_end, q, evt)
+        return False
+
+    def _draw_real(self, q, evt):
+        new_widget = xdot.DotWidget()
+        self._somethingnew = False
+        dotcode = "graph G {%s}" % "\n".join(self.nodos_code)
+        new_widget.set_dotcode(dotcode)
+        evt.set()
+        q.put(new_widget)
+
+    def _draw_end(self, q, evt):
+        if not evt:
+            return True
+
+        new_widget = q.get()
+        new_widget.zoom_to_fit()
+
+        # put that drawing in the widget
+        self.remove(self.widget)
+        self.pack_start(new_widget)
+        self.widget = new_widget
+        new_widget.show()
+        self.toolbox.set_sensitive(True)
+
+        gobject.timeout_add(500, self._draw_start)
+
+
+    def limitNode(self, parent, node, name):
+        self.nodos_code.append('"%s" [label="%s"]' % (node, name))
+        if parent:
+            nline = '"%s" -- "%s"' % (parent, node)
+            self.nodos_code.append(nline)
+        self._somethingnew = True
+
+    def newNode(self, parent, node, name, isLeaf):
+        if not isLeaf:
+            self.nodos_code.append('"%s" [shape=box]' % node)
+        self.nodos_code.append('"%s" [label="%s"]' % (node, name))
+        if parent:
+            nline = '"%s" -- "%s"' % (parent, node)
+            self.nodos_code.append(nline)
+        self._somethingnew = True
+
+
+
+HEAD_TO_SEND = """\
+GET %s HTTP/1.0
+Host: %s
+User-Agent: w3af.sf.net
+"""
 
 class URLsTree(gtk.TreeView):
     '''Show the URLs that the system discovers.
-    
+
     @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
     '''
-    def __init__(self):
+    def __init__(self, w3af, grapher):
+        self.w3af = w3af
+        self.grapher = grapher
+
         # simple empty Tree Store
         self.treestore = gtk.TreeStore(str)
         gtk.TreeView.__init__(self, self.treestore)
-        #self.set_enable_tree_lines(True)
+        self.connect('button-release-event', self.popup_menu)
+        self.connect('button-press-event', self._doubleClick)
 
         # the TreeView column
         tvcolumn = gtk.TreeViewColumn('URLs')
@@ -270,6 +385,18 @@ class URLsTree(gtk.TreeView):
         self.urls = helpers.IteratedQueue(queue)
         gobject.timeout_add(500, self.addUrl().next)
         self.show()
+
+    def _doubleClick(self, widg, event):
+        '''If double click, expand/collapse the row.'''
+        if event.type == gtk.gdk._2BUTTON_PRESS:
+            path = self.get_cursor()[0]
+            # This "if path" fixed bug #2205544
+            # https://sourceforge.net/tracker2/?func=detail&atid=853652&aid=2205544&group_id=170274
+            if path:
+                if self.row_expanded(path):
+                    self.collapse_row(path)
+                else:
+                    self.expand_row(path, False)
 
     def addUrl(self):
         '''Adds periodically the new URLs to the tree.
@@ -289,23 +416,35 @@ class URLsTree(gtk.TreeView):
                 end += "?" + query
             if fragment:
                 end += "#" + fragment
-            nodes = path.split("/")[1:]
+
+            # AR:
+            # This was the old way of doing it:
+            #nodes = path.split("/")[1:]
+            # But it generated this bug:    http://sourceforge.net/tracker/index.php?func=detail&aid=1963947&group_id=170274&atid=853652
+            # So I changed it to this:
+            splittedPath = re.split('(\\\\|/)', path )
+            nodes = []
+            for i in splittedPath:
+                if i not in ['\\','/']:
+                    nodes.append(i)
+            # Ok, now we continue with the code from Facundo
             nodes.insert(0, ini)
             nodes.append(end)
             parts = [x for x in nodes if x]
-            self._insertNodes(None, parts, self.treeholder)
+            self._insertNodes(None, parts, self.treeholder, 1)
         yield False
 
-    def _insertNodes(self, parent, parts, holder):
+    def _insertNodes(self, parent, parts, holder, rec_cntr):
         '''Insert a new node in the tree.
 
-        It's recursive: it walks the path of nodes, being each node a 
+        It's recursive: it walks the path of nodes, being each node a
         part of the URL, checking every time if needs to create a new
         node or just enter in it.
 
         @param parent: the parent to insert the node
         @param parts: the rest of the parts to walk the path
         @param holder: the dict when what is already exists is stored.
+        @param rec_cntr: the recursion counter
 
         @return: The new or modified holder
         '''
@@ -313,54 +452,112 @@ class URLsTree(gtk.TreeView):
             return {}
         node = parts[0]
         rest = parts[1:]
+
+        if rec_cntr >= RECURSION_LIMIT:
+            newtreenode = self.treestore.append(parent, [RECURSION_MSG])
+            self.grapher.limitNode(parent, newtreenode, RECURSION_MSG)
+            return holder
+
         if node in holder:
             # already exists, use it if have more nodes
             (treenode, children) = holder[node]
-            return self._insertNodes(treenode, rest, children)
+            return self._insertNodes(treenode, rest, children, rec_cntr+1)
 
         # does not exist, create it
         newtreenode = self.treestore.append(parent, [node])
-        newholdnode = self._insertNodes(newtreenode, rest, {})
+        self.grapher.newNode(parent, newtreenode, node, not rest)
+        newholdnode = self._insertNodes(newtreenode, rest, {}, rec_cntr+1)
         holder[node] = (newtreenode, newholdnode)
         return holder
 
+    def popup_menu( self, tv, event ):
+        '''Shows a menu when you right click on a plugin.
 
-class ScanRunBody(gtk.VPaned):
+        @param tv: the treeview.
+        @parameter event: The GTK event
+        '''
+        if event.button != 3:
+            return
+
+        (path, column) = tv.get_cursor()
+        # Is it over a plugin name ?
+        if path is None:
+            return
+
+        # Get the information about the click
+        fullurl = "/".join(self.treestore[path[:i+1]][0] for i in range(len(path)))
+        host = urllib2.urlparse.urlparse(fullurl)[1]
+        sendtext = HEAD_TO_SEND % (fullurl, host)
+
+        gm = gtk.Menu()
+
+        e = gtk.ImageMenuItem(_("Open with Manual Request Editor..."))
+        image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_INDEX,  gtk.ICON_SIZE_MENU)
+        e.set_image(image)
+        e.connect('activate', self._sendRequest, sendtext, craftedRequests.ManualRequests)
+        gm.append( e )
+
+        image = gtk.Image()
+        image.set_from_stock(gtk.STOCK_PROPERTIES,  gtk.ICON_SIZE_MENU)
+        e = gtk.ImageMenuItem(_("Open with Fuzzy Request Editor..."))
+        e.set_image(image)
+        e.connect('activate', self._sendRequest, sendtext, craftedRequests.FuzzyRequests)
+        gm.append( e )
+
+        e = gtk.ImageMenuItem(_("Open with default browser..."))
+        e.connect('activate', self._openBrowser, fullurl)
+        gm.append( e )
+
+        gm.show_all()
+        gm.popup( None, None, None, event.button, event.time)
+
+    def _openBrowser( self, widg, text):
+        '''Opens the text with an external browser.'''
+        webbrowser.open_new_tab(text)
+
+    def _sendRequest(self, widg, text, func):
+        func(self.w3af, (text,""))
+
+class ScanRunBody(gtk.Notebook):
     '''The whole body of scan run.
-    
+
     @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
     '''
-    def __init__(self):
+    def __init__(self, w3af):
         super(ScanRunBody,self).__init__()
+        self.w3af = w3af
+        self.helpChapter = ("Browsing_the_Knowledge_Base", "Site_structure", "Requests_and_Responses")
+        self.connect("switch-page", self.changedPage)
 
-        # the paned window
-        inner_hpan = gtk.HPaned()
-        
-        # left
-        urlstree = URLsTree()
+        # KB Browser
+        # this one does not go inside a scrolled window, because that's handled
+        # in each widget of itself
+        kbbrowser = KBBrowser(w3af)
+        l = gtk.Label(_("KB Browser"))
+        self.append_page(kbbrowser, l)
+
+        # urlstree, the tree
+        pan = entries.RememberingHPaned(w3af, "pane-urltreegraph")
+        urlsgraph = URLsGraph(w3af)
+        urlstree = URLsTree(w3af, urlsgraph)
         scrollwin1 = gtk.ScrolledWindow()
         scrollwin1.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         scrollwin1.add_with_viewport(urlstree)
         scrollwin1.show()
+        pan.pack1(scrollwin1)
+        pan.pack2(urlsgraph)
+        pan.show()
+        l = gtk.Label("URLs")
+        self.append_page(pan, l)
 
-        # rigth
-        kbbrowser = KBBrowser()
-        scrollwin2 = gtk.ScrolledWindow()
-        scrollwin2.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        scrollwin2.add_with_viewport(kbbrowser)
-        scrollwin2.show()
+        # Request Response navigator
+        httplog = httpLogTab.httpLogTab(w3af)
+        l = gtk.Label(_("Request/Response navigator"))
+        self.append_page(httplog, l)
 
-        # pack it all and show
-        inner_hpan.pack1(scrollwin1)
-        inner_hpan.pack2(scrollwin2)
-        inner_hpan.set_position(250)
-        inner_hpan.show()
-        self.pack1(inner_hpan)
-
-        # bottom widget
-        messag = messages.Messages()
-        self.pack2(messag)
-
-        self.set_position(250)
         self.show()
 
+    def changedPage(self, notebook, page, page_num):
+        '''Changed the page in the Notebook.'''
+        self.w3af.helpChapters["scanrun"] = self.helpChapter[page_num]

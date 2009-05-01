@@ -25,10 +25,14 @@ from core.controllers.w3afException import w3afException
 
 import core.data.dc.form as form
 import core.data.parsers.urlParser as urlParser
+from core.data.parsers.abstractParser import abstractParser as abstractParser
+
+from sgmllib import SGMLParser
+import traceback
 import string
 import re
-from sgmllib import SGMLParser
-from core.data.parsers.abstractParser import abstractParser as abstractParser
+import urllib
+
 
 class sgmlParser(abstractParser, SGMLParser):
     '''
@@ -38,60 +42,28 @@ class sgmlParser(abstractParser, SGMLParser):
     '''
     
 
-    def __init__(self, document, baseUrl, normalizeMarkup=True, verbose=0):
-        abstractParser.__init__( self, baseUrl )
+    def __init__(self, httpResponse, normalizeMarkup=True, verbose=0):
+        abstractParser.__init__( self, httpResponse )
         SGMLParser.__init__(self, verbose)
 
+        # Set some constants
         self._tagsContainingURLs =  ('go', 'a','img', 'link', 'script', 'iframe', 'object',
                 'embed', 'area', 'frame', 'applet', 'input', 'base',
                 'div', 'layer', 'ilayer', 'bgsound', 'form')
         self._urlAttrs = ('href', 'src', 'data', 'action' )
         
-        self._urlsInDocumentWithTags = []
-        
-        #########
-        # Regex URL detection ( normal detection is also done, see below )
-        #########
-        #urlRegex = '((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|%[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)'
-        urlRegex = '((http|https)://([\w\.]*)/[^ \n\r\t"]*)'
-        self._urlsInDocument = [ x[0] for x in re.findall(urlRegex, document ) ]
-        
-        # Now detect some relative URL's ( also using regexs )
-        def findRelative( doc ):
-            res = []
-            relRegex = re.compile('[^\/\/]([\/][A-Z0-9a-z%_~\.]+)+\.[A-Za-z0-9]{1,4}(((\?)([a-zA-Z0-9]*=\w*)){1}((&)([a-zA-Z0-9]*=\w*))*)?')
-            
-            go = True
-            while go:
-                try:
-                    s, e = relRegex.search( doc ).span()
-                except:
-                    go = False
-                else:
-                    res.append( urlParser.urlJoin( baseUrl , doc[s+1:e] ) )
-                    doc = doc[e:]
-            '''
-            om.out.debug('Relative URLs found using regex:')
-            for u in res:
-                om.out.debug('- ' + u )
-            '''
-            return res
-        
-        relativeURLs = findRelative( document )
-        self._urlsInDocument.extend( relativeURLs )
-        ########
-        # End
-        ########
-        
+        # And some internal variables
+        self._tag_and_url = []
+        self._parsed_URLs = []
+        self._re_URLs = []
+        self._encoding = httpResponse.getCharset()
         self._forms = []
         self._insideForm = False
         self._insideSelect = False
+        self._insideTextarea = False
         self._insideScript = False
         self._commentsInDocument = []
         self._scriptsInDocument = []
-        
-        # mail accounts
-        self._accounts = []
         
         # Meta tags
         self._metaRedirs = []
@@ -99,22 +71,54 @@ class sgmlParser(abstractParser, SGMLParser):
         
         self._normalizeMarkup = normalizeMarkup
         
+        # Fill self._re_URLs
+        self._regex_url_parse( httpResponse )
+        
         # Now we are ready to work
-        self._preParse( document )
-    
+        self._preParse( httpResponse.getBody() )
+        
+    def _preParse(self, document):
+        '''
+        Parse the document!
+        
+        @parameter document: The document that we want to parse.
+        '''
+        raise w3afException('You have to override the _preParse method when subclassing sgmlParser class.')
+
+    def _findForms(self, tag, attrs):
+        '''
+        Find forms.
+        '''
+        raise w3afException('You have to override the _findForms method when subclassing sgmlParser class.')
+
     def unknown_endtag(self, tag):         
         '''
         called for each end tag, e.g. for </pre>, tag will be "pre"
         '''
         if tag.lower() == 'form' :
             self._insideForm = False
-        
+
         if tag.lower() == 'select' :
-            self._insideSelect = False
-            
+            self._handle_select_endtag()
+
         if tag.lower() == 'script':
             self._insideScript = False
-            
+
+        if tag.lower() == 'textarea' :
+            self._handle_textarea_endtag()
+
+    def _handle_textarea_endtag(self):
+        """
+        Handler for textarea end tag
+        """
+        self._insideTextarea = False
+
+    def _handle_select_endtag(self):
+        """
+        Handler for select end tag
+        """
+        self._insideSelect = False
+
     def unknown_starttag(self, tag, attrs):
         '''
         Called for each start tag
@@ -126,17 +130,40 @@ class sgmlParser(abstractParser, SGMLParser):
         All non-HTML code must be enclosed in HTML comment tags (<!-- code -->)
         to ensure that it will pass through this parser unaltered (in handle_comment).
         '''
+        # TODO: For some reason this method failed to work:
+        #def _handle_base_starttag(self, tag, attrs):        
+        # so I added this here... it's not good code... but... it works!
+        if tag.lower() == 'base':
+            # Get the href value and then join
+            new_base_url = ''
+            for attr in attrs:
+                if attr[0].lower() == 'href':
+                    new_base_url = attr[1]
+                    break
+            # set the new base URL
+            self._baseUrl = urlParser.urlJoin( self._baseUrl , new_base_url )
+        
         if tag.lower() == 'script':
             self._insideScript = True
             
         try:
             self._findReferences(tag, attrs)
+        except Exception, e:
+            om.out.error('An unhandled exception was found while finding references inside a document. The exception is: "' + str(e) + '"')
+            om.out.error('Error traceback: ' + str( traceback.format_exc() ) )
+
+        try:
             self._findForms(tag, attrs)
-        
+        except Exception, e:
+            om.out.error('An unhandled exception was found while finding forms inside a document. The exception is: "' + str(e) + '"')
+            om.out.error('Error traceback: ' + str( traceback.format_exc() ) )
+
+        try:        
             if tag.lower() == 'meta':
                 self._parseMetaTags(tag, attrs)
         except Exception, e:
-            om.out.error('An unhandled exception was found while parsing a document. The exception is: "' + str(e) + '"')
+            om.out.error('An unhandled exception was found while parsing meta tags inside a document. The exception is: "' + str(e) + '"')
+            om.out.error('Error traceback: ' + str( traceback.format_exc() ) )
     
     def _parseMetaTags( self, tag , attrs ):
         '''
@@ -169,27 +196,32 @@ class sgmlParser(abstractParser, SGMLParser):
                 # The content variables looks something like... "4;URL=http://www.f00.us/"
                 # The content variables looks something like... "2; URL=http://www.f00.us/"
                 # The content variables looks something like... "6  ; URL=http://www.f00.us/"
-                time, url = content.split(';')
-                url = url.strip()
-                url = url[4:]
-                url = urlParser.urlJoin( self._baseUrl , url )
-                self._urlsInDocument.append( url )
-                self._urlsInDocumentWithTags.append( ('meta', url ) )
+                for url in re.findall('.*?URL.*?=(.*)', content, re.IGNORECASE):
+                    url = url.strip()
+                    url = self._decode_URL( url, self._encoding )
+                    url = urlParser.urlJoin( self._baseUrl , url )
+                    
+                    self._parsed_URLs.append( url )
+                    self._tag_and_url.append( ('meta', url ) )
     
     def _findReferences(self, tag, attrs):
         '''
         This method finds references inside a document.
         '''
-        if tag.lower() in self._tagsContainingURLs:
-            for attr in attrs:
-                if attr[0].lower() in self._urlAttrs:
-                    if len(  attr[1] ):
-                            if attr[1][0] != '#':
-                                url = urlParser.urlJoin( self._baseUrl ,attr[1] )
-                                if url not in self._urlsInDocument:
-                                    self._urlsInDocument.append( url )
-                                    self._urlsInDocumentWithTags.append( (tag.lower(), url) )
-                                    break
+        if tag.lower() not in self._tagsContainingURLs:
+            return
+
+        for attr in attrs:
+            if attr[0].lower() in self._urlAttrs:
+                # We don't need fragments
+                if len(attr[1]) and attr[1][0] != '#':
+                    url = urlParser.urlJoin(self._baseUrl, attr[1])
+                    url = self._decode_URL(url, self._encoding)
+                    url = urlParser.normalizeURL(url)
+                    if url not in self._parsed_URLs:
+                        self._parsed_URLs.append(url)
+                        self._tag_and_url.append((tag.lower(), url))
+                        break
     
     def _parse(self, s):
         '''
@@ -198,27 +230,25 @@ class sgmlParser(abstractParser, SGMLParser):
         @parameter s: The document to parse.
         '''
         try:
-            self.findAccounts( s )
+            self.findEmails( s )
             self.feed(s)
             self.close()
         except Exception, e:
-            # The user will call getAccounts, getReferences, etc and will get all the information
+            # The user will call getEmails, getReferences, etc and will get all the information
             # that the parser could find before dieing
-            om.out.debug('Exception found while parsing document. Exception: ' + str(e) )
+            om.out.debug('Exception found while parsing document. Exception: ' + str(e) + '. Document head: "' + s[0:20] +'".' )
+            import traceback
+            om.out.debug( 'Traceback for this error: ' + str( traceback.format_exc() ) )
         else:
             # Saves A LOT of memory
             # without this a run will use 4,799,936
             # with this, a run will use 113,696
             del self.rawdata
         
-        
-    def getAccounts( self ):
-        return self._accounts
-    
     def getForms( self ):
         '''
         @return: Returns list of forms.
-        '''     
+        '''
         return self._forms
         
     def getReferences( self ):
@@ -230,15 +260,17 @@ class sgmlParser(abstractParser, SGMLParser):
             - frames
             - etc.
         
-        @return: Returns list of links.
+        @return: Two sets, one with the parsed URLs, and one with the URLs that came out of a
+        regular expression. The second list if less trustworthy.
         '''
-        return set( self._urlsInDocument )
+        tmp_re_URLs = set(self._re_URLs) - set( self._parsed_URLs )
+        return list(set( self._parsed_URLs )), list(tmp_re_URLs)
         
     def getReferencesOfTag( self, tagType ):
         '''
         @return: A list of the URLs that the parser found in a tag of tagType = "tagType" (i.e img, a)
         '''
-        return [ x[1] for x in self._urlsInDocumentWithTags if x[0] == tagType ]
+        return [ x[1] for x in self._tag_and_url if x[0] == tagType ]
         
     def getComments( self ):
         '''

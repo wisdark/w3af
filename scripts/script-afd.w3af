@@ -7,23 +7,19 @@ back
 
 plugins
 output console,textFile
-output
 output config textFile
 set fileName output-w3af.txt
-set verbosity 10
+set verbose True
 back
 output config console
-set verbosity 0
+set verbose False
 back
 
 discovery afd
-discovery
 
 back
 
 target
-#set target http://200.32.71.75/cash/validaAdministrador.jsp
-#set target http://www.cybsec.com/
 set target http://www.bancohipotecario.com.ar/
 back
 
@@ -32,3 +28,4 @@ start
 assert len(kb.kb.getData('afd','afd')) == 1
 
 exit
+

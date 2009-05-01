@@ -1,0 +1,204 @@
+[audit.preg_replace]
+
+[audit.responseSplitting]
+
+[grep.svnUsers]
+
+[grep.passwordProfiling]
+
+[grep.blankBody]
+
+[grep.lang]
+
+[grep.metaTags]
+search404 = False
+
+[audit.htaccessMethods]
+
+[grep.strangeHeaders]
+
+[audit.xpath]
+
+[discovery.spiderMan]
+listenAddress = 127.0.0.1
+listenPort = 44444
+
+[audit.LDAPi]
+
+[audit.generic]
+diffRatio = 0.35
+
+[audit.frontpage]
+stopOnFirst = True
+
+[audit.formatString]
+
+[audit.localFileInclude]
+
+[grep.fileUpload]
+
+[grep.objects]
+
+[audit.unSSL]
+
+[grep.strangeParameters]
+
+[grep.errorPages]
+
+[grep.motw]
+withoutMOTW = False
+
+[grep.ajax]
+
+[grep.creditCards]
+
+[audit.blindSqli]
+equAlgorithm = setIntersection
+equalLimit = 0.8
+
+[audit.globalRedirect]
+
+[discovery.webSpider]
+urlParameter = None
+followRegex = .*
+ignoreRegex = None
+onlyForward = False
+
+[audit.xst]
+
+[audit.xss]
+checkStored = True
+numberOfChecks = 3
+
+[audit.sslCertificate]
+
+[profile]
+description = Perform a manual discovery using the spiderMan plugin, and afterwards scan the site for any known vulnerabilities.
+name = full_audit_manual_disc
+
+[misc-settings]
+exportFuzzableRequests = 
+maxThreads = 0
+fuzzFCExt = txt
+autoDependencies = True
+demo = False
+fuzzableHeaders = 
+showProgressBar = True
+fuzzCookie = False
+fuzzFileName = False
+fuzzFileContent = True
+maxDiscoveryLoops = 500
+maxDepth = 25
+interface = eth0
+localAddress = 127.0.0.1
+nonTargets = 
+
+[grep.findComments]
+search404 = False
+
+[audit.eval]
+useEcho = True
+useTimeDelay = True
+
+[audit.osCommanding]
+
+[audit.ssi]
+
+[output.gtkOutput]
+
+[grep.ssn]
+
+[grep.dotNetEventValidation]
+
+[bruteforce.formAuthBrute]
+profilingNumber = 50
+useMails = True
+useProfiling = True
+passEqUser = True
+useMailUsers = True
+passwdFile = core/controllers/bruteforce/passwords.txt
+usersFile = core/controllers/bruteforce/users.txt
+stopOnFirst = True
+useSvnUsers = True
+
+[audit.phishingVector]
+
+[audit.sqli]
+
+[audit.buffOverflow]
+
+[grep.oracle]
+
+[grep.newline]
+
+[grep.httpInBody]
+
+[audit.mxInjection]
+
+[grep.feeds]
+
+[grep.directoryIndexing]
+
+[audit.remoteFileInclude]
+usew3afSite = True
+listenAddress = 
+listenPort = 44449
+
+[grep.error500]
+
+[grep.collectCookies]
+
+[grep.getMails]
+onlyTargetDomain = True
+
+[grep.privateIP]
+
+[grep.pathDisclosure]
+
+[audit.xsrf]
+
+[http-settings]
+proxyPort = 8080
+basicAuthDomain = 
+maxFileSize = 400000
+always404 = 
+headersFile = 
+proxyAddress = 
+maxRetrys = 2
+404exceptions = 
+ignoreSessCookies = False
+byDirectory404 = False
+timeout = 10
+userAgent = w3af.sourceforge.net
+basicAuthUser = 
+basicAuthPass = 
+byDirectoryAndExtension404 = False
+autodetect404 = True
+cookieJarFile = 
+
+[bruteforce.basicAuthBrute]
+profilingNumber = 50
+useMails = True
+useProfiling = True
+passEqUser = True
+useMailUsers = True
+passwdFile = core/controllers/bruteforce/passwords.txt
+usersFile = core/controllers/bruteforce/users.txt
+stopOnFirst = True
+useSvnUsers = True
+
+[grep.hashFind]
+
+[grep.wsdlGreper]
+
+[grep.codeDisclosure]
+
+[audit.dav]
+
+[grep.domXss]
+
+[audit.fileUpload]
+extensions = gif,html
+
+[grep.httpAuthDetect]
+

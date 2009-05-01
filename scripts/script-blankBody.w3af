@@ -2,21 +2,21 @@
 
 plugins
 output console,textFile
-output
 output config textFile
 set fileName output-w3af.txt
-set verbosity 10
+set verbose True
 back
 output config console
-set verbosity 0
+set verbose False
 back
+
 grep blankBody
-discovery webSpider
-grep
 back
+
 target
-set target http://localhost/w3af/grepEmpty/abc.html
+set target http://localhost/w3af/grep/grep_empty/
 back
+
 start
 
 assert len( kb.kb.getData('blankBody', 'blankBody') ) == 1

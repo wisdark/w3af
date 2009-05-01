@@ -21,10 +21,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 # This module is a collection of useful code snippets for the GTK gui
 
-import threading, re, sys
-import gtk, gobject
+import threading, re, sys, Queue
+import  traceback, webbrowser
+import time
+import gtk
+import os
+from core.controllers.w3afException import w3afException
 
 RE_TRIM_SPACES = re.compile( "([\w.]) {1,}")
+
 
 def all(iterable):
     '''Redefinition of >=2.5 builtin all().
@@ -86,6 +91,41 @@ class PropagateBuffer(object):
         return
 
 
+class PropagateBufferPayload(object):
+    '''Equal to PropagateBuffer, but sending a payload
+
+    @param target: the target to alert when the change *is* propagated.
+    @param payload: anything to transmit
+
+    @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
+    '''
+    def __init__(self, target, *payload):
+        self.target = target
+        self.alerted = {}
+        self.last_notified = None
+        self.payload = payload
+
+    def change(self, widg, status):
+        '''A change enters the buffer.
+
+        @param widg: the widget that changed
+        @param status: the new status of the widget
+        '''
+        # if the widget didn't change anything, we do not propagate
+        if self.alerted.get(widg) == status:
+            return
+        
+        # something changed, let's see our message
+        self.alerted[widg] = status
+        message = all(self.alerted.values())
+
+        # save and propagate if different
+        if message != self.last_notified:
+            self.last_notified = message
+            self.target(message, *self.payload)
+        return
+
+
 def cleanDescription(desc):
     '''Cleans a description.
 
@@ -138,14 +178,11 @@ def endThreads():
         if not t.isAlive():
             continue
         t.my_thread_ended = True
-        if t.queue is not None:
-            t.queue.put("Terminated")
+        t.join()
 
 class RegistThread(threading.Thread):
     '''Class to provide registered threads.
     
-    @parameter queue: Queue used [optional].
-
     If the class that inherits this will get locked listening a queue, it
     should pass it here, at thread termination it will receive there a
     'Terminated' message.
@@ -158,10 +195,9 @@ class RegistThread(threading.Thread):
 
     @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
     '''
-    def __init__(self, queue=None):
+    def __init__(self):
         _threadPool.append(self)
         self.my_thread_ended = False
-        self.queue = queue
         super(RegistThread,self).__init__()
         self.start()
 
@@ -169,8 +205,31 @@ class RegistThread(threading.Thread):
 
 #-- the following is for core wrapping
 
-import gtk, sys, traceback
-from core.controllers.w3afException import w3afException
+def friendlyException(message):
+    '''Creates the dialog showing the message.
+
+    @param message: text received in the friendly exception.
+    '''
+    class w3af_message_dialog(gtk.MessageDialog):
+        def dialog_response_cb(self, widget, response_id):
+            '''
+            http://faq.pygtk.org/index.py?req=show&file=faq10.017.htp
+            '''
+            self.destroy()
+            
+        def dialog_run(self):
+            '''
+            http://faq.pygtk.org/index.py?req=show&file=faq10.017.htp
+            '''
+            if not self.modal:
+                self.set_modal(True)
+            self.connect('response', self.dialog_response_cb)
+            self.show()
+            
+    dlg = w3af_message_dialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_WARNING, gtk.BUTTONS_OK, message)
+    dlg.set_icon_from_file('core/ui/gtkUi/data/w3af_icon.png')
+    dlg.dialog_run()
+    return
 
 class _Wrapper(object):
     '''Wraps a call to the Core.
@@ -189,64 +248,10 @@ class _Wrapper(object):
             return func(*args, **kwargs)
         except Exception, err:
             if isinstance(err, self.friendly):
-                self._friendlyException(str(err))
+                friendlyException(str(err))
             raise
 
-    def _friendlyException(self, message):
-        '''Creates the dialog showing the message.
-
-        @param message: text received in the friendly exception.
-        '''
-        dlg = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_WARNING, gtk.BUTTONS_OK, message)
-        dlg.run()
-        dlg.destroy()
-        return
-
 coreWrap = _Wrapper(w3afException)
-
-def _crash(type, value, tb):
-    '''Function to handle any exception that is not addressed explicitly.'''
-    if issubclass(type, KeyboardInterrupt ):
-        ### FIXME: Do I need to call gtk.quit ?
-        endThreads()
-        import core.controllers.outputManager as om
-        om.out.console('Thanks for using w3af.')
-        om.out.console('Bye!')
-        sys.exit(0)
-        return
-        
-    exception = traceback.format_exception(type, value, tb)
-    exception = "".join(exception)
-    print exception
-
-    # save the info to a file
-    arch = file("w3af_crash.txt", "w")
-    arch.write(exception)
-    arch.close()
-
-    # inform the user
-    exception += "\nAll this info is in a file called w3af_crash.txt for later review. Please send it to the developers, thank you!"
-    exception += "\n\nThe program will exit after you close this window."
-    dlg = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_ERROR, gtk.BUTTONS_OK, exception)
-    dlg.set_title('Bug detected!')
-    dlg.run()
-    dlg.destroy()
-    sys.exit()
-    
-sys.excepthook = _crash
-
-#-- 
-
-def init(mainwin):
-    '''Initialize threads and anything needed.
-
-    This is called from the main appl at start.
-    '''
-    if sys.platform == "win32":
-        gobject.threads_init()
-    else:
-        gtk.gdk.threads_init()
-
 
 #--
 # Trying to not use threads anymore, but still need to 
@@ -269,19 +274,25 @@ class IteratedQueue(RegistThread):
     def __init__(self, queue):
         self.inputqueue = queue
         self.repository = []
-        RegistThread.__init__(self, self.inputqueue)
+        RegistThread.__init__(self)
 
     def run(self):
         '''The initial function of the thread.'''
-        while True:
-            text = self.inputqueue.get()
-            self.repository.append(text)
-            if self.my_thread_ended:
-                break
+        while not self.my_thread_ended:
+            try:
+                msg = self.inputqueue.get(timeout=1)
+            except Queue.Empty:
+                pass
+            else:
+                self.repository.append(msg)
 
-    def get(self):
+    def get(self, start_idx=0):
         '''Serves the elements taken from the queue.'''
-        idx = 0
+        if start_idx > len(self.repository):
+            start_idx = len(self.repository)
+            
+        idx = start_idx
+        
         while True:
             if idx == len(self.repository):
                 msg = None
@@ -290,3 +301,159 @@ class IteratedQueue(RegistThread):
                 idx += 1
             yield msg
 
+
+class BroadcastWrapper(object):
+    '''Broadcast methods access to several widgets.
+    
+    Wraps objects to be able to have n widgets, and handle them
+    as one.
+
+    @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
+    '''
+    def __init__(self, *values):
+        self.initvalues = values
+        self.widgets = []
+    
+    def __addWidget(self, widg):
+        '''Adds the widget to broadcast.'''
+        self.widgets.append(widg)
+
+    def __getattr__(self, attr):
+        if attr == "addWidget":
+            return self.__addWidget
+
+        def call(*args, **kwargs):
+            for w in self.widgets:
+                realmeth = getattr(w, attr)
+                realmeth(*args, **kwargs)
+        return call
+
+# This is a helper for debug, you just should connect the
+# 'event' event to this debugHandler
+
+event_types = [i for i in vars(gtk.gdk).values() if type(i) is gtk.gdk.EventType]
+
+def debugHandler(widget, event, *a):
+    '''Just connect it to the 'event' event.'''
+    if event.type in event_types:
+        print event.type.value_nick
+
+class Throbber(gtk.ToolButton):
+    '''Creates the throbber widget.
+    
+    @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
+    '''
+    def __init__(self):
+        self.img_static = gtk.Image()
+        self.img_static.set_from_file('core/ui/gtkUi/data/throbber_static.gif')
+        self.img_static.show()
+        self.img_animat = gtk.Image()
+        self.img_animat.set_from_file('core/ui/gtkUi/data/throbber_animat.gif')
+        self.img_animat.show()
+
+        super(Throbber,self).__init__(self.img_static, "")
+        self.set_sensitive(False)
+        self.show()
+
+    def running(self, spin):
+        '''Returns if running.'''
+        if spin:
+            self.set_icon_widget(self.img_animat)
+        else:
+            self.set_icon_widget(self.img_static)
+            
+
+def loadImage(filename):
+    '''Loads a pixbuf from disk.
+
+    @param filename: the file name, full path
+    @returns: The pixbuf from the image.
+    '''
+    im = gtk.Image()
+    im.set_from_file(filename)
+    im.show()
+    return im
+
+
+class SensitiveAnd(object):
+    ''''AND's some sensitive info for a widget.
+    
+    If all says it should be enable it is. If only one says it shouldn't
+    it's off.
+
+    @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
+    '''
+    def __init__(self, target, falseDefaults=None):
+        if falseDefaults is None:
+            falseDefaults = []
+        self.target = target
+        self.opinions = dict.fromkeys(falseDefaults, False)
+
+    def set_sensitive(self, how, whosays=None):
+        '''Sets the sensitivity of the target.'''
+        self.opinions[whosays] = how
+        sensit = all(self.opinions.values())
+        self.target.set_sensitive(sensit)
+            
+        
+import core.data.constants.severity as severity
+KB_ICONS = {
+    ("info", None): loadImage('core/ui/gtkUi/data/information.png'),
+    ("vuln", None):  loadImage('core/ui/gtkUi/data/vulnerability.png'),
+    ("shell", None):  loadImage('core/ui/gtkUi/data/shell.png'),
+    ("vuln", severity.LOW):  loadImage('core/ui/gtkUi/data/vulnerability_l.png'),
+    ("vuln", severity.MEDIUM):  loadImage('core/ui/gtkUi/data/vulnerability_m.png'),
+    ("vuln", severity.HIGH):  loadImage('core/ui/gtkUi/data/vulnerability_h.png'),
+}
+KB_COLOR_LEVEL = {
+    ("info", None):            0,
+    ("vuln", severity.LOW):    1,
+    ("vuln", severity.MEDIUM): 2,
+    ("vuln", severity.HIGH):   3,
+}
+
+KB_COLORS = ["black", "orange", "red", "red"]
+
+
+def open_help(chapter=''):
+    '''Opens the help file in user's preferred browser.
+
+    @param chapter: the chapter of the help, optional.
+    '''
+    if chapter:
+        chapter = '#' + chapter
+    helpfile = os.path.join(os.getcwd(), "readme/EN/gtkUiHTML/gtkUiUsersGuide.html" + chapter)
+    webbrowser.open("file://" + helpfile)
+
+
+def write_console_messages( dlg ):
+    '''
+    Write console messages to the TextDialog.
+    
+    @parameter dlg: The TextDialog.
+    '''
+    import core.data.kb.knowledgeBase as kb
+    from . import messages
+    
+    msg_queue = messages.getQueueDiverter()
+    get_message_index = kb.kb.getData('get_message_index', 'get_message_index')
+    inc_message_index = kb.kb.getData('inc_message_index', 'inc_message_index')
+    
+    for msg in msg_queue.get(get_message_index()):
+        if msg is None:
+            yield True
+            continue
+        
+        inc_message_index()
+
+        if msg.getType() != 'console':
+            continue
+
+        # Handling new lines
+        text = msg.getMsg()
+        if msg.getNewLine():
+            text += '\n'
+
+        dlg.addMessage( text )
+
+    yield False

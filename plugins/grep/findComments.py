@@ -22,14 +22,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import core.data.parsers.dpCache as dpCache
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+from core.controllers.w3afException import w3afException
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
-from core.data.getResponseType import *
+
 import re
+
 
 class findComments(baseGrepPlugin):
     '''
@@ -40,29 +45,48 @@ class findComments(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
+
+        # Internal variables
         self._comments = {}
-        self._search404 = False
         self._interestingWords = ['user', 'pass', 'xxx', 'fix', 'bug', 'broken', 'oops', 'hack', 
         'caution', 'todo', 'note', 'warning', '!!!', '???', 'shit','stupid', 'tonto', 'porqueria',
-        'ciudado', 'usuario', 'contrase', 'puta']
-        self._alreadyReportedInteresting = []
+        'ciudado', 'usuario', 'contrase', 'puta',
+        'secret','@', 'email','security','captcha'
+        ]
+        self._already_reported_interesting = []
+        self.is404 = None
+
+        # User configurations
+        self._search404 = False
         
-    def _testResponse(self, request, response):
-        
-        if isTextOrHtml(response.getHeaders()):
-            
+    def grep(self, request, response):
+        '''
+        Plugin entry point, parse those comments!
+        @return: None
+        '''
+        # Set the is404 method if not already set
+        if not self.is404:
             self.is404 = kb.kb.getData( 'error404page', '404' )
-            
+
+        if response.is_text_or_html():
             if not self.is404( response ) or self._search404:
-                dp = dpCache.dpc.getDocumentParserFor( response.getBody(), response.getURL() )
-                commentList = dp.getComments()
                 
+                try:
+                    dp = dpCache.dpc.getDocumentParserFor( response )
+                except w3afException:
+                    return
+
+                commentList = dp.getComments()
+
                 for comment in commentList:
                     # This next two lines fix this issue:
                     # audit.ssi + grep.findComments + web app with XSS = false positive
                     if self._wasSent( request, '<!--'+comment+'>' ):
                         continue
-                        
+                    
+                    # show nice comments ;)
+                    comment = comment.strip()
+                    
                     if comment not in self._comments.keys():
                         self._comments[ comment ] = [ (response.getURL(), response.id), ]
                     else:
@@ -71,31 +95,37 @@ class findComments(baseGrepPlugin):
                     
                     comment = comment.lower()
                     for word in self._interestingWords:
-                        if comment.count( word ) and ( word, response.getURL() ) not in self._alreadyReportedInteresting:
+                        if word in comment and ( word, response.getURL() ) not in self._already_reported_interesting:
                             i = info.info()
-                            i.setName('HTML comment')
-                            i.setDesc( 'A comment with the string "' + word + '" was found in: ' + response.getURL() + ' . This could be interesting.' )
+                            i.setName('HTML comment with "' + word + '" inside')
+                            msg = 'A comment with the string "' + word + '" was found in: "'
+                            msg += response.getURL() + '". This could be interesting.'
+                            i.setDesc( msg )
                             i.setId( response.id )
                             i.setDc( request.getDc )
                             i.setURI( response.getURI() )
+                            i.addToHighlight( word )
                             kb.kb.append( self, 'interestingComments', i )
                             om.out.information( i.getDesc() )
-                            self._alreadyReportedInteresting.append( ( word, response.getURL() ) )
+                            self._already_reported_interesting.append( ( word, response.getURL() ) )
                     
-                    if re.search('<[a-zA-Z]*.*?>.*?</[a-zA-Z]>', comment) and ( comment, response.getURL() ) not in self._alreadyReportedInteresting:
+                    if re.search('<[a-zA-Z]*.*?>.*?</[a-zA-Z]>', comment) and \
+                    ( comment, response.getURL() ) not in self._already_reported_interesting:
                         # There is HTML code in the comment.
                         i = info.info()
                         i.setName('HTML comment contains HTML code')
-                        i.setDesc( 'A comment with the string "' +comment + '" was found in: ' + response.getURL() + ' . This could be interesting.' )
+                        desc = 'A comment with the string "' +comment + '" was found in: "'
+                        desc += response.getURL() + '" . This could be interesting.'
+                        i.setDesc( desc )
                         i.setId( response.id )
                         i.setDc( request.getDc )
                         i.setURI( response.getURI() )
                         kb.kb.append( self, 'htmlCommentsHideHtml', i )
                         om.out.information( i.getDesc() )
-                        self._alreadyReportedInteresting.append( ( comment, response.getURL() ) )
+                        self._already_reported_interesting.append( ( comment, response.getURL() ) )
                             
     def setOptions( self, optionsMap ):
-        self._search404 = optionsMap['search404']
+        self._search404 = optionsMap['search404'].getValue()
     
     def getOptions( self ):
         '''
@@ -114,10 +144,10 @@ class findComments(baseGrepPlugin):
         '''
         inform = []
         for comment in self._comments.keys():
-            urlsWithThisComment = self._comments[comment]
+            urls_with_this_comment = self._comments[comment]
             om.out.information('The comment : "' + comment + '" was found on this URL(s):')
-            for url , request_id in urlsWithThisComment:
-                inform.append('- ' + url + ' (with id:'+str(request_id)+')' )
+            for url , request_id in urls_with_this_comment:
+                inform.append('- ' + url + ' (request with id:'+str(request_id)+')' )
         
             inform.sort()
             inform = list(set(inform))
@@ -136,6 +166,6 @@ class findComments(baseGrepPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin greps every page for comments, special comments like the ones containing the words
-        "password" or "user" are specially reported.
+        This plugin greps every page for HTML comments, special comments like the ones containing
+        the words "password" or "user" are specially reported.
         '''

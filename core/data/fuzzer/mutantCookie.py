@@ -58,3 +58,40 @@ class mutantCookie(mutant):
         
     def getData( self ):
         return ''
+    
+    def setModValue( self, val ):
+        '''
+        Set the value of the variable that this mutant modifies.
+        '''
+        try:
+            self._freq._cookie[ self.getVar() ][ self._index ] = val
+        except Exception, e:
+            raise w3afException('The cookie mutant object wasn\'t correctly initialized.')
+        
+    def getModValue( self ): 
+        try:
+            return self._freq._cookie[ self.getVar() ][ self._index ]
+        except:
+            raise w3afException('The cookie mutant object was\'nt correctly initialized.')
+            
+    def foundAt(self):
+        '''
+        @return: A string representing WHAT was fuzzed. This string is used like this:
+                - v.setDesc( 'SQL injection in a '+ v['db'] +' was found at: ' + mutant.foundAt() )
+        '''
+        res = ''
+        res += '"' + self.getURL() + '", using HTTP method '
+        res += self.getMethod() + '. The modified parameter was the session cookie with value: "'
+        
+        # Depending on the data container, print different things:
+        dc_length = 0
+        for i in self._freq._dc:
+            dc_length += len(i) + len(self._freq._dc[i])
+        if dc_length > 65:
+            res += '...' + self.getVar()  + '=' + self.getModValue() + '...'
+            res += '"'
+        else:
+            res += str(self.getDc())
+            res += '".'
+        
+        return res       

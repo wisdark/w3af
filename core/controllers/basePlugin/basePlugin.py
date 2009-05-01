@@ -34,7 +34,7 @@ class basePlugin(configurable):
         
     Please note that this class is a configurable object, so it must implement:
         1. setOptions( OptionList )
-        2. getOptionsXML()
+        2. getOptions()
         
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
@@ -58,11 +58,11 @@ class basePlugin(configurable):
         self._urlOpener = urlOpener
         
 
-    def setOptions( self, OptionsMap ):
+    def setOptions( self, optionsMap ):
         '''
         Sets the Options given on the OptionList to self. The options are the result of a user
-        entering some data on a window that was constructed using the XML Options that was
-        retrieved from the plugin using getOptionsXML()
+        entering some data on a window that was constructed using the options that were
+        retrieved from the plugin using getOptions()
         
         This method MUST be implemented on every plugin. 
         
@@ -70,24 +70,11 @@ class basePlugin(configurable):
         ''' 
         raise w3afException('Plugin "'+self.getName()+'" is not implementing required method setOptions' )
         
-    def getOptionsXML(self):
-        '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/ui/userInterface.dtd
-        
-        This method is just here for back compatibility; please use getOptions.
-        
-        @return: XML with the plugin options.
-        ''' 
-        return  str(self.getOptions())
-
     def getOptions(self):
         '''
         @return: A list of option objects for this plugin.
         '''
-        raise w3afException('Plugin is not implementing required method getOptions' )
+        raise w3afException('Plugin "'+self.getName()+'" is not implementing required method getOptions' )
 
     def getPluginDeps( self ):
         '''
@@ -154,14 +141,20 @@ class basePlugin(configurable):
             else:
                 om.out.information( i.getDesc() )
             
-    def _sendMutant( self, mutant, analyze=True, grepResult=True ):
+    def _sendMutant( self, mutant, analyze=True, grepResult=True, analyze_callback=None ):
         '''
         Sends a mutant to the remote web server.
         '''
+        #
+        #
+        #   IMPORTANT NOTE: If you touch something here, the whole framework may stop working!
+        #
+        #
         url = mutant.getURI()
         data = mutant.getData()
+
+        # Also add the cookie header; this is needed by the mutantCookie
         headers = mutant.getHeaders()
-        # Also add the cookie header.
         cookie = mutant.getCookie()
         if cookie:
             headers['Cookie'] = str(cookie)
@@ -174,8 +167,22 @@ class basePlugin(configurable):
         res = apply( functor, args, {'data': data, 'headers': headers, 'grepResult': grepResult } )
         
         if analyze:
-            self._analyzeResult( mutant, res )
+            if analyze_callback:
+                # The user specified a custom callback for analyzing the sendMutant result
+                analyze_callback(mutant, res)
+            else:
+                # Calling the default callback
+                self._analyzeResult(mutant, res)
         return res
+    
+    def _analyzeResult(self,  mutant,  res):
+        '''
+        Analyze the result of sending the mutant to the remote web server.
+        
+        @parameter mutant: The mutated request.
+        @parameter res: The HTTP response.
+        '''
+        raise w3afException('You must override the _analyzeResult method of basePlugin if you want to use _sendMutant().')
     
     def __eq__( self, other ):
         '''

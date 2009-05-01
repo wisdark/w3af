@@ -25,6 +25,7 @@ import socket, urlparse, select
 import core.controllers.outputManager as om
 from core.controllers.w3afException import w3afException
 import core.data.kb.config as cf
+import os
 
 class request:
     """Collect elements needed to send a Request to an HTTP server"""
@@ -61,24 +62,32 @@ class request:
             try:
                 s.connect((HOST, PORT))
             except:
-                raise w3afException('hmap: Connection failed to ' + str(HOST) + ':' + str(PORT) )
+                raise w3afException('Connection failed to ' + str(HOST) + ':' + str(PORT) )
             else:
                 
                 if useSSL:
                     try:
                         s2 = socket.ssl( s )
                     except:
-                        raise w3afException('hmap: SSL Connection failed to ' + str(HOST) + ':' + str(PORT) )
-                        
+                        raise w3afException('SSL Connection failed to ' + str(HOST) + ':' + str(PORT) )
+                    else:
                         s.recv = s2.read
                         s.send = s2.write
+                
+                data = ''
                 
                 try:
                     s.send(str(self))
                 except:
-                    raise w3afException('hmap: Failed to send data to socket.' )
+                    om.out.debug('Failed to send data to socket.' )
+                    # Try again
+                    tries -= 1
+                    time.sleep(wait_time)
+                    wait_time *= 2
+                    s.close()
+                    continue                    
                 
-                data = ''
+                
                 ss = s
                 try:
                     while 1:
@@ -92,7 +101,22 @@ class request:
                     s.close()
                 except KeyboardInterrupt,e:
                     raise e
+                except socket.sslerror, sslerr:
+                    # When the remote server has no more data to send
+                    # It simply closes the remote connection, which raises:
+                    # (6, 'TLS/SSL connection has been closed')
+                    if sslerr[0] == 6:
+                        return response(data)
+                    else:
+                        # Try again
+                        tries -= 1
+                        time.sleep(wait_time)
+                        wait_time *= 2
+                        s.close()
+                        continue
+                        
                 except Exception:
+                    # Try again.
                     tries -= 1
                     time.sleep(wait_time)
                     wait_time *= 2
@@ -837,7 +861,7 @@ def testServer( ssl, server, port, matchCount, generateFP ):
     useSSL = ssl
     
     MATCH_COUNT = matchCount
-    fingerprintDir = 'plugins/discovery/oHmap/known.servers/'
+    fingerprintDir = 'plugins'+os.path.sep+'discovery'+os.path.sep+'oHmap'+os.path.sep+'known.servers'+os.path.sep
     
     # Get the fingerprint
     target_url = server
@@ -847,21 +871,28 @@ def testServer( ssl, server, port, matchCount, generateFP ):
     known_servers = []
     for f in glob.glob(fingerprintDir+'*'):
         ksf = file(f)
-        ks = eval(ksf.read())
-        known_servers.append(ks)
-        ksf.close()
+        try:
+            ### FIXME: This eval is awful, I should change it to pickle.
+            ks = eval(ksf.read())
+        except Exception,  e:
+            raise w3afException('The signature file "' + f + '" has an invalid sintax.')
+        else:
+            known_servers.append(ks)
+            ksf.close()
     
     # Generate the fingerprint file
     if generateFP:
-        try:
-            fd = open( 'hmap-fingerprint-' + server , 'w' )
-        except:
-            raise w3afException('Cannot open fingerprint file.')
-        else:
-            import pprint
-            pp = pprint.PrettyPrinter(indent=4)
-            pprint.PrettyPrinter(stream=fd).pprint(fp)
-            fd.close()
+        for i in xrange(10):
+            try:
+                fd = open( 'hmap-fingerprint-' + server + '-'+ str(i), 'w' )
+            except Exception,  e:
+                raise w3afException('Cannot open fingerprint file. Error:' + str(e))
+            else:
+                import pprint
+                pp = pprint.PrettyPrinter(indent=4)
+                pprint.PrettyPrinter(stream=fd).pprint(fp)
+                fd.close()
+                break
     
     # Compare
     scores = find_most_similar(known_servers, fp)

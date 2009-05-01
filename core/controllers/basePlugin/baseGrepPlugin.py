@@ -26,6 +26,7 @@ import core.controllers.outputManager as om
 import core.data.kb.config as cf
 import urllib
 import core.data.parsers.urlParser as urlParser
+from core.controllers.w3afException import w3afException
 
 class baseGrepPlugin(basePlugin):
     '''
@@ -33,7 +34,7 @@ class baseGrepPlugin(basePlugin):
     and implement the following methods :
         1. testResponse(...)
         2. setOptions( OptionList )
-        3. getOptionsXML()
+        3. getOptions()
 
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
@@ -41,9 +42,8 @@ class baseGrepPlugin(basePlugin):
     def __init__(self):
         basePlugin.__init__( self )
         self._urlOpener = None
-        self._alreadyTested = []
 
-    def testResponse(self, fuzzableRequest, response):
+    def grep_wrapper(self, fuzzableRequest, response):
         '''
         This method tries to find patterns on responses.
         
@@ -53,37 +53,46 @@ class baseGrepPlugin(basePlugin):
         @param fuzzableRequest: This is the fuzzable request object that generated the current response being analyzed.
         @return: If something is found it must be reported to the Output Manager and the KB.
         '''
-        if fuzzableRequest in self._alreadyTested:
-            # The __eq__ includes, url, method and dc !
-            #om.out.debug('Grep plugins not testing: ' + fuzzableRequest.getURL() + ' cause it was already tested.' )
+        if response.getFromCache():
+            #om.out.debug('Grep plugins not testing: ' + repr(fuzzableRequest) + ' cause it was already tested.' )
             pass
         elif urlParser.getDomain( fuzzableRequest.getURL() ) in cf.cf.getData('targetDomains'):
-            self._alreadyTested.append( fuzzableRequest )
-            self._testResponse( fuzzableRequest, response )
+            self.grep( fuzzableRequest, response )
         else:
             #om.out.debug('Grep plugins not testing: ' + fuzzableRequest.getURL() + ' cause it aint a target domain.' )
             pass
     
-    def _wasSent( self, request, theWord ):
+    def _wasSent( self, request, something_interesting ):
         '''
-        Checks if the theWord was sent in the request, this is mainly used to avoid false positives.
+        Checks if the something_interesting was sent in the request.
+
+        @parameter request: The HTTP request
+        @parameter something_interesting: The string
+        @return: True if it was sent
         '''
-        
+        url = urllib.unquote_plus( request.getURI() )
+
+        sent_data = ''
         if request.getMethod().upper() == 'POST':
-            sentData = request.getData()
-            if sentData == None:
-                sentData = ''
+            sent_data = request.getData()
+            # This fixes bug #2012748
+            if sent_data != None:
+                sent_data = urllib.unquote( str(sent_data) )
             else:
-                sentData = urllib.unquote( sentData )
-        else:
-            url = urllib.unquote( request.getURL() )
-            dp = urlParser.getDomainPath( url )
-            sentData = url.replace( dp, '' )
+                sent_data = ''
         
-        if sentData.count( theWord ):
+        # This fixes bug #1990018
+        # False positive with http://localhost/home/f00.html and
+        # /home/user/
+        path = urlParser.getPath(url)
+        if something_interesting[0:5] in path:
             return True
-        else:
-            return False
+
+        if url.count( something_interesting ) or sent_data.count( something_interesting ):
+            return True
+
+        # I didn't sent the something_interesting in any way
+        return False
             
     def _testResponse( self, request, response ):
         '''

@@ -21,16 +21,20 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
-import core.data.parsers.urlParser as uparser
-import re
-from core.data.getResponseType import *
 import core.data.constants.severity as severity
+
+import core.data.parsers.urlParser as urlParser
+import re
+
 
 class privateIP(baseGrepPlugin):
     '''
@@ -41,45 +45,77 @@ class privateIP(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
-        self._classA = re.compile('(10\.\d?\d?\d?\.\d?\d?\d?\.\d?\d?\d?)')
-        self._classB = re.compile('(172\.[1-3]\d?\d?\.\d?\d?\d?\.\d?\d?\d?)')
-        self._classC = re.compile('(192\.168\.\d?\d?\d?\.\d?\d?\d?)')
-        self._regexList = [self._classA, self._classB, self._classC ]
         
-    def _testResponse(self, request, response):
+        # For more info regarding this regular expression, please see:
+        # https://sourceforge.net/mailarchive/forum.php?thread_name=1955593874.20090122023644%40
+        #mlists.olympos.org&forum_name=w3af-develop
+        regex_str = '(?<!\.)(?<!\d)(?:(?:10|127)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|192\.168|169\.'
+        regex_str += '254|172\.0?(?:1[6-9]|2[0-9]|3[01]))(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-'
+        regex_str += '9]?)){2}(?!\d)(?!\.)'
+        self._private_ip_address = re.compile(regex_str)
+        self._regex_list = [self._private_ip_address ]
         
-        headers = response.getHeaders()
+    def grep(self, request, response):
+        '''
+        Plugin entry point. Search for private IPs in the header and the body.
+        @return: None, results are saved to the kb.
+        '''
         
-        for regex in self._regexList:
-            for h in headers.keys():
-                val = headers[ h ]
-                header = "%s: %s" % (h,val)
-                res = regex.search( header )
-                if res:                 
+        # Search for IP addresses in HTTP headers
+        # Get the headers string
+        headers_string = response.dumpHeaders()
+        
+        for regex in self._regex_list:
+            for match in regex.findall(headers_string):
+                # If i'm requesting 192.168.2.111 then I don't want to be alerted about it
+                if match != urlParser.getDomain(response.getURL()):
                     v = vuln.vuln()
                     v.setURL( response.getURL() )
                     v.setId( response.id )
                     v.setSeverity(severity.LOW)
                     v.setName( 'Private IP disclosure vulnerability' )
                     
-                    v.setDesc( "The URL : " + v.getURL() + " returned an HTTP header with an IP address :" +  header )
-                    v['header'] = header
+                    msg = 'The URL: "' + v.getURL() + '" returned an HTTP header '
+                    msg += 'with an IP address: "' +  match + '".'
+                    v.setDesc( msg )
+                    v['IP'] = match                            
+                    v.addToHighlight( match )
                     kb.kb.append( self, 'header', v )       
         
         # Search for IP addresses on HTML
-        if isTextOrHtml(response.getHeaders()):
-            for regex in self._regexList:
-                res = regex.search(response.getBody())
-                if res:                 
-                    for match in res.groups():
+        if response.is_text_or_html():
+            
+            # Performance improvement!
+            # Remember that httpResponse objects have a faster "__in__" than
+            # the one in strings; so string in response.getBody() is slower than
+            # string in response; and regular expression matching is way slower!
+            if not (('10.' in response) or ('172.' in response) or \
+                ('192.168.' in response) or ('169.254.' in response)):
+                return
+            
+            for regex in self._regex_list:
+                for match in regex.findall(response.getBody()):
+                    match = match.strip()
+                    
+                    # Some proxy servers will return errors that include headers in the body
+                    # along with the client IP which we want to ignore
+                    if re.search("^.*X-Forwarded-For: .*%s" % match, response.getBody(), re.M):
+                        continue
+                        
+                    # If i'm requesting 192.168.2.111 then I don't want to be alerted about it
+                    if match != urlParser.getDomain(response.getURL()) and \
+                    not self._wasSent( request, match ):
+
                         v = vuln.vuln()
                         v.setURL( response.getURL() )
                         v.setId( response.id )
                         v.setSeverity(severity.LOW)
                         v.setName( 'Private IP disclosure vulnerability' )
                         
-                        v.setDesc( "The URL : " + v.getURL() + " returned an HTML document with an IP address : " + match )
-                        v['html'] = match
+                        msg = 'The URL: "' + v.getURL() + '" returned an HTML document '
+                        msg += 'with an IP address: "' +  match + '".'
+                        v.setDesc( msg )
+                        v['IP'] = match
                         kb.kb.append( self, 'html', v )     
 
     def setOptions( self, OptionList ):

@@ -22,23 +22,26 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from core.controllers.configurable import configurable
 import core.data.kb.config as cf
-from core.controllers.misc.parseOptions import parseOptions
+
 import core.data.parsers.urlParser as urlParser
 from core.controllers.w3afException import w3afException
 import time
+import urllib2
 
 # options
 from core.data.options.option import option
+from core.data.options.comboOption import comboOption
 from core.data.options.optionList import optionList
 
 cf.cf.save('targets', [] )
 cf.cf.save('targetDomains', [] )
 cf.cf.save('baseURLs', [] )
 
+
 class targetSettings(configurable):
     '''
     A class that acts as an interface for the user interfaces, so they can configure the target
-    settings using getOptionsXML and SetOptions.
+    settings using getOptions and SetOptions.
     '''
     
     def __init__( self ):
@@ -52,24 +55,13 @@ class targetSettings(configurable):
             cf.cf.save('targetFramework', 'unknown' )
             cf.cf.save('targetDomains', [] )
             cf.cf.save('baseURLs', [] )
-            cf.cf.save('sessionName', 'defaultSession' )
+            cf.cf.save('sessionName', 'defaultSession' + '-' + time.strftime('%Y-%b-%d_%H-%M-%S') )
         
         # Some internal variables
-        self._operatingSystems = ['unix','windows', 'unknown']
-        self._programmingFrameworks = ['php','asp','asp.net','java','jsp','cfm','ruby','perl','unknown']
+        self._operatingSystems = ['unknown','unix','windows']
+        self._programmingFrameworks = ['unknown', 'php','asp','asp.net','java','jsp','cfm','ruby','perl']
 
-        
-    def getOptionsXML(self):
-        '''
-        This method returns a XML containing the Options that the plugin has.
-        Using this XML the framework will build a window, a menu, or some other input method to retrieve
-        the info from the user. The XML has to validate against the xml schema file located at :
-        w3af/core/ui/userInterface.dtd
-        
-        @return: XML with the plugin options.
-        ''' 
-        return str(self.getOptions())
-        
+                
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
@@ -77,17 +69,23 @@ class targetSettings(configurable):
         d1 = 'A comma separated list of URLs'
         o1 = option('target', ','.join(cf.cf.getData('targets')), d1, 'list')
         
-        d2 = 'Target operating system. Valid options: '+','.join(self._operatingSystems)
-        h2 = 'This setting is here to enhance w3af performance. If you are not sure what the\
-          target operating system is, you can leave this value blank; otherwise please choose one from:\
-          '+','.join(self._operatingSystems)
-        o2 = option('targetOS', cf.cf.getData('targetOS'), d2, 'string', help=h2)
+        d2 = 'Target operating system ('+ '/'.join(self._operatingSystems) +')'
+        h2 = 'This setting is here to enhance w3af performance.'
+        # This list "hack" has to be done becase the default value is the one
+        # in the first position on the list
+        tmpList = self._operatingSystems[:]
+        tmpList.remove( cf.cf.getData('targetOS') )
+        tmpList.insert(0, cf.cf.getData('targetOS') )
+        o2 = comboOption('targetOS', tmpList, d2, 'combo', help=h2)
 
-        d3 = 'Target programming framework. Valid options: '+','.join(self._programmingFrameworks)
-        h3 = 'This setting is here to enhance w3af performance. If you are not sure what the\
-          target programming framework is, you can leave this value blank; otherwise please choose one from:\
-          '+','.join(self._programmingFrameworks)
-        o3 = option('targetFramework', cf.cf.getData('targetFramework'), d3, 'string', help=h3)
+        d3 = 'Target programming framework ('+ '/'.join(self._programmingFrameworks) +')'
+        h3 = 'This setting is here to enhance w3af performance.'
+        # This list "hack" has to be done becase the default value is the one
+        # in the first position on the list
+        tmpList = self._programmingFrameworks[:]
+        tmpList.remove( cf.cf.getData('targetFramework') )
+        tmpList.insert(0, cf.cf.getData('targetFramework') )
+        o3 = comboOption('targetFramework', tmpList, d3, 'combo', help=h3)
         
         ol = optionList()
         ol.add(o1)
@@ -95,57 +93,79 @@ class targetSettings(configurable):
         ol.add(o3)
         return ol
     
+    def _verifyURL(self, targetUrl, fileTarget=True):
+        '''
+        Verify if the URL is valid and raise an exception if w3af doesn't support it.
+        '''
+        if fileTarget:
+            aFile = targetUrl.count('file://') and len(targetUrl) > len('file://')
+        else:
+            aFile = False
+        aHTTP = targetUrl.count('http://') and len(targetUrl) > len('http://')
+        aHTTPS = targetUrl.count('https://') and len(targetUrl) > len('https://')
+        if not aFile and not aHTTP and not aHTTPS:
+            msg = 'Invalid format for target URL "'+ targetUrl
+            msg += '", you have to specify the protocol (http/https/file) and a domain or IP'
+            msg += 'address. Examples: http://host.tld/ ; https://127.0.0.1/ .'
+            raise w3afException( msg )
     
     def setOptions( self, optionsMap ):
         '''
         This method sets all the options that are configured using the user interface 
-        generated by the framework using the result of getOptionsXML().
+        generated by the framework using the result of getOptions().
         
         @parameter optionsMap: A dictionary with the options for the plugin.
         @return: No value is returned.
-        ''' 
-        f00, optionsMap = parseOptions( 'targetSettings', optionsMap )
-        
-        targetUrls = optionsMap['target']
+        '''
+        targetUrls = optionsMap['target'].getValue()
         
         for targetUrl in targetUrls:
-            if not targetUrl.count('file://') and not targetUrl.count('http://')\
-            and not targetUrl.count('https://'):
-                raise w3afException('Invalid format for target URL: '+ targetUrl )
-        
+            self._verifyURL(targetUrl)
+
         for targetUrl in targetUrls:
             if targetUrl.count('file://'):
                 try:
-                    f = open( targetUrl.replace( 'file://' , '' ) )
+                    f = urllib2.urlopen(targetUrl)
                 except:
-                    raise w3afException('Cannot open target file: ' + targetUrl.replace( 'file://' , '' ) )
+                    raise w3afException('Cannot open target file: ' + targetUrl )
                 else:
                     for line in f:
-                        targetUrls.append( line.strip() )
+                        target_in_file = line.strip()
+                        self._verifyURL(target_in_file, fileTarget=False)
+                        targetUrls.append(target_in_file)
                     f.close()
                 targetUrls.remove( targetUrl )
         
+        # Now we perform a check to see if the user has specified more than one target
+        # domain, for example: "http://google.com, http://yahoo.com".
+        domainList = [urlParser.getNetLocation(targetURL) for targetURL in targetUrls]
+        domainList = list( set(domainList) )
+        if len( domainList ) > 1:
+            msg = 'You specified more than one target domain: ' + ','.join(domainList)
+            msg += ' . And w3af only supports one target domain at the time.'
+            raise w3afException(msg)
+        
         # Save in the config, the target URLs, this may be usefull for some plugins.
         cf.cf.save('targets', targetUrls)
-        cf.cf.save('targetDomains', [ urlParser.getDomain( i ) for i in targetUrls ] )
+        cf.cf.save('targetDomains', [ urlParser.getNetLocation( i ) for i in targetUrls ] )
         cf.cf.save('baseURLs', [ urlParser.baseUrl( i ) for i in targetUrls ] )
         
         if targetUrls:
-            sessName = [ urlParser.getDomain(x) for x in targetUrls ]
+            sessName = [ urlParser.getNetLocation(x) for x in targetUrls ]
             sessName = '-'.join(sessName)
         else:
             sessName = 'noTarget'
 
-        cf.cf.save('sessionName', sessName + '-' + time.strftime('%Y-%b-%d_%H-%M') )
+        cf.cf.save('sessionName', sessName + '-' + time.strftime('%Y-%b-%d_%H-%M-%S') )
         
         # Advanced target selection
-        os = optionsMap['targetOS']
+        os = optionsMap['targetOS'].getValueStr()
         if os.lower() in self._operatingSystems:
             cf.cf.save('targetOS', os.lower() )
         else:
             raise w3afException('Unknown target operating system: ' + os)
         
-        pf = optionsMap['targetFramework']
+        pf = optionsMap['targetFramework'].getValueStr()
         if pf.lower() in self._programmingFrameworks:
             cf.cf.save('targetFramework', pf.lower() )
         else:

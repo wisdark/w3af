@@ -21,9 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
-from core.controllers.w3afException import w3afException
 from core.data.searchEngines.searchEngine import searchEngine as searchEngine
-import core.data.parsers.urlParser as urlParser
 import urllib
 import re
 
@@ -41,20 +39,21 @@ class msn(searchEngine):
         self._urlOpener = urlOpener
         
     def search( self, query, start, count=10 ):
-        res = self.met_search( query, start, count )
+        res = self.met_search(query, start)
         om.out.debug('MSN search for : '+ query + ' returned ' + str( len( res ) ) + ' results.' )
         return res
 
-    def met_search(self, query, start = 0, count = 10):
+    def met_search(self, query, start = 0):
         """
-        search(query, start = 0, count = 10) -> results
-
         Search the web with MSN.
         
         This method is based from the msn.py file from the massive enumeration toolset, 
         coded by pdp and released under GPL v2.
         """
         class msnResult:
+            '''
+            Dummy class that represents the search result.
+            '''
             def __init__( self, url ):
                 self.URL = url
         
@@ -65,7 +64,8 @@ class msn(searchEngine):
 
         results = []
 
-        urls = re.findall('<h3><a href="(.*?)" gping=".*?">',   response.getBody())
+        # This regex MAY become outdated
+        urls = re.findall('<h3><a href="(.*?)" onmousedown',   response.getBody())
         if len(urls) == 11:
             urls = urls[:-1]
         

@@ -21,17 +21,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.kb.info as info
-import core.data.parsers.urlParser as urlParser
-from core.controllers.w3afException import *
 import core.data.constants.severity as severity
+
+import core.data.parsers.urlParser as urlParser
+from core.controllers.w3afException import w3afException, w3afRunOnce
+
 
 class crossDomain(baseDiscoveryPlugin):
     '''
@@ -41,13 +45,16 @@ class crossDomain(baseDiscoveryPlugin):
 
     def __init__(self):
         baseDiscoveryPlugin.__init__(self)
+        
+        # Internal variables
         self._exec = True
 
     def discover(self, fuzzableRequest ):
         '''
         Get the crossdomain.xml file and parse it.
         
-        @parameter fuzzableRequest: A fuzzableRequest instance that contains (among other things) the URL to test.
+        @parameter fuzzableRequest: A fuzzableRequest instance that contains 
+                                                    (among other things) the URL to test.
         '''
         dirs = []
         if not self._exec :
@@ -58,44 +65,59 @@ class crossDomain(baseDiscoveryPlugin):
             # Only run once
             self._exec = False
             
-            self.is404 = kb.kb.getData( 'error404page', '404' )
+            is_404 = kb.kb.getData( 'error404page', '404' )
             
-            baseUrl = urlParser.baseUrl( fuzzableRequest.getURL() )
-            crossDomainUrl = urlParser.urlJoin(  baseUrl , 'crossdomain.xml' )
-            response = self._urlOpener.GET( crossDomainUrl, useCache=True )
+            base_url = urlParser.baseUrl( fuzzableRequest.getURL() )
+            cross_domain_url = urlParser.urlJoin(  base_url , 'crossdomain.xml' )
+            response = self._urlOpener.GET( cross_domain_url, useCache=True )
             
-            if not self.is404( response ):
+            if not is_404( response ):
                 dirs.extend( self._createFuzzableRequests( response ) )
                 
                 import xml.dom.minidom
                 try:
                     dom = xml.dom.minidom.parseString( response.getBody() )
-                except:
-                    raise w3afException('Error while parsing crossdomain.xml')
-                
-                urlList = dom.getElementsByTagName("allow-access-from")
-                for url in urlList:
-                    url = url.getAttribute('domain')
-                    
-                    if url == '*':
-                        v = vuln.vuln()
-                        v.setURL( response.getURL() )
-                        v.setMethod( 'GET' )
-                        v.setName( 'Insecure crossdomain.xml settings' )
-                        v.setSeverity(severity.LOW)
-                        v.setDesc( 'The crossdomain.xml file at ' +  urlParser.baseUrl( fuzzableRequest.getURL() ) + '/crossdomain.xml allows flash access from any site.')
-                        v.setId( response.id )
-                        kb.kb.append( self, 'vuln', v )
-                        om.out.vulnerability( v.getDesc(), severity=v.getSeverity() )
-                    else:
+                except Exception, e:
+                    # Report this, it may be interesting for the final user
+                    # not a vulnerability per-se... but... it's information after all
+                    if 'allow-access-from' in response.getBody() or \
+                    'cross-domain-policy' in response.getBody():
                         i = info.info()
-                        i.setName('Crossdomain allow ACL')
+                        i.setName('Invalid crossdomain.xml')
                         i.setURL( response.getURL() )
                         i.setMethod( 'GET' )
-                        i.setDesc( 'Crossdomain.xml file allows access from domain: ' + url )
+                        msg = 'The crossdomain.xml file at: "' + url  + '" is not a valid XML.'
+                        i.setDesc( msg )
                         i.setId( response.id )
                         kb.kb.append( self, 'info', i )
                         om.out.information( i.getDesc() )
+                else:
+                    # parsed ok!
+                    url_list = dom.getElementsByTagName("allow-access-from")
+                    for url in url_list:
+                        url = url.getAttribute('domain')
+                        
+                        if url == '*':
+                            v = vuln.vuln()
+                            v.setURL( response.getURL() )
+                            v.setMethod( 'GET' )
+                            v.setName( 'Insecure crossdomain.xml settings' )
+                            v.setSeverity(severity.LOW)
+                            msg = 'The crossdomain.xml file at "' + cross_domain_url + '" allows'
+                            msg += ' flash access from any site.'
+                            v.setDesc( msg )
+                            v.setId( response.id )
+                            kb.kb.append( self, 'vuln', v )
+                            om.out.vulnerability( v.getDesc(), severity=v.getSeverity() )
+                        else:
+                            i = info.info()
+                            i.setName('Crossdomain allow ACL')
+                            i.setURL( response.getURL() )
+                            i.setMethod( 'GET' )
+                            i.setDesc( 'Crossdomain.xml file allows access from: "' + url  + '".')
+                            i.setId( response.id )
+                            kb.kb.append( self, 'info', i )
+                            om.out.information( i.getDesc() )
         
         return dirs
         
@@ -128,8 +150,9 @@ class crossDomain(baseDiscoveryPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin searches for the crossdomain.xml file used by flash, and parses it.
+        This plugin searches for the crossdomain.xml file used by Flash, and parses it.
         
-        This file is used by Flash as an ACL that defines what domains can access the domain that
-        contains the file. By parsing this file, you can get more information about relationships between sites.
+        The crossdomain.xml file is used by Flash as an ACL that defines what domains can access
+        the domain that contains the file inside the webroot. By parsing this file, you can get more
+        information about relationships between sites and insecure configurations.
         '''

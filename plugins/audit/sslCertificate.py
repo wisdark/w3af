@@ -21,17 +21,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
-import core.data.kb.knowledgeBase as kb
 from core.controllers.w3afException import w3afException
+from core.data.parsers.urlParser import getProtocol, getNetLocation, getDomain
+
+from core.data.db.temp_persist import disk_list
+
+import core.data.kb.knowledgeBase as kb
+import core.data.kb.info as info
+
+from OpenSSL import SSL, crypto
 import socket
-import re
-from core.data.parsers.urlParser import *
-import core.data.constants.severity as severity
+import select
+
 
 class sslCertificate(baseAuditPlugin):
     '''
@@ -41,49 +48,169 @@ class sslCertificate(baseAuditPlugin):
 
     def __init__(self):
         baseAuditPlugin.__init__(self)
+        
+        # Internal variables
+        self._already_tested_domains = disk_list()
 
-    def _fuzzRequests(self, freq ):
+    def audit(self, freq ):
         '''
         Get the cert and do some checks against it.
-        
+
         @param freq: A fuzzableRequest
         '''
         url = freq.getURL()
-        if 'HTTPS' == getProtocol( url ).upper():
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            splited = getDomain(url).split(':')
-            if len( splited ) == 1:
-                port = 443
-                host = splited[0]
-            else:
-                port = splited[1]
-                host = splited[0]
-            s.connect( ( host , port ) )
-            s = socket.ssl( s )
-            
-            def printCert( certStr ):
-                # All of this could be replaced with a smarter re, but i had no time
-                pparsecertstringre = re.compile(    r"""(?:/)(\w(?:\w|))(?:=)""")
-                varNames = pparsecertstringre.findall( certStr )
-                pos = 0
-                for i in xrange( len(varNames) ):
-                    start = certStr.find( varNames[ i ], pos )
-                    if ( i +1 ) != len(varNames):
-                        end = certStr.find( varNames[ i + 1], start )
-                    else:
-                        end = len( certStr ) +1
-                    value = certStr[ start+ len(varNames[ i ]) +1 : end -1 ]
-                    om.out.information('- '+ varNames[ i ] + '=' + value)
-            
-            om.out.information('Issuer of SSL Certificate:')
-            printCert( s.issuer() )
-            om.out.information('Server SSL Certificate:')
-            printCert( s.server() )
+        
+        if 'HTTPS' != getProtocol( url ).upper():
+            return
+
+        domain = getDomain(url)
+        # We need to check certificate only once per host
+        if domain in self._already_tested_domains:
+            return
+
+        # Parse the domain:port
+        splited = getNetLocation(url).split(':')
+        port = 443
+        host = splited[0]
+
+        if len( splited ) > 1:
+            port = int(splited[1])
+
+        # Create the connection
+        socket_obj = socket.socket()
+        try:
+            socket_obj.connect( ( host , port ) )
+            ctx = SSL.Context(SSL.SSLv23_METHOD)
+            ssl_conn = SSL.Connection(ctx, socket_obj)
+
+            # Go to client mode
+            ssl_conn.set_connect_state()
+
+            # If I don't send something here, the "get_peer_certificate"
+            # method returns None. Don't ask me why!
+            #ssl_conn.send('GET / HTTP/1.1\r\n\r\n')
+            self.ssl_wrapper( ssl_conn, ssl_conn.send, ('GET / HTTP/1.1\r\n\r\n', ), {})
+        except Exception, e:
+            om.out.error('Error in audit.sslCertificate: "' + repr(e)  +'".')
+        else:
+            # Get the cert
+            cert = ssl_conn.get_peer_certificate()
+
+            # Perform the analysis
+            self._analyze_cert( cert, ssl_conn, host )
+            self._already_tested_domains.append(domain)
+            # Print the SSL information to the log
+            desc = 'This is the information about the SSL certificate used in the target site:'
+            desc += '\n'
+            desc += self._dump_X509(cert)
+            om.out.information( desc )
+            i = info.info()
+            i.setName('SSL Certificate' )
+            i.setDesc( desc )
+            kb.kb.append( self, 'certificate', i )
+
+    def ssl_wrapper(self, ssl_obj, method, args, kwargs):
+        '''
+        This is a method that calls SSL functions, wrapping them around
+        try/except and handling WantRead and WantWrite errors.
+        '''
+        while True:
+            try:
+                return apply( method, args, kwargs )
+                break
+            except SSL.WantReadError:
+                select.select([ssl_obj],[],[],10.0)
+            except SSL.WantWriteError:
+                select.select([],[ssl_obj],[],10.0)
+
+    def _analyze_cert(self, cert, ssl_conn, host):
+        '''
+        Analyze the cert.
+
+        @parameter cert: The cert object from pyopenssl.
+        @parameter ssl_conn: The SSL connection.
+        '''
+        server_digest_SHA1 = cert.digest('sha1')
+        server_digest_MD5 = cert.digest('md5')
+
+        # Check for expired
+        if cert.has_expired():
+            i = info.info()
+            i.setName('Expired SSL certificate' )
+            i.setDesc( 'The certificate with MD5 digest: "' + server_digest_MD5 + '" has expired.' )
+            kb.kb.append( self, 'expired', i )
+
+        # Check for SSL version
+        # TODO why not '... < 3:'?
+        if cert.get_version() < 2:
+            i = info.info()
+            i.setName('Insecure SSL version' )
+            desc = 'The certificate is using an old version of SSL (' + str(cert.get_version())
+            desc += '), which is insecure.'
+            i.setDesc( desc )
+            kb.kb.append( self, 'version', i )
+
+        peer = cert.get_subject()
+        issuer = cert.get_issuer()
+        ciphers = ssl_conn.get_cipher_list()
+        cn = str(peer.commonName)
+
+        # Check that the name of the site and the name reported in the certificate match.
+        if host != cn:
+            i = info.info()
+            i.setName('Invalid name of the certificate')
+            desc = 'The certificate presented by this website ('
+            desc += host
+            desc += ') was issued for a different website\'s address ('
+            desc += cn + ')'
+            i.setDesc( desc )
+            om.out.information( desc )
+            kb.kb.append( self, 'cn', i )
+
+        # Check that the certificate is self issued
+        if peer == issuer:
+            i = info.info()
+            i.setName('Self issued SSL certificate')
+            desc = 'The certificate is self issued'
+            i.setDesc( desc )
+            om.out.information( desc )
+            kb.kb.append( self, 'si_cert', i )
+        # TODO
+        # 1. Self-signed
+        # 2. MD5 check like in Metasploit
+
+    def _dump_X509(self, cert):
+        '''
+        Dump X509
+        '''
+        res = ''
+        res += "- Digest (SHA-1): " + cert.digest("sha1") +'\n'
+        res += "- Digest (MD5): " + cert.digest("md5") +'\n'
+        res += "- Serial#: " + str(cert.get_serial_number()) +'\n'
+        res += "- Version: " + str(cert.get_version()) +'\n'
+
+        expired = cert.has_expired() and "Yes" or "No"
+        res += "- Expired: " + expired + '\n'
+        res += "- Subject: " + str(cert.get_subject()) + '\n'
+        res += "- Issuer: " + str(cert.get_issuer()) + '\n'
+
+        # Dump public key
+        pkey = cert.get_pubkey()
+        typedict = {crypto.TYPE_RSA: "RSA", crypto.TYPE_DSA: "DSA"}
+        res += "- PKey bits: " + str(pkey.bits()) +'\n'
+        res += "- PKey type: %s (%d)" % (typedict.get(pkey.type(), "Unknown"), pkey.type()) +'\n'
+
+        res += '- Certificate dump: \n' + crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+
+        # Indent
+        res = res.replace('\n', '\n    ')
+        res = '    ' + res
+        return res
 
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
-        '''    
+        '''
         ol = optionList()
         return ol
 
@@ -91,10 +218,10 @@ class sslCertificate(baseAuditPlugin):
         '''
         This method sets all the options that are configured using the user interface 
         generated by the framework using the result of getOptions().
-        
+
         @parameter OptionList: A dictionary with the options for the plugin.
         @return: No value is returned.
-        ''' 
+        '''
         pass
 
     def getPluginDeps( self ):
@@ -103,13 +230,13 @@ class sslCertificate(baseAuditPlugin):
         current one.
         '''
         return []
-    
+
     def getLongDesc( self ):
         '''
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
         This plugin audits SSL certificate parameters.
-        
+
         Note: It's only usefull when testing HTTPS sites.
         '''

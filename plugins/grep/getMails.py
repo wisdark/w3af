@@ -21,15 +21,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
+
 import core.data.parsers.dpCache as dpCache
-from core.data.parsers.urlParser import *
-from core.data.getResponseType import *
+import core.data.parsers.urlParser as urlParser
+from core.controllers.w3afException import w3afException
 
 class getMails(baseGrepPlugin):
     '''
@@ -40,42 +44,112 @@ class getMails(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
+        # User configured variables
+        self._only_target_domain = True
 
-    def _testResponse(self, request, response):
+    def grep(self, request, response):
+        '''
+        Plugin entry point, get the emails and save them to the kb.
+        @parameter request: The HTTP request
+        @parameter request: The HTTP response
+        @return: None
+        '''
+        self._grep_worker(request, response, 'mails', \
+                urlParser.getRootDomain(response.getURL()))
+
+        if not self._only_target_domain:
+            self._grep_worker(request, response, 'external_mails')
+            
+    def _grep_worker(self, request, response, kb_key, domain=None):
+        '''
+        Helper method for using in self.grep()
         
+        @parameter request: The HTTP request
+        @parameter request: The HTTP response
+        @parameter kb_key: Knowledge base dict key
+        @parameter domain: Target domain for getEmails filter
+        @return: None
+        '''
         # Modified when I added the pdfParser
         #if isTextOrHtml(response.getHeaders()):
-        dp = dpCache.dpc.getDocumentParserFor( response.getBody(), response.getURL() )
-        mails = dp.getAccounts()
+        try:
+            dp = dpCache.dpc.getDocumentParserFor( response )
+        except w3afException:
+            msg = 'If I can\'t parse the document, I won\'t be able to find any emails.'
+            msg += ' Ignoring the desponse for "' + response.getURL() + '".'
+            om.out.debug( msg )
+            return
+
+        mails = dp.getEmails(domain)
+        
         for m in mails:
-            if not self._wasSent( request, m ):
+            # Define some variables to be used later
+            if self._wasSent( request, m ):
+                continue
+
+            email_map = {}
+            for i in kb.kb.getData( 'getMails', 'mails'):
+                mail_string = i['mail']
+                email_map[ mail_string ] = i
+
+            if m not in email_map:
+                # Create a new info object, and report it
                 i = info.info()
                 i.setURL( response.getURL() )
                 i.setId( response.id )
-                mail = m + '@' + getDomain( response.getURL() )
-                i.setName(mail)
-                i.setDesc( 'The mail account: "'+ mail + '" was found in: "' + response.getURL() + '"' )
-                i['mail'] = mail
-                i['user'] = m
-            
-                kb.kb.append( 'mails', 'mails', i ) 
+                i.setName( m )
+                desc = 'The mail account: "'+ m + '" was found in: '
+                desc += '\n- ' + response.getURL() 
+                desc += ' - In request with id: '+ str(response.id)
+                i.setDesc( desc )
+                i['mail'] = m
+                i['url_list'] = [ response.getURL(), ]
+                i['user'] = m.split('@')[0]
+                i.addToHighlight( m )
+             
+                
+                kb.kb.append( 'mails', kb_key, i )
                 kb.kb.append( self, 'mails', i )
-    
-    def setOptions( self, OptionList ):
-        pass
+                continue
+            
+            # Get the corresponding info object.
+            i = email_map[ m ]
+            # And work
+            if response.getURL() not in i['url_list']:
+                # This email was already found in some other URL
+                # I'm just going to modify the url_list and the description message
+                # of the information object.
+                id_list_of_info = i.getId()
+                id_list_of_info.append( response.id )
+                i.setId( id_list_of_info )
+                i.setURL('')
+                desc = i.getDesc()
+                desc += '\n- ' + response.getURL() 
+                desc += ' - In request with id: '+ str(response.id)
+                i.setDesc( desc )
+                i['url_list'].append( response.getURL() )
+        
+    def setOptions( self, optionsMap ):
+        self._only_target_domain = optionsMap['onlyTargetDomain'].getValue()
     
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
         '''    
         ol = optionList()
+        d1 = 'When greping, only search mails for domain of target'
+        o1 = option('onlyTargetDomain', self._only_target_domain, d1, 'boolean')
+        
+        ol = optionList()
+        ol.add(o1)
         return ol
 
     def end(self):
         '''
         This method is called when the plugin wont be used anymore.
         '''
-        self.printUniq( kb.kb.getData( 'getMails', 'mails' ), None )
+        self.printUniq( kb.kb.getData( 'mails', 'mails' ), None )
+        self.printUniq( kb.kb.getData( 'mails', 'external_mails' ), None )
     
     def getPluginDeps( self ):
         '''

@@ -37,7 +37,8 @@ class profilesMenu(menu):
     def __init__(self, name, console, w3af, parent=None):
         menu.__init__(self, name, console, w3af, parent)
         self._profiles = {}
-        for profile in w3af.getProfileList():
+        instance_list, invalid_profiles = w3af.getProfileList()
+        for profile in instance_list:
             self._profiles[profile.getName()] = profile
         self._loadHelp('profiles')
 
@@ -61,7 +62,7 @@ class profilesMenu(menu):
             om.out.console('No parameters expected')
         else:
             table = [['Profile', 'Description'],[]]
-            for profileInstance in self._profiles:
+            for profileInstance in self._profiles.values():
                 table.append([profileInstance.getName() , profileInstance.getDesc()])
 
             self._console.drawTable(table)
@@ -69,7 +70,7 @@ class profilesMenu(menu):
     def _para_use(self, params, part):
         if len(params)==0:
 #        profiles = [str(p.getName()) for p in self._w3af.getProfileList()]
-            return suggest (profiles.keys(), part)
+            return suggest (self._profiles.keys(), part)
 
         return []
 

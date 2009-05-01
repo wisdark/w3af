@@ -1,0 +1,198 @@
+[audit.preg_replace]
+
+[audit.responseSplitting]
+
+[grep.ssn]
+
+[grep.svnUsers]
+
+[grep.passwordProfiling]
+
+[grep.blankBody]
+
+[grep.lang]
+
+[grep.metaTags]
+search404 = False
+
+[audit.htaccessMethods]
+
+[grep.strangeHeaders]
+
+[audit.xpath]
+
+[audit.LDAPi]
+
+[audit.generic]
+diffRatio = 0.35
+
+[audit.frontpage]
+stopOnFirst = True
+
+[audit.formatString]
+
+[grep.fileUpload]
+
+[audit.unSSL]
+
+[grep.strangeParameters]
+
+[audit.xss]
+checkStored = True
+numberOfChecks = 3
+
+[grep.errorPages]
+
+[audit.fileUpload]
+extensions = gif,html
+
+[grep.motw]
+withoutMOTW = False
+
+[grep.ajax]
+
+[grep.creditCards]
+
+[audit.blindSqli]
+equAlgorithm = setIntersection
+equalLimit = 0.8
+
+[audit.globalRedirect]
+
+[discovery.webSpider]
+urlParameter = None
+followRegex = .*
+ignoreRegex = None
+onlyForward = False
+
+[audit.xst]
+
+[grep.error500]
+
+[audit.sslCertificate]
+
+[profile]
+description = This profile performs a full audit of the target website, using only the webSpider plugin for discovery.
+name = full_audit
+
+[misc-settings]
+exportFuzzableRequests = 
+maxThreads = 0
+fuzzFCExt = txt
+autoDependencies = True
+demo = False
+fuzzableHeaders = 
+showProgressBar = True
+fuzzCookie = False
+fuzzFileName = False
+fuzzFileContent = True
+maxDiscoveryLoops = 500
+maxDepth = 25
+interface = eth0
+localAddress = 127.0.0.1
+nonTargets = 
+
+[grep.findComments]
+search404 = False
+
+[audit.eval]
+
+[audit.osCommanding]
+
+[audit.ssi]
+
+[output.gtkOutput]
+
+[audit.sqli]
+
+[grep.dotNetEventValidation]
+
+[bruteforce.formAuthBrute]
+profilingNumber = 50
+useMails = True
+useProfiling = True
+passwdFile = core/controllers/bruteforce/passwords.txt
+useMailUsers = True
+passEqUser = True
+usersFile = core/controllers/bruteforce/users.txt
+stopOnFirst = True
+useSvnUsers = True
+
+[audit.phishingVector]
+
+[grep.objects]
+
+[audit.buffOverflow]
+
+[grep.oracle]
+
+[grep.newline]
+
+[grep.httpInBody]
+
+[grep.feeds]
+
+[grep.directoryIndexing]
+
+[audit.remoteFileInclude]
+usew3afSite = True
+listenAddress = 
+listenPort = 44449
+
+[grep.codeDisclosure]
+
+[grep.collectCookies]
+
+[grep.getMails]
+onlyTargetDomain = True
+
+[grep.privateIP]
+
+[grep.pathDisclosure]
+
+[audit.xsrf]
+
+[http-settings]
+proxyPort = 8080
+basicAuthDomain = 
+maxFileSize = 400000
+always404 = 
+headersFile = 
+proxyAddress = 
+maxRetrys = 2
+404exceptions = 
+ignoreSessCookies = False
+byDirectory404 = False
+timeout = 10
+userAgent = w3af.sourceforge.net
+basicAuthUser = 
+basicAuthPass = 
+byDirectoryAndExtension404 = False
+autodetect404 = True
+cookieJarFile = 
+
+[bruteforce.basicAuthBrute]
+profilingNumber = 50
+useMails = True
+useProfiling = True
+passwdFile = core/controllers/bruteforce/passwords.txt
+useMailUsers = True
+passEqUser = True
+usersFile = core/controllers/bruteforce/users.txt
+stopOnFirst = True
+useSvnUsers = True
+
+[grep.hashFind]
+
+[grep.wsdlGreper]
+
+[audit.localFileInclude]
+
+[audit.dav]
+
+[grep.domXss]
+
+[audit.mxInjection]
+
+[grep.httpAuthDetect]
+

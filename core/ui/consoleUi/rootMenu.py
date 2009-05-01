@@ -24,9 +24,23 @@ from core.ui.consoleUi.menu import *
 from core.ui.consoleUi.plugins import *
 from core.ui.consoleUi.profiles import *
 from core.ui.consoleUi.exploit import *
+from core.ui.consoleUi.kbMenu import *
 import core.controllers.miscSettings as ms
 #from core.ui.consoleUi.session import *
 from core.ui.consoleUi.util import *
+import core.ui.consoleUi.io.console as term
+
+from core.controllers.w3afException import *
+from core.controllers.misc.get_w3af_version import get_w3af_version
+
+# Provide a progress bar for all plugins.
+from core.ui.consoleUi.progress_bar import progress_bar
+import threading
+import sys
+import time
+
+# This is to perform the "print scan status" in show_progress_on_request()
+import select
 
 
 class rootMenu(menu):
@@ -46,21 +60,101 @@ class rootMenu(menu):
             'http-settings' : (configMenu, self._w3af.uriOpener.settings),
             'profiles' : profilesMenu,
             'exploit' : exploit,
-       })
-    
+            'kb': kbMenu
+        })
+       
     def _cmd_start(self, params):
+        '''
+        Start the core in a different thread, monitor keystrokes in the main thread.
+        @return: None
+        '''
+        # Check if the console output plugin is enabled or not, and warn.
+        output_plugins = self._w3af.getEnabledPlugins('output')
+        if 'console' not in output_plugins:
+            msg = "Warning: You disabled the console output plugin. The scan information, such as"
+            msg += ' discovered vulnerabilities won\'t be printed to the console, we advise you'
+            msg += ' to enable this output plugin in order to be able to actually see'
+            msg += ' the scan output in the console.'
+            print msg
+        
+        threading.Thread(target=self._real_start).start()
+        try:
+            # let the core start
+            time.sleep(1)
+            if self._w3af.getCoreStatus() != 'Not running.':
+                self.show_progress_on_request()
+        except KeyboardInterrupt, k:
+            om.out.console('User hitted Ctrl+C, stopping scan.')
+            time.sleep(1)
+            self._w3af.stop()
+            self._w3af.quit()
+ 
+    def _real_start(self):
+        '''
+        Actually run core.start()
+        @return: None
+        '''
         try:
             self._w3af.initPlugins()
             self._w3af.verifyEnvironment()
-            self._console.disableConsoleIfNeed()
             self._w3af.start()
+        except w3afException, w3:
+            om.out.error(str(w3))
+        except w3afMustStopException, w3:
+            om.out.error(str(w3))
         except Exception, e:
-            om.out.console(str(e))
-        finally:
-            self._console.enableConsole()
- 
+            self._w3af.quit()
+            raise e
+     
+    def show_progress_on_request(self):
+        '''
+        When the user hits enter, show the progress
+        '''
+        while self._w3af.isRunning():
+            
+            # Define some variables...
+            rfds = []
+            wfds = []
+            efds = []
+            hitted_enter = False
+
+            # TODO: This if is terrible! I need to remove it!
+            # read from sys.stdin with a 0.5 second timeout
+            if sys.platform != 'win32':
+                # linux
+                rfds, wfds, efds = select.select( [sys.stdin], [], [], 0.5)
+                if rfds:
+                    if len(sys.stdin.readline()):
+                        hitted_enter = True
+            else:
+                # windows
+                import msvcrt
+                time.sleep(0.3)
+                if msvcrt.kbhit():
+                    if term.read(1) in ['\n', '\r', '\r\n', '\n\r']:
+                        hitted_enter = True
+            
+            # If something was written to sys.stdin, read it
+            if hitted_enter:
+                
+                # change back to the previous state
+                hitted_enter = False
+                
+                # Get the information
+                progress = self._w3af.progress.get_progress()
+                eta = self._w3af.progress.get_eta()
+                
+                # Create the message to print
+                progress = str(progress * 100)
+                progress = progress[:5] + ' ' + '%'
+                msg = 'Status: ' + self._w3af.getCoreStatus() + '\n'
+                msg += 'Current phase status: ' + progress + ' - ETA: %.2dd %.2dh %.2dm %.2ds' % eta
+                
+                # Print
+                om.out.console( msg , newLine=True)
+        
     def _cmd_version(self, params):
         '''
         Show the w3af version and exit
         '''
-        om.out.console( self._w3af.getVersion() )
+        om.out.console( get_w3af_version() )

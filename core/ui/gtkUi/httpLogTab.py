@@ -22,32 +22,48 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import gtk
 import gobject
-import core.data.kb.knowledgeBase as kb
-import core.controllers.outputManager as om
-import re
-from core.ui.gtkUi.entries import ValidatedEntry
+import pango
 
-class httpLogTab(gtk.HPaned):
+# The elements to create the req/res viewer
+from . import reqResViewer, entries
+from core.data.db.reqResDBHandler import reqResDBHandler
+from core.controllers.w3afException import w3afException
+
+MARKUP_HELP = _('''The w3af framework saves all the requests to a database. This database can be searched using a SQL like syntax that combines the <i>id</i>, <i>url</i> and <i>code</i> columns.
+
+Here are some <b>examples</b>:
+    - <i>id = 3 or id = 4</i>
+    - <i>code &lt;&gt; 404 and code &gt; 400</i>
+    - <i>url like '%xc.php'</i>
+    - <i>url like '%xc%' and id &lt;&gt; 3</i>
+''')
+
+class httpLogTab(entries.RememberingHPaned):
     '''
     A tab that shows all HTTP requests and responses made by the framework.    
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     def __init__(self, w3af):
-        super(httpLogTab,self).__init__()
+        super(httpLogTab,self).__init__(w3af, "pane-httplogtab", 300)
+        self.w3af = w3af
         
         # Show the information message about long searchs only one time
         self._alreadyReported = True
         
         # This is a search bar for request/responses
-        searchLabel = gtk.Label("Search:")
+        searchLabel = gtk.Label(_("Search:"))
         
         # The search entry
-        self._searchText = searchEntry('req.id == 1')
+        self._searchText = searchEntry('id = 1')
         self._searchText.connect("activate", self._findRequestResponse )
         
         # The button that is used to search
         searchBtn = gtk.Button(stock=gtk.STOCK_FIND)
         searchBtn.connect("clicked", self._findRequestResponse )
+        
+        # A help button
+        helpBtn = gtk.Button(stock=gtk.STOCK_HELP)
+        helpBtn.connect("clicked", self._showHelp )
         
         # Create the container that has the menu
         menuHbox = gtk.HBox()
@@ -55,26 +71,24 @@ class httpLogTab(gtk.HPaned):
         menuHbox.pack_start( searchLabel, False )
         menuHbox.pack_start( self._searchText )
         menuHbox.pack_start( searchBtn, False )
+        menuHbox.pack_start( helpBtn, False )
         menuHbox.show_all()
         
         # Create the main container
         mainvbox = gtk.VBox()
         
         # Create the req/res viewer
-        reqResViewer = gtk.Notebook()
-        reqLabel = gtk.Label("Request")
-        self._reqPaned = requestPaned()
-        resLabel = gtk.Label("Response")
-        self._resPaned = responsePaned()
-        reqResViewer.append_page(self._reqPaned, reqLabel)
-        reqResViewer.append_page(self._resPaned, resLabel)
-        reqResViewer.show_all()
+        self._reqResViewer = reqResViewer.reqResViewer(w3af, editableRequest=False, editableResponse=False)
+        self._reqResViewer.set_sensitive(False)
+        
+        # Create the database handler
+        self._dbHandler = reqResDBHandler()
         
         # Create the req/res selector (when a search with more than one result is done, this window appears)
         self._sw = gtk.ScrolledWindow()
         self._sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
         self._sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        self._lstore = gtk.ListStore(gobject.TYPE_UINT, gobject.TYPE_STRING)
+        self._lstore = gtk.ListStore(gobject.TYPE_UINT, gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_UINT, gobject.TYPE_STRING, gobject.TYPE_UINT, gobject.TYPE_FLOAT)
         # create tree view
         self._lstoreTreeview = gtk.TreeView(self._lstore)
         self._lstoreTreeview.set_rules_hint(True)
@@ -83,11 +97,13 @@ class httpLogTab(gtk.HPaned):
         self._lstoreTreeview.show()
         self._lstoreTreeview.connect('cursor-changed', self._viewInReqResViewer)
         self._sw.add(self._lstoreTreeview)
+        self._sw.set_sensitive(False)
+        self._sw.show_all()
         
         # I want all sections to be resizable
-        self._vpan = gtk.VPaned()
-        self._vpan.pack1( reqResViewer )
-        self._vpan.pack2( self._sw )
+        self._vpan = entries.RememberingVPaned(w3af, "pane-swandrRV", 100)
+        self._vpan.pack1( self._sw )
+        self._vpan.pack2( self._reqResViewer )
         self._vpan.show()
         
         # Add the menuHbox, the request/response viewer and the r/r selector on the bottom
@@ -97,85 +113,106 @@ class httpLogTab(gtk.HPaned):
         
         # Add everything
         self.add( mainvbox )
-        self.set_position(300)
         self.show()
     
     def __add_columns(self, treeview):
         model = treeview.get_model()
+        
         # column for id's
-        column = gtk.TreeViewColumn('ID', gtk.CellRendererText(),text=0)
+        column = gtk.TreeViewColumn(_('ID'), gtk.CellRendererText(),text=0)
         column.set_sort_column_id(0)
         treeview.append_column(column)
 
-        # columns for severities
-        column = gtk.TreeViewColumn('URI', gtk.CellRendererText(),text=1)
+        # column for METHOD
+        column = gtk.TreeViewColumn(_('Method'), gtk.CellRendererText(),text=1)
         column.set_sort_column_id(1)
         treeview.append_column(column)
+
+        # column for URI
+        renderer = gtk.CellRendererText()
+        renderer.set_property( 'ellipsize', pango.ELLIPSIZE_END)
+        column = gtk.TreeViewColumn('URI' + ' ' * 155, renderer,text=2)
+        column.set_sort_column_id(2)
+        column.set_resizable(True)
+        treeview.append_column(column)
         
-    def _initDB( self ):
-        try:
-            self._db_req, self._db_res = kb.kb.getData('gtkOutput', 'db')
-        except:
-            return False
-        else:
-            return True
+        # column for Code
+        column = gtk.TreeViewColumn(_('Code'), gtk.CellRendererText(),text=3)
+        column.set_sort_column_id(3)
+        treeview.append_column(column)
+
+        # column for response message
+        column = gtk.TreeViewColumn(_('Message'), gtk.CellRendererText(),text=4)
+        column.set_sort_column_id(4)
+        column.set_resizable(True)
+        treeview.append_column(column)
+        
+        # column for content-length
+        column = gtk.TreeViewColumn(_('Content-Length'), gtk.CellRendererText(),text=5)
+        column.set_sort_column_id(5)
+        treeview.append_column(column)        
+        
+        # column for response time
+        column = gtk.TreeViewColumn(_('Time (ms)'), gtk.CellRendererText(),text=6)
+        column.set_sort_column_id(6)
+        treeview.append_column(column)
     
-    def _doComplexSearch( self, condition ):
+    def _showHelp(self,  widget):
         '''
-        
+        Show a little help for the window.
         '''
-        if not self._alreadyReported:
-            self._alreadyReported = True
-            msg = 'The search that you are trying to do is going to take a lot of time. Are you sure you want to do it?'
-            dlg = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, gtk.BUTTONS_OK|gtk.BUTTONS_CANCEL, msg)
-            dlg.set_title('Information')
-            dlg.run()
-            dlg.destroy()
+        dlg = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_INFO, gtk.BUTTONS_OK)
+        dlg.set_markup(MARKUP_HELP)
+        dlg.set_title( 'Search help' )
+        dlg.run()
+        dlg.destroy()
     
     def _findRequestResponse( self, widget):
-        if self._initDB():
-            condition = self._searchText.get_text()
-            if not self._searchText.validate( condition ):
-                # The text that was entered by the user is not a valid search!
-                pass
-            else:
-                if 'req.' in condition and 'res.' in condition:
-                    self._doComplexSearch( condition )
-                else:
-                    self._doSimpleSearch( condition )
+        try:
+            # Please see the 5000 below
+            searchResultObjects = self._dbHandler.searchByString( self._searchText.get_text(), result_limit=5001 )
+        except w3afException, w3:
+            self._reqResViewer.request.clearPanes()
+            self._reqResViewer.response.clearPanes()
+            self._reqResViewer.set_sensitive(False)
+            self._sw.set_sensitive(False)
+            self._lstore.clear()
+            self._showDialog(_('No results'), str(w3) )
         else:
-            self._showDialog('No results', 'The database engine has no rows at this moment. Please start a scan.' )
-    
+            # no results ?
+            if len( searchResultObjects ) == 0:
+                self._reqResViewer.request.clearPanes()
+                self._reqResViewer.response.clearPanes()
+                self._reqResViewer.set_sensitive(False)
+                self._sw.set_sensitive(False)
+                self._lstore.clear()
+                self._showDialog(_('No results'), _('The search you performed returned no results.') )
+                return
+            # Please see the 5001 above
+            elif len( searchResultObjects ) > 5000:
+                self._reqResViewer.request.clearPanes()
+                self._reqResViewer.response.clearPanes()
+                self._reqResViewer.set_sensitive(False)
+                self._sw.set_sensitive(False)
+                self._lstore.clear()
+                msg = _('The search you performed returned too many results (') + str(len(searchResultObjects)) + ').\n'
+                msg += _('Please refine your search and try again.')
+                self._showDialog('Too many results', msg )
+                return
+            else:
+                # show the results in the list view (when first row is selected that just triggers
+                # the req/resp filling.
+                self._sw.set_sensitive(True)
+                self._reqResViewer.set_sensitive(True)
+                self._showListView( searchResultObjects )
+                self._lstoreTreeview.set_cursor((0,))
+                return
+
     def _showDialog( self, title, msg, gtkLook=gtk.MESSAGE_INFO ):
         dlg = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtkLook, gtk.BUTTONS_OK, msg)
         dlg.set_title( title )
         dlg.run()
         dlg.destroy()            
-    
-    def _doSimpleSearch( self, condition ):
-        '''
-        Perform a search where only one (request of response) database is involved
-        '''
-        if 'req.' in condition:
-            toExec = 'resultList = [ req for req in self._db_req if %s ]' % condition
-        else:
-            toExec = 'resultList = [ res for res in self._db_res if %s ]' % condition
-        
-        try:
-            exec( toExec )
-        except:
-            self._showDialog('Error', 'Invalid search string, please try again.', gtkLook=gtk.MESSAGE_ERROR )
-        else:
-            self._resultList = resultList
-            self._condition = condition
-            
-            if len( resultList ) > 1:
-                self._showListView( resultList )
-            elif len( resultList ) == 1:
-                # I got only one response to the database query!
-                self._showReqRes( condition, resultList )
-            else:
-                self._showDialog('No results', 'The search you performed returned no results.' )
         
     def _viewInReqResViewer( self, widget ):
         '''
@@ -185,36 +222,21 @@ class httpLogTab(gtk.HPaned):
         itemNumber = path[0]
         
         # Now I have the item number in the lstore, the next step is to get the id of that item in the lstore
-        id = self._lstore[ itemNumber ][0]
-        self.showReqResById( id )
+        iid = self._lstore[ itemNumber ][0]
+        self.showReqResById( iid )
     
-    def showReqResById( self, id ):
+    def showReqResById( self, search_id ):
         '''
         This method should be called by other tabs when they want to show what request/response pair
         is related to the vulnerability.
         '''
-        try:
-            res = [ res for res in self._db_res if res.id == id ][0]
-            req = [ req for req in self._db_req if req.id == id ][0]
-        except Exception, e:
-            om.out.error('An exception was found while searching for the request with id: ' + str(id) + '. Exception: ' +str(e) )
+        search_result = self._dbHandler.searchById( search_id )
+        if len(search_result) == 1:
+            request, response = search_result[0]
+            self._reqResViewer.request.showObject( request )
+            self._reqResViewer.response.showObject( response )
         else:
-            self._reqPaned.show( req.method, req.uri, req.http_version, req.headers, req.data )
-            self._resPaned.show( res.http_version, res.code, res.msg, res.headers, res.body )
-        
-    def _showReqRes( self, condition, resultList ):
-        '''
-        Show the data in the requestPaned and responsePaned
-        '''
-        if 'req.' in condition:
-            req = resultList[0]
-            res = [ res for res in self._db_res if res.id == req.id ][0]
-        else:
-            res = resultList[0]
-            req = [ req for req in self._db_req if req.id == res.id ][0]
-        
-        self._reqPaned.show( req.method, req.uri, req.http_version, req.headers, req.data )
-        self._resPaned.show( res.http_version, res.code, res.msg, res.headers, res.body )
+            self._showDialog(_('Error'), _('The id ') + str(search_id) + _('is not inside the database.'))
         
     def _showListView( self, results ):
         '''
@@ -224,120 +246,33 @@ class httpLogTab(gtk.HPaned):
         self._lstore.clear()
         
         for item in results:
-            iter = self._lstore.append()
-            self._lstore.set(iter,
-                0, item.id,
-                1, item.uri)
-        self._vpan.set_position(300)
+            request, response = item
+            self._lstore.append( [response.getId(), request.getMethod(), request.getURI(), \
+                                                    response.getCode(), response.getMsg(), len(response.getBody()), response.getWaitTime()] )
+        
+        # Size search results
+        if len(results) < 10:
+            position = 13 + 48 * len(results)
+        else:
+            position = 13 + 120
+            
+        self._vpan.set_position(position)
         self._sw.show_all()
             
-class searchEntry(ValidatedEntry):
+class searchEntry(entries.ValidatedEntry):
     '''Class that inherits from validate entry in order to turn yellow if the text is not valid'''
     def __init__(self, value):
-        ValidatedEntry.__init__(self, value)
-        self.default_value = "id == 1"
+        self.default_value = "id = 1"
         self._match = None
+        self.rrh = reqResDBHandler()
+        entries.ValidatedEntry.__init__(self, value)
+        self.set_tooltip_markup(MARKUP_HELP)        
 
     def validate(self, text):
-        '''Redefinition of ValidatedEntry's method.
-
+        '''
+        Validates if the text matches the regular expression
+        
         @param text: the text to validate
         @return True if the text is ok.
-
-        Validates if the text matches the regular expression
         '''
-        ### WARNING !!!!
-        ### Remember that this regex controls what goes into a exec() function, so, THINK about what you are doing before allowing some characters
-        self._match = re.match('^(?:((?:req\\.(?:id|method|uri|http_version|headers|data)|res\\.(?:id|http_version|code|msg|headers|body))) (==|>|>=|<=|<|!=) ([\w\'\" /:\.]+)( (and|or) )?)*$', text )
-        ### WARNING !!!!
-        if self._match:
-            return True
-        else:
-            return False
-
-class requestResponsePaned:
-    def __init__( self ):
-        # The textview where a part of the req/res is showed
-        self._upTv = gtk.TextView()
-        self._upTv.set_border_width(5)
-        
-        # Scroll where the textView goes
-        sw1 = gtk.ScrolledWindow()
-        sw1.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw1.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        
-        # The textview where a part of the req/res is showed
-        self._downTv = gtk.TextView()
-        self._downTv.set_border_width(5)
-        
-        # Scroll where the textView goes
-        sw2 = gtk.ScrolledWindow()
-        sw2.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw2.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        
-        # Add everything to the scroll views
-        sw1.add(self._upTv)
-        sw2.add(self._downTv)
-        
-        # vertical pan (allows resize of req/res texts)
-        vpan = gtk.VPaned()
-        ### TODO: This should be centered
-        vpan.set_position( 200 )
-        vpan.pack1( sw1 )
-        vpan.pack2( sw2 )
-        vpan.show_all()
-        
-        self.add( vpan )
-        
-    def _clear( self, textView ):
-        '''
-        Clears a text view.
-        '''
-        buffer = textView.get_buffer()
-        start, end = buffer.get_bounds()
-        buffer.delete(start, end)
-        
-class requestPaned(gtk.HPaned, requestResponsePaned):
-    def __init__(self):
-        gtk.HPaned.__init__(self)
-        requestResponsePaned.__init__( self )
-        
-    def show( self, method, uri, version, headers, postData ):
-        '''
-        Show the data in the corresponding order in self._upTv and self._downTv
-        '''
-        # Clear previous results
-        self._clear( self._upTv )
-        self._clear( self._downTv )
-        
-        buffer = self._upTv.get_buffer()
-        iter = buffer.get_end_iter()
-        buffer.insert( iter, method + ' ' + uri + ' ' + 'HTTP/' + version + '\n')
-        buffer.insert( iter, headers )
-        
-        buffer = self._downTv.get_buffer()
-        iter = buffer.get_end_iter()
-        buffer.insert( iter, postData )
-    
-class responsePaned(gtk.HPaned, requestResponsePaned):
-    def __init__(self):
-        gtk.HPaned.__init__(self)
-        requestResponsePaned.__init__( self )
-        
-    def show( self, version, code, msg, headers, body ):
-        '''
-        Show the data in the corresponding order in self._upTv and self._downTv
-        '''
-        # Clear previous results
-        self._clear( self._upTv )
-        self._clear( self._downTv )
-
-        buffer = self._upTv.get_buffer()
-        iter = buffer.get_end_iter()
-        buffer.insert( iter, 'HTTP/' + version + ' ' + str(code) + ' ' + str(msg) + '\n')
-        buffer.insert( iter, headers )
-        
-        buffer = self._downTv.get_buffer()
-        iter = buffer.get_end_iter()
-        buffer.insert( iter, body )
-    
+        return self.rrh.validate( text )

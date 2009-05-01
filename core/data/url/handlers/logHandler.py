@@ -20,11 +20,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
+from __future__ import with_statement
 import urllib2
+import thread
+
 import core.controllers.outputManager as om
 import core.data.request.fuzzableRequest as fuzzableRequest
 import core.data.url.httpResponse as httpResponse
 import core.data.kb.knowledgeBase as kb
+import core.data.parsers.urlParser as urlParser
+from core.controllers.misc.number_generator import consecutive_number_generator
+
 
 class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.HTTPRedirectHandler):
     """
@@ -36,38 +42,27 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.H
     def __init__(self):
         pass
     
-    def _getCounter( self ):
+    def inc_counter( self, step=1 ):
         '''
-        @return: The next number to assign as the id for responses.
+        @return: The next number to use in the request/response ID.
         '''
-        c = kb.kb.getData('idHandler', 'counter')
-        if c == []:
-            kb.kb.save('idHandler', 'counter', 0 )
-            c = 0
+        return consecutive_number_generator.inc()
+            
+    def _get_counter( self ):
+        '''
+        @return: The current counter number to assign as the id for responses.
+        '''
+        return consecutive_number_generator.get()
 
-        c += 1
-        kb.kb.save('idHandler', 'counter', c)
-        return c
-    
     def http_error_default(self, req, fp, code, msg, hdrs):
         err = urllib2.HTTPError(req.get_full_url(), code, msg, hdrs, fp)
-        err.id = self._getCounter()
-        
-        # Also log errors to the output manager
-        # Create the response object
-        url = req.get_full_url()
-        body = fp.read()
-        id = err.id
-        res = httpResponse.httpResponse( code, body, hdrs, url, url, msg=msg, id=id)
-        self._logRequestResponse(req, res)
+        err.id = req.id
         raise err
-        
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         '''
         This was added for some special cases where the redirect handler cries a lot...
-        '''
-        
-        """
+
         Return a Request or None in response to a redirect.
 
         This is called by the http_error_30x methods when a
@@ -76,7 +71,7 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.H
         perform the redirect.  Otherwise, raise HTTPError if no-one
         else should try to handle this url.  Return None if you can't
         but another Handler might.
-        """
+        '''
         m = req.get_method()
         if (code in (301, 302, 303, 307) and m in ("GET", "HEAD")
         or code in (301, 302, 303) and m == "POST"):
@@ -90,13 +85,16 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.H
             newurl = newurl.replace(' ', '%20')
             if 'Content-length' in req.headers:
                 req.headers.pop('Content-length')
-            return urllib2.Request(newurl,
+            
+            new_request = urllib2.Request(newurl,
             headers=req.headers,
             origin_req_host=req.get_origin_req_host(),
             unverifiable=True)
+            
+            return new_request
         else:
             err = urllib2.HTTPError(req.get_full_url(), code, msg, headers, fp)
-            err.id = self._getCounter()
+            err.id = self.inc_counter()
             raise err
     
     old_http_error_302 = urllib2.HTTPRedirectHandler.http_error_302
@@ -105,12 +103,13 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.H
         '''
         This is a http_error_302 wrapper to add an id attr to loop errors.
         '''
+        id_for_error = self._get_counter()
         try:
             return self.old_http_error_302(req, fp, code, msg, headers)
         except urllib2.HTTPError, e:
             #om.out.debug('The remote web application generated a redirect loop when requesting: ' + \
             #e.geturl() )
-            e.id = self._getCounter()
+            e.id = id_for_error
             raise e
         
     http_error_301 = http_error_303 = http_error_307 = http_error_302 = mod_http_error_302
@@ -119,6 +118,9 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.H
         '''
         perform some ugly hacking of request headers and go on...
         '''
+        #
+        # FIXME: What if the user doesn't want to add these headers?
+        #
         if not request.has_header('Host'):
             request.add_unredirected_header('Host', request.host )
             
@@ -127,7 +129,7 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.H
         
         return request
 
-    def _logRequestResponse( self, request, response ):
+    def _log_request_response( self, request, response ):
         '''
         Send the request and the response to the output manager.
         '''
@@ -153,12 +155,12 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.H
             body = response.read()
             id = response.id
             res = httpResponse.httpResponse( code, body, hdrs, url, url, msg=msg, id=id)
-
         om.out.logHttp( fr, res )
     
     def http_response(self, request, response):
-        response.id = self._getCounter()
-        self._logRequestResponse( request, response )
+        response.id = self.inc_counter()
+        self._log_request_response( request, response )
+        request.id = response.id
         return response
 
     https_request = http_request

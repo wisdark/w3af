@@ -21,13 +21,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
+
 from core.controllers.misc.groupbyMinKey import groupbyMinKey
+
 
 class strangeHeaders(baseGrepPlugin):
     '''
@@ -38,21 +43,73 @@ class strangeHeaders(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
-        self._commonHeaders = self._getCommonHeaders()
+        self._common_headers = self._getCommonHeaders()
 
-    def _testResponse(self, request, response):
+    def grep(self, request, response):
+        '''
+        Plugin entry point.
         
-        for headerName in response.getHeaders().keys():
-            if headerName.upper() not in self._commonHeaders:
-                i = info.info()
-                i.setName('Strange header')
-                i.setURL( response.getURL() )
-                i.setId( response.id )
-                i.setDesc( 'The URL : ' +  i.getURL() + ' sent the Header: "' + headerName + '" with value: "' + response.getHeaders()[headerName] + '"' )
-                i['headerName'] = headerName
-                i['headerValue'] = response.getHeaders()[headerName]
-                kb.kb.append( self , 'strangeHeaders' , i )
-    
+        @return: None, all results are saved in the kb.
+        '''
+
+        # Check if the header names are common or not
+        for header_name in response.getHeaders().keys():
+            if header_name.upper() not in self._common_headers:
+                
+                # I check if the kb already has a info object with this code:
+                strange_header_infos = kb.kb.getData('strangeHeaders', 'strangeHeaders')
+                
+                corresponding_info = None
+                for info_obj in strange_header_infos:
+                    if info_obj['header_name'] == header_name:
+                        corresponding_info = info_obj
+                        break
+                
+                if corresponding_info:
+                    # Work with the "old" info object:
+                    id_list = corresponding_info.getId()
+                    id_list.append( response.id )
+                    corresponding_info.setId( id_list )
+                else:
+                    # Create a new info object from scratch and save it to the kb:
+                    i = info.info()
+                    i.setName('Strange header')
+                    i.setURL( response.getURL() )
+                    i.setId( response.id )
+                    msg = 'The remote web server sent the HTTP header: "' + header_name
+                    msg += '" with value: "' + response.getHeaders()[header_name] + '".'
+                    i.setDesc( msg )
+                    i['header_name'] = header_name
+                    hvalue = response.getHeaders()[header_name]
+                    i['header_value'] = hvalue
+                    i.addToHighlight( hvalue, header_name )
+                    kb.kb.append( self , 'strangeHeaders' , i )
+
+
+        # Now check for protocol anomalies
+        self._content_location_not_300(request, response)
+
+    def _content_location_not_300( self, request, response):
+        '''
+        Check if the response has a content-location header and the response code
+        is not in the 300 range.
+        
+        @return: None, all results are saved in the kb.
+        '''
+        if 'content-location' in response.getLowerCaseHeaders() \
+        and response.getCode() not in xrange(300,310):
+            i = info.info()
+            i.setName('Content-Location HTTP header anomaly')
+            i.setURL( response.getURL() )
+            i.setId( response.id )
+            msg = 'The URL: "' +  i.getURL() + '" sent the HTTP header: "content-location"' 
+            msg += ' with value: "' + response.getLowerCaseHeaders()['content-location']
+            msg += '" in an HTTP response with code ' + str(response.getCode()) + ' which is'
+            msg += ' a violation to the RFC.'
+            i.setDesc( msg )
+            i.addToHighlight( str(response.getCode()) )
+            kb.kb.append( self , 'anomaly' , i )
+
     def setOptions( self, OptionList ):
         pass
     
@@ -69,20 +126,20 @@ class strangeHeaders(baseGrepPlugin):
         '''
         headers = kb.kb.getData( 'strangeHeaders', 'strangeHeaders' )
         # This is how I saved the data:
-        #i['headerName'] = headerName
-        #i['headerValue'] = response.getHeaders()[headerName]
+        #i['header_name'] = header_name
+        #i['header_value'] = response.getHeaders()[header_name]
         
         # Group correctly
         tmp = []
         for i in headers:
-            tmp.append( (i['headerName'], i.getURL() ) )
+            tmp.append( (i['header_name'], i.getURL() ) )
         
         # And don't print duplicates
         tmp = list(set(tmp))
         
         resDict, itemIndex = groupbyMinKey( tmp )
         if itemIndex == 0:
-            # Grouped by headerName
+            # Grouped by header_name
             msg = 'The header: "%s" was sent by these URLs:'
         else:
             # Grouped by URL
@@ -98,29 +155,34 @@ class strangeHeaders(baseGrepPlugin):
         ### TODO: verify if I need to add more values here
         # Remember that this headers are only the ones SENT BY THE SERVER TO THE CLIENT
         # Headers must be uppercase in order to compare them
-        headers.append("SET-COOKIE")    
-        headers.append("SERVER")
-        headers.append("CONNECTION")
-        headers.append("DATE")
-        headers.append("LAST-MODIFIED")
-        headers.append("ETAG")
         headers.append("ACCEPT-RANGES")
+        headers.append("AGE")
+        headers.append("ALLOW")
+        headers.append("CONNECTION")
         headers.append("CONTENT-LENGTH")
         headers.append("CONTENT-TYPE")
-        headers.append("X-POWERED-BY")
-        headers.append("EXPIRES")
-        headers.append("CACHE-CONTROL")
-        headers.append("PRAGMA")
-        headers.append("PROXY-CONNECTION")
-        headers.append("VIA")
-        headers.append("KEEP-ALIVE")
-        headers.append("ALLOW")
-        headers.append("TRANSFER-ENCODING")
         headers.append("CONTENT-LANGUAGE")
-        headers.append("VARY")
+        headers.append("CONTENT-LOCATION")
+        headers.append("CACHE-CONTROL")
+        headers.append("DATE")
+        headers.append("EXPIRES")
+        headers.append("ETAG")
+        headers.append("KEEP-ALIVE")
+        headers.append("LAST-MODIFIED")
         headers.append("LOCATION")
         headers.append("PUBLIC")
-        headers.append("AGE")
+        headers.append("PRAGMA")
+        headers.append("PROXY-CONNECTION")
+        headers.append("SET-COOKIE")    
+        headers.append("SERVER")
+        headers.append("TRANSFER-ENCODING")
+        headers.append("VIA")        
+        headers.append("VARY")
+        headers.append("WWW-AUTHENTICATE")
+        headers.append("X-POWERED-BY")
+        headers.append("X-ASPNET-VERSION")
+        headers.append("X-CACHE")
+        headers.append("X-PAD")
         return headers
 
     def getPluginDeps( self ):

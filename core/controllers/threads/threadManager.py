@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import core.controllers.outputManager as om
 from core.controllers.threads.threadpool import *
 import core.data.kb.config as cf
+import time
+
 
 class threadManager:
     '''
@@ -73,7 +75,6 @@ class threadManager:
                 threadObj.stop()
                 om.out.debug('Calling join on daemon thread: ' + str(threadObj) )
                 threadObj.join(self._waitForJoin)
-                self._threads.remove( threadObj )
                 
     def stopAllDaemons( self ):
         om.out.debug('Calling join on all daemon threads')

@@ -25,6 +25,7 @@ from core.controllers.basePlugin.basePlugin import basePlugin
 import inspect
 # severity constants for vuln messages
 import core.data.constants.severity as severity
+from core.controllers.w3afException import w3afException
 
 class baseOutputPlugin(basePlugin):
     '''
@@ -44,7 +45,24 @@ class baseOutputPlugin(basePlugin):
         basePlugin.__init__( self )
         self.verbosity = 0
         
-    def debug(self, message ):
+    def logEnabledPlugins(self,  enabledPluginsDict,  pluginOptionsDict):
+        '''
+        This method is called from the output managerobject. 
+        This method should take an action for the enabled plugins 
+        and their configuration.
+        
+        @parameter enabledPluginsDict: As defined in the w3afCore,
+            # A dict with plugin types as keys and a list of plugin names as values
+            self._strPlugins = {'audit':[],'grep':[],'bruteforce':[],'discovery':[],\
+            'evasion':[], 'mangle':[], 'output':[]}
+        
+        @parameter pluginOptionsDict: As defined in the w3afCore,
+            self._pluginsOptions = {'audit':{},'grep':{},'bruteforce':{},'discovery':{},\
+            'evasion':{}, 'mangle':{}, 'output':{}, 'attack':{}}
+        '''
+        raise w3afException('Plugin is not implementing required method logEnabledPlugins' )
+        
+    def debug(self, message, newLine = True ):
         '''
         This method is called from the output managerobject. The OM object was called from a plugin
         or from the framework. This method should take an action for debug messages.
@@ -53,7 +71,7 @@ class baseOutputPlugin(basePlugin):
         '''
         raise w3afException('Plugin is not implementing required method debug' )
 
-    def information(self, message, verbose):
+    def information(self, message, newLine = True):
         '''
         This method is called from the output managerobject. The OM object was called from a plugin
         or from the framework. This method should take an action for information messages.
@@ -62,7 +80,7 @@ class baseOutputPlugin(basePlugin):
         '''
         raise w3afException('Plugin is not implementing required method information' )
 
-    def error(self, message, verbose):
+    def error(self, message, newLine = True):
         '''
         This method is called from the output managerobject. The OM object was called from a plugin
         or from the framework. This method should take an action for error messages.
@@ -80,7 +98,7 @@ class baseOutputPlugin(basePlugin):
         '''
         raise w3afException('Plugin is not implementing required method vulnerability' )
 
-    def console(self, message ):
+    def console(self, message, newLine = True ):
         '''
         This method is called from the output managerobject. The OM object was called from a plugin
         or from the framework. This method should take an action for vulnerability messages.

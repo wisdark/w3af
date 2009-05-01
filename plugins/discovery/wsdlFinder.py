@@ -21,14 +21,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
-import core.data.kb.knowledgeBase as kb
+from core.controllers.w3afException import w3afException
 import core.data.parsers.urlParser as urlParser
-import core.data.parsers.wsdlParser
+
 
 class wsdlFinder(baseDiscoveryPlugin):
     '''
@@ -39,58 +40,43 @@ class wsdlFinder(baseDiscoveryPlugin):
 
     def __init__(self):
         baseDiscoveryPlugin.__init__(self)
+        
+        # Internal variables
         self._tested = []
-    
+        self._fuzzableRequests = []
+        
     def discover(self, fuzzableRequest ):
         '''
         If url not in _tested, append a ?wsdl and check the response.
         
         @parameter fuzzableRequest: A fuzzableRequest instance that contains (among other things) the URL to test.
         '''
-        self._fuzzableRequests = []
-        self.is404 = kb.kb.getData( 'error404page', '404' )
         url = urlParser.uri2url( fuzzableRequest.getURL() )
         if url not in self._tested:
             self._tested.append( url )
-            for wsdl in self._getWsdl():
-                targs = (url , wsdl )
-                self._tm.startFunction( target=self._verifyWsdl, args=targs, ownerObj=self )
+            
+            # perform the requests
+            for wsdl_parameter in self._get_WSDL():
+                url_to_request = url + wsdl_parameter
+                try:
+                    response = self._urlOpener.GET( url_to_request, useCache=True )
+                except w3afException:
+                    om.out.debug('Failed to request the WSDL file: ' + url_to_request)
+                else:
+                    # The response is analyzed by the wsdlGreper plugin
+                    pass
         self._tm.join( self )
+        
         return self._fuzzableRequests
 
-    def _verifyWsdl( self, url, wsdl ):
-        url2test = url + wsdl
-        response = self._urlOpener.GET( url2test, useCache=True )
-        
-        if not self.is404( response ):
-            isWsdl = False
-            for stringsInsideWsdl in self._getStringsWsdl():
-                if response.getBody().count(stringsInsideWsdl):
-                    isWsdl = True
-                    break
-                
-            if isWsdl:
-                om.out.information('wsdlFinder plugin found a web service definition in: ' + url2test )
-                self._fuzzableRequests.extend( self._createFuzzableRequests( response ) )
-                kb.kb.append( self, 'wsdl', url2test )
-    
-    def _getWsdl( self ):
+    def _get_WSDL( self ):
+        '''
+        @return: A list of parameters that are used to request the WSDL
+        '''
         res = []
         
         res.append( '?wsdl' )
         res.append( '?WSDL' )
-        
-        return res
-        
-    def _getStringsWsdl( self ):
-        res = []
-        
-        res.append( 'xs:int' )
-        res.append( 'targetNamespace=' )
-        res.append( 'soap:body' )
-        res.append( '/s:sequence' )
-        res.append( 'wsdl:binding' )
-        res.append( 'soapAction=' )
         
         return res
         
@@ -116,7 +102,7 @@ class wsdlFinder(baseDiscoveryPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return []
+        return ['grep.wsdlGreper']
     
     def getLongDesc( self ):
         '''
@@ -124,5 +110,5 @@ class wsdlFinder(baseDiscoveryPlugin):
         '''
         return '''
         This plugin finds new web service descriptions and other web service related files
-        by appending "?WSDL" to all URL's and checking the response.9
+        by appending "?WSDL" to all URL's and checking the response.
         '''

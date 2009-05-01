@@ -21,20 +21,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
-from core.controllers.w3afException import w3afException
+
 from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
+from core.controllers.w3afException import w3afException
+
 import core.data.parsers.urlParser as urlParser
-from core.data.fuzzer.fuzzer import *
+from core.data.fuzzer.fuzzer import createMutants
 import core.data.kb.knowledgeBase as kb
 import re
 
-# The pywordnet includes
-from extlib.pywordnet.wordnet import *
-from extlib.pywordnet.wntools import *
+# The wordnet includes!
+from nltk.corpus import wordnet as wn
 
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 
 class wordnet(baseDiscoveryPlugin):
     '''
@@ -43,49 +45,39 @@ class wordnet(baseDiscoveryPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    '''
-    Example:
-    
-    input:
-    http://a/index.asp?color=blue
-    http://a/index.asp?color=red
-    
-    toTest 4 existance (returned by google set):
-    http://a/index.asp?color=black
-    http://a/index.asp?color=white
-    ...
-    ...
-    '''
-
     def __init__(self):
         baseDiscoveryPlugin.__init__(self)
         
-        # User variables
-        self._wnResults = 2     
+        # User defined parameters
+        self._wordnet_results = 2     
         
     def discover(self, fuzzableRequest ):
         '''
-        @parameter fuzzableRequest: A fuzzableRequest instance that contains (among other things) the URL to test.
+        @parameter fuzzableRequest: A fuzzableRequest instance that contains
+                                                    (among other things) the URL to test.
         '''
         self._fuzzableRequests = []
         self.is404 = kb.kb.getData( 'error404page', '404' )
         
-        self._originalResponse = self._sendMutant( fuzzableRequest, analyze=False )
+        self._original_response = self._sendMutant( fuzzableRequest, analyze=False )
         
-        for mutant in self._generateMutants( fuzzableRequest ):
+        for mutant in self._generate_mutants( fuzzableRequest ):
             targs = ( mutant, )
-            self._tm.startFunction( target=self._verify, args=targs, ownerObj=self )
+            self._tm.startFunction( target=self._check_existance, args=targs, ownerObj=self )
         self._tm.join( self )
         return self._fuzzableRequests
     
-    def _verify( self, mutant ):
-        
+    def _check_existance( self, mutant ):
+        '''
+        Actually check if the mutated URL exists.
+        @return: None, all important data is saved to self._fuzzableRequests
+        '''
         response = self._sendMutant( mutant, analyze=False )
-        if not self.is404( response ) and self._originalResponse.getBody() != response.getBody() :
+        if not self.is404( response ) and self._original_response.getBody() != response.getBody() :
             fuzzReqs = self._createFuzzableRequests( response )
             self._fuzzableRequests.extend( fuzzReqs )
     
-    def _generateMutants( self, fuzzableRequest ):
+    def _generate_mutants( self, fuzzableRequest ):
         '''
         Based on the fuzzable request, i'll search the wordnet database and generated
         A LOT of mutants.
@@ -93,11 +85,11 @@ class wordnet(baseDiscoveryPlugin):
         @return: A list of mutants.
         '''
         result = []
-        result.extend( self._generateFname( fuzzableRequest ) )
-        result.extend( self._generateQs( fuzzableRequest ) )
+        result.extend( self._generate_fname( fuzzableRequest ) )
+        result.extend( self._generate_qs( fuzzableRequest ) )
         return result
     
-    def _generateQs( self, fuzzableRequest ):
+    def _generate_qs( self, fuzzableRequest ):
         '''
         Check the URL query string.
         @return: A list of mutants.
@@ -105,159 +97,122 @@ class wordnet(baseDiscoveryPlugin):
         # The result
         result = []
 
-        qs = urlParser.getQueryString( fuzzableRequest.getURI() )
-        for key in qs.keys():
-            wordnetResult = self._searchWN( qs[key] )
-            result.extend( self._generateURLFromResult( key, wordnetResult, fuzzableRequest ) )
+        query_string = urlParser.getQueryString( fuzzableRequest.getURI() )
+        for parameter_name in query_string:
+            # this for loop was added to address the repeated parameter name issue
+            for element_index in xrange(len(query_string[parameter_name])):
+                wordnet_result = self._search_wn( query_string[parameter_name][element_index] )
+                result.extend( self._generate_URL_from_result( parameter_name, element_index, wordnet_result, fuzzableRequest ) )
         return result
 
-    def _addWords( self, word ):
-        '''
-        Fills a list with all the wordnet word types of a word and returns it.
-        '''
-        wnWordList = []
-        try:
-            wnWordList.append( N[ word ] )
-        except:
-            pass
-            
-        try:
-            wnWordList.append( ADJ[ word ] )
-        except:
-            pass
-            
-        try:
-            wnWordList.append( V[ word ] )
-        except:
-            pass
-            
-        try:
-            wnWordList.append( ADV[ word ] )
-        except:
-            pass
-        
-        return wnWordList
-
-    def _searchWN( self, word ):
+    def _search_wn( self, word ):
         '''
         Search the wordnet for this word, based on user options.
         @return: A list of related words.
         '''
-        results = {'syno':[],'anto':[],'hyper':[],'hypo':[],'mero':[],'holo':[]}
+        result = []
         
-        wnWordList = self._addWords( word )
+        # Now the magic that gets me a lot of results:
+        #
+        #>>> wn.synsets('blue')[0].hypernyms()
+        #[Synset('chromatic_color.n.01')]
+        #>>> wn.synsets('blue')[0].hypernyms()[0].hyponyms()
+        #[  Synset('orange.n.02'), Synset('brown.n.01'), Synset('green.n.01'), 
+        #   Synset('salmon.n.04'), Synset('red.n.01'), Synset('blue.n.01'), Synset('blond.n.02'), 
+        #   Synset('purple.n.01'), Synset('olive.n.05'), Synset('yellow.n.01'), Synset('pink.n.01'), 
+        #   Synset('pastel.n.01'), Synset('complementary_color.n.01')]
+        #>>> 
+        try:
+            result.extend( wn.synsets(word)[0].hypernyms()[0].hyponyms() )
+        except:
+            pass
         
-        for word in wnWordList:
-            for sense in word:
-                
-                # the biggest try/except in the history of w3af ! :P
-                try:
-                    
-                    for pointer in sense.getPointers( ANTONYM ):
-                        if not isinstance( pointer.target(), Synset ):
-                            results['anto'].append( pointer.target().getWord() )
-                        else:
-                            for i in pointer.target():
-                                results['anto'].append( i.getWord() )
-                
-                    for pointer in sense.getPointers( HYPERNYM ):
-                        if not isinstance( pointer.target(), Synset ):
-                            results['hyper'].append( pointer.target().getWord() )
-                        else:
-                            for i in pointer.target():
-                                results['hyper'].append( i.getWord() )
-                    
-                    for pointer in sense.getPointers( HYPONYM ):
-                        if not isinstance( pointer.target(), Synset ):
-                            results['hypo'].append( pointer.target().getWord() )
-                        else:
-                            for i in pointer.target():
-                                results['hypo'].append( i.getWord() )
-                    
-                    for pointer in sense.getPointers( MEMBER_MERONYM ):
-                        if not isinstance( pointer.target(), Synset ):
-                            results['mero'].append( pointer.target().getWord() )
-                        else:
-                            for i in pointer.target():
-                                results['mero'].append( i.getWord() )
-                    
-                    for pointer in sense.getPointers( MEMBER_HOLONYM ):
-                        if not isinstance( pointer.target(), Synset ):
-                            results['holo'].append( pointer.target().getWord() )
-                        else:
-                            for i in pointer.target():
-                                results['holo'].append( i.getWord() )
-                
-                except:
-                    pass
+        synset_list = wn.synsets( word )
         
-        # Now I have a results map filled up with a lot of words.
+        for synset in synset_list:
+            
+            # first I add the synsec as it is:
+            result.append( synset )
+            
+            # Now some variations...
+            result.extend( synset.hypernyms() )
+            result.extend( synset.hyponyms() )
+            result.extend( synset.member_holonyms() )
+            result.extend( synset.lemmas[0].antonyms() )
+
+        # Now I have a results list filled up with a lot of words, the problem is that
+        # this words are really Synset objects, so I'll transform them to strings:
+        result = [ i.name.split('.')[0] for i in result]
+        
+        # Another problem with Synsets is that the name is "underscore separated"
+        # so, for example:
+        # "big dog" is "big_dog"
+        result = [ i.replace('_', ' ') for i in result]
+        
+        # Now I make a "uniq"
+        result = list(set(result))
+        if word in result: result.remove(word)
+        
         # The next step is to order each list by popularity, so I only send to the web
         # the most common words, not the strange and unused words.
-        results = self._popularityContest( results )
+        result = self._popularity_contest( result )
         
-        resultList = []
-        for key in results:
-            strList = self._wnWordsToStr( results[key][: self._wnResults ] )
-            resultList.extend( strList )
-            
-        return resultList
+        # left here for debugging!
+        #print word, result
+        
+        return result
     
-    def _popularityContest( self, results ):
+    def _popularity_contest( self, result ):
         '''
         @parameter results: The result map of the wordnet search.
         @return: The same result map, but each item is ordered by popularity
         '''
-        def sortFunction( x, y ):
-            return cmp( len( x ) , len( y ) )
+        def sort_function( i, j ):
+            '''
+            Compare the lengths of the objects.
+            '''
+            return cmp( len( i ) , len( j ) )
         
-        for key in results:
-            wordList = results[key]
-            wordList.sort( sortFunction )
-            results[key] = wordList
+        result.sort( sort_function )
             
-        return results
+        return result
     
-    def _wnWordsToStr( self, wnWordList ):
-        tmp = []
-        for i in wnWordList:
-            tmp.append( re.sub('\(.\.\)','', str(i) ) )
-                    
-        results = [ x for x in tmp if not x.count( ' ' ) ]
-        results = list( set( results ) )
-        return results
-    
-    def _generateFname( self, fuzzableRequest ):
+    def _generate_fname( self, fuzzableRequest ):
         '''
         Check the URL filenames
         @return: A list mutants.
         '''
         url = fuzzableRequest.getURL()
-        fname = self._getFilename( url )
-        dp = urlParser.getDomainPath( url )
+        fname = self._get_filename( url )
         
-        wordnetResult = self._searchWN( fname )
-        result = self._generateURLFromResult( None, wordnetResult, fuzzableRequest )
+        wordnet_result = self._search_wn( fname )
+        result = self._generate_URL_from_result( None, None, wordnet_result, fuzzableRequest )
                 
         return result
     
-    def _getFilename( self, url ):
+    def _get_filename( self, url ):
         '''
         @return: The filename, without the extension
         '''
         fname = urlParser.getFileName( url )
-        splittedFname = fname.split('.')
+        splitted_fname = fname.split('.')
         name = ''
-        if len(splittedFname) != 0:
-            name = splittedFname[0]
+        if len(splitted_fname) != 0:
+            name = splitted_fname[0]
         return name
             
-    def _generateURLFromResult( self, analyzedVariable, resultSet, fuzzableRequest ):
+    def _generate_URL_from_result( self, analyzed_variable, element_index, result_set, fuzzableRequest ):
         '''
         Based on the result, create the new URLs to test.
+        
+        @parameter analyzed_variable: The parameter name that is being analyzed
+        @parameter element_index: 0 in most cases, >0 if we have repeated parameter names
+        @parameter result_set: The set of results that wordnet gave use
+        @parameter fuzzableRequest: The fuzzable request that we got as input in the first place.
+        
         @return: An URL list.
         '''
-        if analyzedVariable == None:
+        if analyzed_variable == None:
             # The URL was analyzed
             url = fuzzableRequest.getURL()
             fname = urlParser.getFileName( url )
@@ -266,24 +221,25 @@ class wordnet(baseDiscoveryPlugin):
             # The result
             result = []
             
-            splittedFname = fname.split('.')
-            if len(splittedFname) == 2:
-                name = splittedFname[0]
-                extension = splittedFname[1]
+            splitted_fname = fname.split('.')
+            if len(splitted_fname) == 2:
+                name = splitted_fname[0]
+                extension = splitted_fname[1]
             else:
-                name = splittedFname[0]
+                name = '.'.join(splitted_fname[:-1])
                 extension = 'html'
             
-            for setItem in resultSet:
-                newFname = url.replace( name, setItem )
+            for set_item in result_set:
+                new_fname = fname.replace( name, set_item )
                 frCopy = fuzzableRequest.copy()
-                frCopy.setURL( urlParser.urlJoin( dp, newFname ) )
+                frCopy.setURL( urlParser.urlJoin( dp, new_fname ) )
                 result.append( frCopy )
                 
             return result
             
         else:
-            mutants = createMutants( fuzzableRequest , resultSet, fuzzableParamList=[analyzedVariable,] )
+            mutants = createMutants( fuzzableRequest , result_set, \
+                                                    fuzzableParamList=[analyzed_variable,] )
             return mutants
         
     def getOptions( self ):
@@ -291,7 +247,7 @@ class wordnet(baseDiscoveryPlugin):
         @return: A list of option objects for this plugin.
         '''
         d1 = 'Only use the first wnResults (wordnet results) from each category.'
-        o1 = option('wnResults', self._wnResults, d1, 'integer')
+        o1 = option('wnResults', self._wordnet_results, d1, 'integer')
         
         ol = optionList()
         ol.add(o1)
@@ -319,7 +275,7 @@ class wordnet(baseDiscoveryPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin finds new URL's using wordnet.
+        This plugin finds new URL's using wn.
         
         An example is the best way to explain what this plugin does, let's suppose that the input
         for this plugin is:
@@ -332,5 +288,5 @@ class wordnet(baseDiscoveryPlugin):
         
         If the response for those URL's is not a 404 error, and has not the same body content, then we have 
         found a new URI. The wordnet database is bundled with w3af, more information about wordnet can be
-        found at : http://wordnet.princeton.edu/
+        found at : http://wn.princeton.edu/
         '''

@@ -5,10 +5,10 @@ output console,textFile
 output
 output config textFile
 set fileName output-w3af.txt
-set verbosity 10
+set verbose True
 back
 output config console
-set verbosity 0
+set verbose False
 back
 discovery webSpider,allowedMethods
 
@@ -19,11 +19,11 @@ back
 audit sqli
 back
 target
-set target http://127.0.0.1/w3af/wmlParser/test-forms2.wml
+set target http://localhost/w3af/core/wml_parser/index.html
 back
 start
 
-assert len(kb.kb.getData('urls','urlList')) == 7
+assert len(kb.kb.getData('urls','urlList')) >= 7
 assert len(kb.kb.getData('sqli','sqli')) == 1
 
 exit

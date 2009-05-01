@@ -22,7 +22,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import os,sys
 from core.controllers.misc.factory import factory
-from core.controllers.misc.parseOptions import parseOptions
 # severity constants for vuln messages
 import core.data.constants.severity as severity
 
@@ -36,6 +35,7 @@ class outputManager:
     
     def __init__(self):
         self._outputPluginList = []
+        self._outputPlugins = []
         self._pluginsOptions = {}
         self._echo = True
 
@@ -71,6 +71,22 @@ class outputManager:
     def endOutputPlugins( self ):
         for oPlugin in self._outputPluginList:
             oPlugin.end()
+            
+    def logEnabledPlugins(self,  enabledPluginsDict,  pluginOptionsDict):
+        '''
+        This method logs to the output plugins the enabled plugins and their configuration.
+        
+        @parameter enabledPluginsDict: As defined in the w3afCore,
+            # A dict with plugin types as keys and a list of plugin names as values
+            self._strPlugins = {'audit':[],'grep':[],'bruteforce':[],'discovery':[],\
+            'evasion':[], 'mangle':[], 'output':[]}
+        
+        @parameter pluginOptionsDict: As defined in the w3afCore,
+            self._pluginsOptions = {'audit':{},'grep':{},'bruteforce':{},'discovery':{},\
+            'evasion':{}, 'mangle':{}, 'output':{}, 'attack':{}}
+        '''
+        for oPlugin in self._outputPluginList:
+          oPlugin.logEnabledPlugins(enabledPluginsDict, pluginOptionsDict)
     
     def debug(self, message, newLine = True ):
         '''
@@ -80,11 +96,12 @@ class outputManager:
         '''
         if self._echo:
             try:
-                message = unicode( message, errors='replace')
+                message = unicode( message, 'utf-8', errors='replace').encode('utf-8')
             except:
                 pass
-            for oPlugin in self._outputPluginList:
-                oPlugin.debug( message, newLine )
+            else:
+                for oPlugin in self._outputPluginList:
+                    oPlugin.debug( message, newLine )
     
     def information(self, message, newLine = True ):
         '''
@@ -94,11 +111,12 @@ class outputManager:
         '''
         if self._echo:
             try:
-                message = unicode( message, errors='replace')
+                message = unicode( message, 'utf-8', errors='replace').encode('utf-8')
             except:
                 pass
-            for oPlugin in self._outputPluginList:
-                oPlugin.information( message, newLine )
+            else:
+                for oPlugin in self._outputPluginList:
+                    oPlugin.information( message, newLine )
             
     def error(self, message, newLine = True ):
         '''
@@ -108,11 +126,12 @@ class outputManager:
         '''
         if self._echo:
             try:
-                message = unicode( message, errors='replace')
+                message = unicode( message, 'utf-8', errors='replace').encode('utf-8')
             except:
                 pass
-            for oPlugin in self._outputPluginList:
-                oPlugin.error( message, newLine )
+            else:
+                for oPlugin in self._outputPluginList:
+                    oPlugin.error( message, newLine )
 
     def logHttp( self, request, response ):
         '''
@@ -132,11 +151,12 @@ class outputManager:
         '''
         if self._echo:
             try:
-                message = unicode( message, errors='replace')
+                message = unicode( message, 'utf-8', errors='replace').encode('utf-8')
             except:
                 pass
-            for oPlugin in self._outputPluginList:
-                oPlugin.vulnerability( message, newLine, severity=severity )
+            else:
+                for oPlugin in self._outputPluginList:
+                    oPlugin.vulnerability( message, newLine, severity=severity )
 
     def console( self, message, newLine = True ):
         '''
@@ -144,11 +164,12 @@ class outputManager:
         '''
         if self._echo:
             try:
-                message = unicode( message, errors='replace')
+                message = unicode( message, 'utf-8', errors='replace').encode('utf-8')
             except:
                 pass
-            for oPlugin in self._outputPluginList:
-                oPlugin.console( message, newLine )
+            else:
+                for oPlugin in self._outputPluginList:
+                    oPlugin.console( message, newLine )
     
     def echo( self, onOff ):
         '''
@@ -156,19 +177,22 @@ class outputManager:
         '''
         self._echo = onOff
 
-    def setOutputPlugins( self, OutputPlugins ):
+    def setOutputPlugins( self, outputPlugins ):
         '''
-        @parameter OutputPlugins: A list with the names of Output Plugins that will be used.
+        @parameter outputPlugins: A list with the names of Output Plugins that will be used.
         @return: No value is returned.
         '''     
         self._outputPluginList = []
-        self._outputPlugins = OutputPlugins
+        self._outputPlugins = outputPlugins
         
         for pluginName in self._outputPlugins:
             out._addOutputPlugin( pluginName )  
         
         out.debug('Exiting setOutputPlugins()' )
-        
+    
+    def getOutputPlugins(self):
+        return self._outputPlugins
+    
     def setPluginOptions(self, pluginName, PluginsOptions ):
         '''
         @parameter PluginsOptions: A tuple with a string and a dictionary with the options for a plugin. For example:\
@@ -176,7 +200,6 @@ class outputManager:
             
         @return: No value is returned.
         '''
-        pluginName, PluginsOptions = parseOptions( pluginName, PluginsOptions )
         self._pluginsOptions[pluginName] = PluginsOptions
     
     def getMessageCache(self):

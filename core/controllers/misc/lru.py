@@ -46,12 +46,15 @@ class LRU:
         self.last = None
         for key, value in pairs:
             self[key] = value
+            
     def __contains__(self, obj):
         return obj in self.d
+        
     def __getitem__(self, obj):
-        a = self.d[obj].me
-        self[a[0]] = a[1]
-        return a[1]
+        item = self.d[obj].me
+        self[item[0]] = item[1]
+        return item[1]
+        
     def __setitem__(self, obj, val):
         if obj in self.d:
             del self[obj]
@@ -67,12 +70,13 @@ class LRU:
                 self.first = None
                 self.last = None
                 return
-            a = self.first
-            a.next.prev = None
-            self.first = a.next
-            a.next = None
-            del self.d[a.me[0]]
-            del a
+            item = self.first
+            item.next.prev = None
+            self.first = item.next
+            item.next = None
+            del self.d[item.me[0]]
+            del item
+        
     def __delitem__(self, obj):
         nobj = self.d[obj]
         if nobj.prev:
@@ -84,44 +88,55 @@ class LRU:
         else:
             self.last = nobj.prev
         del self.d[obj]
+        
     def __iter__(self):
         cur = self.first
         while cur != None:
             cur2 = cur.next
             yield cur.me[1]
             cur = cur2
+    
     def iteritems(self):
         cur = self.first
         while cur != None:
             cur2 = cur.next
             yield cur.me
             cur = cur2
+    
     def iterkeys(self):
         return iter(self.d)
+    
     def itervalues(self):
-        for i,j in self.iteritems():
+        for i, j in self.iteritems():
             yield j
+    
     def keys(self):
         return self.d.keys()
+        
+    def __len__(self):
+        return len(self.d)
+        
+    def values(self):
+        return [i.me[1] for i in self.d.values()]
 
 def main(): 
-    a = LRU(4)
-    a['1']=1
-    a['2']=1
-    a['3']=1
-    a['4']=1
+    lruTest = LRU(4)
+    lruTest['1'] = 1
+    lruTest['2'] = 1
+    lruTest['3'] = 1
+    lruTest['4'] = 1
     print 'Original:'
-    for i in a.iteritems():
+    for i in lruTest.iteritems():
         print i
     
-    a['5']=1
+    lruTest['5'] = 1
     print 'Agrego 5, se va 1:'
-    for i in a.iteritems():
+    for i in lruTest.iteritems():
         print i
     
     print 'El dos paso a estar en el primer puesto para irse. Pero si le asigno algo a 2...'
-    a['2']=1
-    for i in a.iteritems():
+    lruTest['2'] = 1
+    for i in lruTest.iteritems():
         print i
     print 'Paso de nuevo al ultimo puesto para irse.'
     

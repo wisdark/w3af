@@ -23,16 +23,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import urlOpenerSettings
 import core.controllers.outputManager as om
 import core.data.url.timeAnalysis as timeAnalysis
-from core.controllers.w3afException import w3afException
-from core.controllers.threads.threadManager import threadManager as tm
+from core.controllers.w3afException import *
+from core.controllers.threads.threadManager import threadManagerObj as thread_manager
 from core.data.parsers.urlParser import *
 from core.data.constants.httpConstants import *
 
 import core.data.parsers.urlParser as urlParser
+from core.data.parsers.httpRequestParser import httpRequestParser
 
 from core.data.request.frFactory import createFuzzableRequestRaw
 
 from core.data.url.httpResponse import httpResponse as httpResponse
+from core.data.url.handlers.localCache import CachedResponse
 from core.controllers.misc.lru import LRU
 
 # For subclassing requests and other things
@@ -41,15 +43,22 @@ import urllib
 
 import time
 import os
-from core.controllers.misc.homeDir import getHomeDir
+from core.controllers.misc.homeDir import get_home_dir
+from core.controllers.misc.memoryUsage import dumpMemoryUsage
 
 # for better debugging of handlers
 import traceback
 
 import core.data.kb.config as cf
+import core.data.kb.knowledgeBase as kb
+
+# This is a singleton that's used for assigning request IDs
+from core.controllers.misc.number_generator import consecutive_number_generator
+
 
 class sizeExceeded( Exception ):
     pass
+
     
 class xUrllib:
     '''
@@ -63,25 +72,81 @@ class xUrllib:
         self._opener = None
         self._cacheOpener = None
         self._timeAnalysis = None
+        self._memoryUsageCounter = 0
         
-        # FIXME: Not thread safe
-        self._errorCount = 0
-        # End of not thread safe
+        # For error handling
+        self._lastRequestFailed = False
+        self._consecutiveErrorCount = 0
+        self._errorCount = {}
         
         self._dnsCache()
-        self._tm = tm()
+        self._tm = thread_manager
         self._sizeLRU = LRU(200)
         
         # User configured options (in an indirect way)
         self._grepPlugins = []
         self._evasionPlugins = []
+        self._paused = False
+        self._mustStop = False
+        self._ignore_errors_conf = False
+    
+    def pause(self,  pauseYesNo):
+        '''
+        When the core wants to pause a scan, it calls this method, in order to freeze all actions
+        @parameter pauseYesNo: True if I want to pause the scan; False to un-pause it.
+        '''
+        self._paused = pauseYesNo
         
+    def stop(self):
+        '''
+        Called when the user wants to finish a scan.
+        '''
+        self._mustStop = True
+    
+    def _callBeforeSend(self):
+        '''
+        This is a method that is called before every request is sent. I'm using it as
+        a hook implement:
+            - The pause/stop feature
+            - Memory debugging features
+        '''
+        self._sleepIfPausedDieIfStopped()
+        
+        self._memoryUsageCounter += 1
+        if self._memoryUsageCounter == 2000:
+            dumpMemoryUsage()
+            self._memoryUsageCounter = 0
+    
+    def _sleepIfPausedDieIfStopped( self ):
+        '''
+        This method sleeps until self._paused is False.
+        '''
+        while self._paused:
+            time.sleep(0.5)
+            
+            # The user can pause and then STOP
+            if self._mustStop:
+                self._mustStop = False
+                self._paused = False
+                # This raises a keyboard interrupt in the middle of the discovery process.
+                # It has almost the same effect that a ctrl+c by the user if in consoleUi
+                raise KeyboardInterrupt
+        
+        # The user can simply STOP the scan
+        if self._mustStop:
+            self._mustStop = False
+            self._paused = False
+            # This raises a keyboard interrupt in the middle of the discovery process.
+            # It has almost the same effect that a ctrl+c by the user if in consoleUi
+            # TODO: THIS SUCKS
+            raise KeyboardInterrupt
+    
     def end( self ):
         '''
         This method is called when the xUrllib is not going to be used anymore.
         '''
         try:
-            cacheLocation = getHomeDir() + os.path.sep + 'urllib2cache' + os.path.sep + str(os.getpid())
+            cacheLocation = get_home_dir() + os.path.sep + 'urllib2cache' + os.path.sep + str(os.getpid())
             if os.path.exists(cacheLocation):
                 for f in os.listdir(cacheLocation):
                     os.unlink( cacheLocation + os.path.sep + f)
@@ -110,7 +175,7 @@ class xUrllib:
         '''
         om.out.debug('Enabling _dnsCache()')
         import socket
-        if not hasattr( socket, 'alreadyConfigured' ):
+        if not hasattr( socket, 'already_configured' ):
             socket._getaddrinfo = socket.getaddrinfo
         
         _dns_cache = LRU(200)
@@ -119,7 +184,7 @@ class xUrllib:
                 query = (args)
                 res = _dns_cache[query]
                 #This was too noisy and not so usefull
-                #om.out.debug('Cached DNS response for domain: ' + query[0] )
+                om.out.debug('Cached DNS response for domain: ' + query[0] )
                 return res
             except KeyError:
                 res = socket._getaddrinfo(*args, **kwargs)
@@ -127,9 +192,9 @@ class xUrllib:
                 om.out.debug('DNS response from DNS server for domain: ' + query[0] )
                 return res
         
-        if not hasattr( socket, 'alreadyConfigured' ):      
+        if not hasattr( socket, 'already_configured' ):      
             socket.getaddrinfo = _caching_getaddrinfo
-            socket.alreadyConfigured = True
+            socket.already_configured = True
     
     def _init( self ):
         if self.settings.needUpdate or \
@@ -155,14 +220,48 @@ class xUrllib:
         If the user configured w3af to ignore a URL, we are going to be applying that configuration here.
         This is the lowest layer inside w3af.
         '''
-        listOfNonTargets = cf.cf.getData('nonTargets')
+        listOfNonTargets = cf.cf.getData('nonTargets') or []
         for u in listOfNonTargets:
             if urlParser.uri2url( uri ) == urlParser.uri2url( u ):
-                om.out.debug('The URL you are trying to reach was configured as a non-target. ( '+uri+' ). Returning an empty response.')
+                msg = 'The URL you are trying to reach was configured as a non-target. ( '
+                msg += uri +' ). Returning an empty response.'
+                om.out.debug( msg )
                 return True
         
         return False
     
+    def sendRawRequest( self, head, postdata, fixContentLength=True, get_size=True):
+        '''
+        In some cases the xUrllib user wants to send a request that was typed in a textbox or is stored in a file.
+        When something like that happens, this library allows the user to send the request by specifying two parameters
+        for the sendRawRequest method:
+        
+        @parameter head: The postdata, if any. If set to '' or None, no postdata is sent.
+        @parameter postdata: "<method> <URI> <HTTP version>\r\nHeader: Value\r\nHeader2: Value2..."
+        @parameter fixContentLength: Indicates if the content length has to be fixed or not.
+        
+        @return: An httpResponse object.
+        '''
+        # Parse the two strings
+        fuzzReq = httpRequestParser(head, postdata)
+        
+        # Fix the content length
+        if fixContentLength:
+            headers = fuzzReq.getHeaders()
+            fixed = False
+            for h in headers:
+                if h.lower() == 'content-length':
+                    headers[ h ] = str(len(postdata))
+                    fixed = True
+            if not fixed and postdata:
+                headers[ 'content-length' ] = str(len(postdata))
+            fuzzReq.setHeaders(headers)
+        
+        # Send it
+        function_reference = getattr( self , fuzzReq.getMethod() )
+        return function_reference( fuzzReq.getURI(), data=fuzzReq.getData(), headers=fuzzReq.getHeaders(),
+                                                useCache=False, grepResult=False, getSize=get_size )
+        
     def GET(self, uri, data='', headers={}, useCache=False, grepResult=True, getSize=False ):
         '''
         Gets a uri using a proxy, user agents, and other settings that where set previously.
@@ -172,8 +271,9 @@ class xUrllib:
         @return: An httpResponse object.
         '''
         self._init()
+
         if self._isBlacklisted( uri ):
-            return httpResponse( NO_CONTENT, '', {}, uri, uri )
+            return httpResponse( NO_CONTENT, '', {}, uri, uri, msg='No Content', id=consecutive_number_generator.inc() )
         
         qs = urlParser.getQueryString( uri )
         if qs:
@@ -192,13 +292,13 @@ class xUrllib:
             try:
                 self._checkFileSize( req )
             except sizeExceeded, se:
-                return httpResponse( NO_CONTENT, '', {}, uri, uri )
+                return httpResponse( NO_CONTENT, '', {}, uri, uri, msg='No Content', id=consecutive_number_generator.inc() )
             except Exception, e:
                 raise e
         
         return self._send( req , useCache=useCache, grepResult=grepResult)
     
-    def POST(self, uri, data='', headers={}, grepResult=True, getSize=False ):
+    def POST(self, uri, data='', headers={}, grepResult=True, getSize=False, useCache=False ):
         '''
         POST's data to a uri using a proxy, user agents, and other settings that where set previously.
         
@@ -208,7 +308,7 @@ class xUrllib:
         '''
         self._init()
         if self._isBlacklisted( uri ):
-            return httpResponse( NO_CONTENT, '', {}, uri, uri )
+            return httpResponse( NO_CONTENT, '', {}, uri, uri, msg='No Content', id=consecutive_number_generator.inc() )
         
         req = urllib2.Request(uri, data )
         req = self._addHeaders( req, headers )
@@ -218,11 +318,11 @@ class xUrllib:
             try:
                 self._checkFileSize( req )
             except sizeExceeded, se:
-                return httpResponse( NO_CONTENT, '', {}, uri, uri )
+                return httpResponse( NO_CONTENT, '', {}, uri, uri, msg='No Content', id=consecutive_number_generator.inc() )
             except Exception, e:
                 raise e
         
-        return self._send( req , grepResult=grepResult)
+        return self._send( req , grepResult=grepResult, useCache=useCache)
     
     def getRemoteFileSize( self, uri, headers={}, useCache=True ):
         '''
@@ -237,14 +337,17 @@ class xUrllib:
                 if fileLen.isdigit():
                     fileLen = int( fileLen )
                 else:
-                    msg = 'The content length header value of the response wasn\'t an integer... this is strange... The value is: ' + res.getHeaders()[ i ]
+                    msg = 'The content length header value of the response wasn\'t an integer...'
+                    msg += ' this is strange... The value is: "' + res.getHeaders()[ i ] + '"'
                     om.out.error( msg )
                     raise w3afException( msg )
         
         if fileLen != None:
             return fileLen
         else:
-            om.out.debug( 'The response didn\'t contain a content-length header. Unable to return the remote file size of request with id: ' + str(res.id) )
+            msg = 'The response didn\'t contain a content-length header. Unable to return the'
+            msg += ' remote file size of request with id: ' + str(res.id)
+            om.out.debug( msg )
             # I prefer to fetch the file, before this om.out.debug was a "raise w3afException", but this didnt make much sense
             return 0
         
@@ -267,16 +370,18 @@ class xUrllib:
             #(self, uri, data='', headers={}, useCache=False, grepResult=True, getSize=False )
             def __call__( self, *args, **keywords ):
                 if len( args ) != 1:
-                    raise w3afException('Invalid number of arguments. This method receives one argument and N keywords.')
+                    msg = 'Invalid number of arguments. This method receives one argument and N keywords and you called it with:'
+                    msg += 'args: ' + repr(args) + ' and keywords: ' + repr(keywords)
+                    raise w3afException( msg )
                     
                 uri = args[0]
                 
                 self._xurllib._init()
                 
                 if self._xurllib._isBlacklisted( uri ):
-                    return httpResponse( NO_CONTENT, '', {}, uri, uri )
+                    return httpResponse( NO_CONTENT, '', {}, uri, uri, 'No Content', id=consecutive_number_generator.inc() )
             
-                if 'data' in keywords and keywords['data'] != None:
+                if 'data' in keywords:
                     req = self.methodRequest( uri, keywords['data'] )
                     keywords.pop('data')
                 else:
@@ -288,10 +393,13 @@ class xUrllib:
                     req = self._xurllib._addHeaders( req, keywords['headers'] )
                     keywords.pop('headers')
                 
+                if 'getSize' in keywords:
+                    keywords.pop('getSize')
+                    
                 om.out.debug( req.get_method() + ' ' + uri)
                 
                 # def _send( self , req , useCache=False, useMultipart=False, grepResult=True )
-                return self._xurllib._send( req, keywords )
+                return apply(self._xurllib._send, (req,) , keywords )
         
         am = anyMethod( self, methodName )
         return am
@@ -325,28 +433,40 @@ class xUrllib:
         if self.settings.getMaxFileSize() == 0:
             pass
         else:
-            # This will speed up the most frequent request, no HEAD is done to the last recently used URL's
-            if req.get_full_url() not in self._sizeLRU:
+            # This will speed up the most frequent request, no HEAD is done to the last
+            # recently used URLs
+            try:
+                size = self._sizeLRU[ req.get_full_url() ]
+            except KeyError:
                 size = self.getRemoteFileSize( req.get_full_url() )
                 self._sizeLRU[ req.get_full_url() ] = size
-            else:
-                size = self._sizeLRU[ req.get_full_url() ]
                 #om.out.debug('Size of response got from self._sizeLRU.')
             
             if self.settings.getMaxFileSize() < size :
-                msg = 'File size of URL: ' +  req.get_full_url()  + ' exceeds the configured file size limit. Max size limit is: ' + str(greek(self.settings.getMaxFileSize())) + ' and file size is: ' + str(greek(size)) + ' .'
+                msg = 'File size of URL: "' +  req.get_full_url()  + '" exceeds the configured file'
+                msg += ' size limit. Max size limit is: ' + str(greek(self.settings.getMaxFileSize()))
+                msg += ' and file size is: ' + str(greek(size)) + ' .'
                 om.out.debug( msg )
                 raise sizeExceeded( msg )
             
     def _send( self , req , useCache=False, useMultipart=False, grepResult=True ):
+        '''
+        Actually send the request object.
+        
+        @return: An httpResponse object.
+        '''
+        # This is the place where I hook the pause and stop feature
+        # And some other things like memory usage debugging.
+        self._callBeforeSend()
+
         # Sanitize the URL
         self._checkURI( req )
         
         # Evasion
-        originalUrl = req._Request__original
+        original_url = req._Request__original
         req = self._evasion( req )
         
-        startTime = time.time()
+        start_time = time.time()
         res = None
         try:
             if useCache:
@@ -358,28 +478,55 @@ class xUrllib:
             # also possible when a proxy is configured and not available
             # also possible when auth credentials are wrong for the URI
             if hasattr(e, 'reason'):
+                self._incrementGlobalErrorCount()
                 try:
                     e.reason[0]
                 except:
                     raise w3afException('Unexpected error in urllib2 / httplib: ' + repr(e.reason) )                    
                 else:
-                    if e.reason[0] == -2:
-                        raise w3afException('Failed to resolve domain name for URL: ' + req.get_full_url() )
-                    if e.reason[0] == 111:
-                        raise w3afException('Connection refused while requesting: ' + req.get_full_url() )
+                    if isinstance(e.reason, type(())):
+                        # It's a tuple
+                        if e.reason[0] in (-2, 111):
+                            msg = 'w3af failed to reach the server while requesting: "' + original_url
+                            msg += '".\nReason: "' + str(e.reason[1]) + '" , error code: "'
+                            msg += str(e.reason[0]) + '".'
+                            raise w3afException( msg )
+                        else:
+                            msg = 'w3af failed to reach the server while requesting: "' + original_url
+                            msg += '".\nReason: "' + str(e.reason[1]) + '" , error code: "' + str(e.reason[0])
+                            msg += '"; going to retry.'
+                            om.out.debug( msg )
+                            om.out.debug( 'Traceback for this error: ' + str( traceback.format_exc() ) )
+                            req._Request__original = original_url
+                            return self._retry( req, useCache )
                     else:
-                        om.out.debug( 'w3af failed to reach the server while requesting: "'+originalUrl+'".\nReason: "' + str(e.reason) + '" , Exception: "'+ str(e)+'"; going to retry.')
-                        #om.out.debug( 'Traceback for this error: ' + str( traceback.format_exc() ) )
-                        req._Request__original = originalUrl
+                        # Not a tuple, something "strange"!
+                        msg = 'w3af failed to reach the server while requesting: "' + original_url
+                        msg += '".\nReason: "' + str(e.reason)
+                        msg += '"; going to retry.'
+                        om.out.debug( msg )
+                        om.out.debug( 'Traceback for this error: ' + str( traceback.format_exc() ) )
+                        req._Request__original = original_url
                         return self._retry( req, useCache )
+
             elif hasattr(e, 'code'):
-                om.out.debug( req.get_method() + ' ' + originalUrl +' returned HTTP code "' + str(e.code) + '"' )
+                # We usually get here when the response has codes 404, 403, 401, etc...
+                msg = req.get_method() + ' ' + original_url +' returned HTTP code "'
+                msg += str(e.code) + '" - id: ' + str(e.id)
+                om.out.debug( msg )
+                
                 # Return this info to the caller
                 code = int(e.code)
                 info = e.info()
                 geturl = e.geturl()
                 read = self._readRespose( e )
-                httpResObj = httpResponse(code, read, info, geturl, originalUrl, id=e.id, time=time.time() - startTime )
+                httpResObj = httpResponse(code, read, info, geturl, original_url, id=e.id, time=time.time() - start_time, msg=e.msg )
+                
+                # Clear the log of failed requests; this request is done!
+                if id(req) in self._errorCount:
+                    del self._errorCount[ id(req) ]
+                self._zeroGlobalErrorCount()
+            
                 if grepResult:
                     self._grepResult( req, httpResObj )
                 else:
@@ -392,26 +539,45 @@ class xUrllib:
             # This except clause will catch errors like 
             # "(-3, 'Temporary failure in name resolution')"
             # "(-2, 'Name or service not known')"
-            # for now... i think re-raising the exception is the best solution
-            # contact me at andres.riancho@gmail.com if you have a better idea
-            #raise w3afException( str(e) )
-            # best is to post a message
-            om.out.debug( req.get_method() + ' ' + originalUrl +' returned HTTP code "' + str(NO_CONTENT) + '"' )
+            # The handling of this errors is complex... if I get a lot of errors in a row, I'll raise a
+            # w3afMustStopException because the remote webserver might be unreachable.
+            # For the first N errors, I just return an empty response...
+            om.out.debug( req.get_method() + ' ' + original_url +' returned HTTP code "' + str(NO_CONTENT) + '"' )
             om.out.debug( 'Unhandled exception in xUrllib._send(): ' + str ( e ) )
             om.out.debug( str( traceback.format_exc() ) )
-            return httpResponse( NO_CONTENT, '', {}, originalUrl, originalUrl )
+            
+            # Clear the log of failed requests; this request is done!
+            if id(req) in self._errorCount:
+                del self._errorCount[ id(req) ]
+            self._incrementGlobalErrorCount()
+            
+            return httpResponse( NO_CONTENT, '', {}, original_url, original_url, msg='No Content', id=consecutive_number_generator.inc() )
         else:
             # Everything ok !
             if not req.get_data():
-                om.out.debug( req.get_method() + ' ' + urllib.unquote_plus( originalUrl ) +' returned HTTP code "' + str(res.code) + '"' )
+                msg = req.get_method() + ' ' + urllib.unquote_plus( original_url ) +' returned HTTP code "'
+                msg += str(res.code) + '" - id: ' + str(res.id)
+                om.out.debug( msg )
             else:
-                om.out.debug( req.get_method() + ' ' + originalUrl +' with data: "'+ urllib.unquote_plus( req.get_data() ) +'" returned HTTP code "' + str(res.code) + '"' )
-                
+                msg = req.get_method() + ' ' + original_url +' with data: "'
+                msg += urllib.unquote_plus( req.get_data() ) +'" returned HTTP code "'
+                msg += str(res.code) + '" - id: ' + str(res.id)
+                om.out.debug( msg )
+            
             code = int(res.code)
             info = res.info()
             geturl = res.geturl()
             read = self._readRespose( res )
-            httpResObj = httpResponse(code, read, info, geturl, originalUrl, id=res.id, time=time.time() - startTime )
+            httpResObj = httpResponse(code, read, info, geturl, original_url, id=res.id, time=time.time() - start_time, msg=res.msg )
+            # Let the upper layers know that this response came from the local cache.
+            if isinstance(res, CachedResponse):
+                httpResObj.setFromCache(True)
+            
+            # Clear the log of failed requests; this request is done!
+            if id(req) in self._errorCount:
+                del self._errorCount[ id(req) ]
+            self._zeroGlobalErrorCount()
+            
             if grepResult:
                 self._grepResult( req, httpResObj )
             else:
@@ -431,16 +597,60 @@ class xUrllib:
         
     def _retry( self, req , useCache ):
         '''
-        Try to send the request again.
-        
+        Try to send the request again while doing some error handling.
         '''
-        if self._errorCount < self.settings.getMaxRetrys() :
-            self._errorCount += 1
+        if self._errorCount.get( id(req), 0 ) < self.settings.getMaxRetrys() :
+            # Increment the error count of this particular request.
+            if id(req) not in self._errorCount:
+                self._errorCount[ id(req) ] = 0
+            self._errorCount[ id(req) ] += 1
+            
+            om.out.debug('Re-sending request...')
             return self._send( req, useCache )
         else:
-            self._errorCount = 0
+            # Clear the log of failed requests; this one definetly failed...
+            del self._errorCount[ id(req) ]
+            # No need to add this:
+            #self._incrementGlobalErrorCount()
+            # The global error count is already incremented by the _send method.
             raise w3afException('Too many retries when trying to get: ' + req.get_full_url() )
+    
+    def _incrementGlobalErrorCount( self ):
+        '''
+        Increment the error count, and if we got a lot of failures... raise a "afMustStopException"
+        '''
+        if self._ignore_errors_conf:
+            return
+
+        # All the logic follows:
+        if self._lastRequestFailed:
+            self._consecutiveErrorCount += 1
+        else:
+            self._lastRequestFailed = True
         
+        om.out.debug('Incrementing global error count. GEC: ' + str(self._consecutiveErrorCount))
+        
+        if self._consecutiveErrorCount >= 10:
+            msg = 'The xUrllib found too much consecutive errors. The remote webserver doesn\'t'
+            msg += ' seem to be reachable anymore; please verify manually.'
+            raise w3afMustStopException( msg )
+
+    def ignore_errors( self, yes_no ):
+        '''
+        Let the library know if errors should be ignored or not. Basically,
+        ignore all calls to "_incrementGlobalErrorCount" and don't raise the
+        w3afMustStopException.
+
+        @parameter yes_no: True to ignore errors.
+        '''
+        self._ignore_errors_conf = yes_no
+            
+    def _zeroGlobalErrorCount( self ):
+        if self._lastRequestFailed or self._consecutiveErrorCount:
+            self._lastRequestFailed = False
+            self._consecutiveErrorCount = 0
+            om.out.debug('Decrementing global error count. GEC: ' + str(self._consecutiveErrorCount))
+    
     def setGrepPlugins(self, grepPlugins ):
         self._grepPlugins = grepPlugins
     
@@ -468,26 +678,38 @@ class xUrllib:
         return request
         
     def _grepResult(self, request, response):
-        # The grep process is all done in another thread. This improved the
+        # The grep process is all done in another thread. This improves the
         # speed of all w3af.
         if len( self._grepPlugins ) and urlParser.getDomain( request.get_full_url() ) in cf.cf.getData('targetDomains'):
             # I'll create a fuzzable request based on the urllib2 request object
             fuzzReq = createFuzzableRequestRaw( request.get_method(), request.get_full_url(), request.get_data(), request.headers )
             targs = (fuzzReq, response)
-            self._tm.startFunction( target=self._grepWorker, args=targs, ownerObj=self )
+            self._tm.startFunction( target=self._grepWorker, args=targs, ownerObj=self, restrict=True )
     
     def _grepWorker( self , request, response):
+        '''
+        This method calls all the grep plugins so they can analyze the request/response pair.
+
+        Remember that this method is always called in a thread (see the restrict=False 3 lines above)
+
+        @parameter request: The request which generated the response. A request object.
+        @parameter response: The response which was generated by the request (first parameter). A httpResponse object.
+        '''
         om.out.debug('Starting grepWorker for response: ' + repr(response) )
         
         for grepPlugin in self._grepPlugins:
             try:
-                grepPlugin.testResponse( request, response)
+                grepPlugin.grep_wrapper( request, response)
             except KeyboardInterrupt:
                 # Correct control+c handling...
                 raise
             except Exception, e:
-                om.out.error( 'Error in grep plugin, "' + grepPlugin.getName() + '" raised the exception: ' + str(e) + '. Please report this bug. Exception: ' + str(traceback.format_exc(1)) )
-                om.out.debug( str(traceback.format_exc()) )
+                msg = 'Error in grep plugin, "' + grepPlugin.getName() + '" raised the exception: '
+                msg += str(e) + '. Please report this bug to the w3af sourceforge project page '
+                msg += '[ http://sourceforge.net/tracker/?func=add&group_id=170274&atid=853652 ] '
+                msg += '\nException: ' + str(traceback.format_exc(1))
+                om.out.error( msg )
+                om.out.error( str(traceback.format_exc()) )
         
         om.out.debug('Finished grepWorker for response: ' + repr(response) )
 

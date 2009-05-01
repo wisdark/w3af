@@ -25,6 +25,7 @@ import socket
 import re
 import core.controllers.outputManager as om
 
+
 class searchEngine:
     '''
     This class represents a searchEngine .
@@ -44,16 +45,17 @@ class searchEngine:
         while True:
             try:
                 tmp = self.search( query, start, 10 )
-            except w3afException, w:
-                om.out.debug( str(w) )
-                return result
+            except w3afException, w3:
+                om.out.debug( str(w3) )
+                raise w3
             except Exception, e:
-                om.out.debug( 'Unhandled exception in searchEngines.google.search(): '+str(w) )
-                return result
+                om.out.debug( 'Unhandled exception in searchEngines.searchEngine.search(): '+str(e) )
+                raise e
             else:
                 result.extend( tmp )
                 start += len( tmp )
-                if len( tmp ) != 10 or start >= limit: break
+                if len( tmp ) != 10 or start >= limit:
+                    break
         
         # Do some debug..
         if len( result ):
@@ -74,17 +76,18 @@ class searchEngine:
         result = []
         while True:
             try:
-                resPage = self.pagesearch( query, start, 10 )
-            except w3afException, w:
-                om.out.debug( str(w) )
-                return result
+                res_page = self.pagesearch( query, start, 10 )
+            except w3afException, w3:
+                om.out.debug( str(w3) )
+                raise w3
             except Exception, e:
-                om.out.debug( 'Unhandled exception in searchEngines.google.search(): '+str(w) )
-                return result
+                om.out.debug( 'Unhandled exception in searchEngines.searchEngine.search(): '+str(e) )
+                raise e
             else:
-                result.extend( resPage )
+                result.extend( res_page )
                 start += 10
-                if start >= limit: break
+                if start >= limit:
+                    break
     
         return result
         
@@ -92,37 +95,39 @@ class searchEngine:
         '''
         Return the number of results for a given search.
         '''
-        numberOfResults = 0
+        number_of_results = 0
         while True:
-            res = self.search( query, numberOfResults, 10 )
-            numberOfResults += len( res )
-            if len( res ) != 10: break
+            res = self.search( query, number_of_results, 10 )
+            number_of_results += len( res )
+            if len( res ) != 10:
+                break
             
-        return numberOfResults
+        return number_of_results
         
     def search( self, query, start, count=10 ):
+        '''
+        This method is meant to be overriden by the subclasses of searchEngine.py
+        
+        This method searches the web and returns a list of URLs.
+        
+        @parameter query: The query that we want to perform in the search engine
+        @parameter start: The first result item
+        @parameter count: How many results to get from start
+        '''
         raise w3afException('searchEngine subclasses should implement the search method.')
+        return
+    
+    def pagesearch( self, query, start, count=10 ):
+        '''
+        This method is meant to be overriden by the subclasses of searchEngine.py
+        
+        This method searches the web and returns a list of http response objects.
+        
+        @parameter query: The query that we want to perform in the search engine
+        @parameter start: The first result item
+        @parameter count: How many results to get from start
+        '''
+        raise w3afException('searchEngine subclasses should implement the pagesearch method.')
+        return
 
-    def isPrivate( self, dp ):
-        '''
-        Get the IP address of the domain, return True if its a private address.
-        '''
-        if re.match('(10\.\d?\d?\d?\.\d?\d?\d?\.\d?\d?\d?)', dp) or\
-        re.match('(172\.[1-3]\d?\d?\.\d?\d?\d?\.\d?\d?\d?)', dp) or\
-        re.match('(192\.168\.\d?\d?\d?\.\d?\d?\d?)', dp) or\
-        re.match('(127\.\d?\d?\d?\.\d?\d?\d?\.\d?\d?\d?)', dp):
-            return True
-        else:
-            addrinfo = None
-            try:
-                addrinfo = socket.getaddrinfo(dp, 0)
-            except:
-                raise w3afException('Could not resolve hostname: ' + dp )
-            ips = [info[4][0] for info in addrinfo]
-            for ip in ips:
-                if re.match('(10\.\d?\d?\d?\.\d?\d?\d?\.\d?\d?\d?)', ip) or\
-                re.match('(172\.[1-3]\d?\d?\.\d?\d?\d?\.\d?\d?\d?)', ip) or\
-                re.match('(192\.168\.\d?\d?\d?\.\d?\d?\d?)', ip) or\
-                re.match('(127\.\d?\d?\d?\.\d?\d?\d?\.\d?\d?\d?)', ip):
-                    return True
-        return False
+

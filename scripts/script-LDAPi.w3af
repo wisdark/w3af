@@ -4,11 +4,11 @@ plugins
 audit LDAPi
 output console
 output config console
-set verbosity 0
+set verbose False
 back
 back
 target
-set target http://localhost/w3af/LDAP/ldap.php?i=f00
+set target http://localhost/w3af/audit/LDAP/simple_ldap.php?i=1
 back
 start
 

@@ -1,23 +1,14 @@
-# This is a simple xss detection demo:
-
-#http-settings
-#set proxyAddress 127.0.0.1
-#set proxyPort 8080
-#back
 
 plugins
-
 output console,textFile
-output
 output config textFile
-set verbosity 10
+set verbose True
 back
 output config console
-set verbosity 0
+set verbose False
 back
 
 audit xss
-audit
 # There is no sense in enabling ALLL evasion plugins. IT WONT WORK
 # But i'm enabling them just to test if they raise any exceptions
 evasion all
@@ -25,9 +16,8 @@ evasion
 back
 
 target
-# It ain't working on Apache
-set target http://localhost/w3af/xss/test-xss.php?a=f0as9
-#set target http://172.16.1.132/index.asp?q=holaMundo
+# It is not working on Apache
+set target http://localhost/w3af/audit/xss/simple_xss.php?text=1
 back
 
 start

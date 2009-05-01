@@ -23,8 +23,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import copy
 from core.ui.consoleUi.menu import *
 from core.ui.consoleUi.config import *
-from core.controllers.misc.parseOptions import parseXML
+from core.ui.consoleUi.util import *
 import core.controllers.outputManager as om
+from core.controllers.w3afException import w3afException
+import sys
 
 class pluginsMenu(menu):
     '''
@@ -116,23 +118,33 @@ class pluginsTypeMenu(menu):
         plugins = w3af.getPluginList(name)
         self._plugins = {} # name to number of options
         for p in plugins:
-            options = parseXML(self._w3af.getPluginInstance(p, self._name).getOptionsXML())
-            self._plugins[p] = len(options)
+            try:
+                options = self._w3af.getPluginInstance(p, self._name).getOptions()
+            except w3afException, w3:
+                om.out.error('Error while reading plugin options.')                
+                om.out.error(str(w3))
+                sys.exit(-8)
+            else:
+                self._plugins[p] = len(options)
         self._configs = {}
       
 
-    def suggestCommands(self, part):
-        return suggest(self._plugins.keys() + ['all'], part, True) \
-            + suggest(['config'], part, False)
+    def suggestCommands(self, part, *skip):
+        return suggest(self._plugins.keys() + ['all'], part.lstrip('!')) + \
+            suggest(self.getCommands(), part)
 
     def suggestParams(self, command, params, part):
         if command in self.getCommands():
             return menu.suggestParams(self, command, params, part)
         
-        alreadySel = command.split(',')
-        return suggest(self._plugins.keys() + ['all'], \
-            ','.join(alreadySel + params + [part]), True)
+        alreadySel =[s.lstrip('!') for s in [command] + params]
+        
+        plugins = self._plugins.keys()
+        return suggest(plugins, part.lstrip('!'), alreadySel)
 
+
+    def getCommands(self):
+        return ['config', 'desc']
 
     def execute(self, tokens):
         if len(tokens)>0:
@@ -146,15 +158,14 @@ class pluginsTypeMenu(menu):
             return self
 
     def _enablePlugins(self, list):
-        prevEnabled = self._w3af.getEnabledPlugins(self._name)
-        enabled = copy.copy(prevEnabled)
+        enabled = copy.copy(self._w3af.getEnabledPlugins(self._name))
         
         for plugin in list:
             if plugin=='':
                 continue 
             if plugin.startswith('!'):
                 disabling = True
-                plugin = plugin[1:]
+                plugin = plugin.lstrip('!')
             else:
                 disabling = False
 
@@ -171,27 +182,33 @@ class pluginsTypeMenu(menu):
             elif plugin not in enabled:
                 enabled.append(plugin)
         
-        if self._name == 'output':
-            if 'console' not in enabled:
-                self._console._disableConsole = True
-
-                om.out.console("Warning: console output plugin will be \
-disabled during the scan.")
-
-                enabled.append('console')
-            else:
-                self._console._disableConsole = False
-    
+        # Note: Disabling this check after talking with olle. Only advanced users are going to
+        # remove the console output plugin, and if someone else does, he will realize that he
+        # fucked up ;)
+        #
+        #if self._name == 'output' and 'console' not in enabled:
+        #    om.out.console("Warning: You can't disable the console output plugin in the console UI")
+        #    enabled.append('console')
+        #
+        # What I'm going to do, is to let the user know that he's going into blind mode:
+        #
+        if self._name == 'output' and 'console' not in enabled and len(enabled) == 0:
+            msg = "Warning: You disabled the console output plugin. If you start a new scan, the"
+            msg += ' discovered vulnerabilities won\'t be printed to the console, we advise you'
+            msg += ' to enable at least one output plugin in order to be able to actually see'
+            msg += ' the scan output.'
+            om.out.console( msg )
+            
         self._w3af.setPlugins(enabled, self._name)
 
     def _cmd_desc(self, params):
-        if len(params) != 1:
-            self._cmd_help(['desc'])
-            return None
+        
+        if len(params) == 0:
+            raise w3afException("Plugin name is required")
 
         pluginName = params[0]
         if pluginName not in self._plugins:
-            raise w3afException("Unknown plugin: '%s'" % p)
+            raise w3afException("Unknown plugin: '%s'" % pluginName)
 
         plugin = self._w3af.getPluginInstance(pluginName, self._name)
         om.out.console( str(plugin.getLongDesc()) )
@@ -232,11 +249,6 @@ disabled during the scan.")
         for pluginName in list:
             row = []
             plugin = self._w3af.getPluginInstance(pluginName, self._name)
-#            try:
-#                optionsXML = plugin.getOptionsXML()
-#                options = parseXML(optionsXML)
-#            except:
-#                options = {}
     
             optCount = self._plugins[pluginName]
             row.append(pluginName)
@@ -253,10 +265,13 @@ disabled during the scan.")
     def _cmd_config(self, params):
         
         if len(params) ==0:
-            self._cmd_help(['config'])
-            return
+            raise w3afException("Plugin name is required")
 
         name = params[0]
+
+        if name not in self._plugins:
+            raise w3afException("Unknown plugin: '%s'" %name)
+
         if self._configs.has_key(name):
             config = self._configs[name]
         else:

@@ -20,22 +20,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-
-from shlex import *
-import os.path
-import traceback
-from core.ui.consoleUi.rootMenu import *
-from core.ui.consoleUi.callbackMenu import *
-from core.ui.consoleUi.util import *
-import core.ui.consoleUi.io.console as term
-from core.ui.consoleUi.history import *
-import core.ui.consoleUi.tables as tables
-import core.controllers.w3afCore
-import core.controllers.outputManager as om
-import core.controllers.miscSettings as miscSettings
-from core.controllers.w3afException import w3afException
 import sys
-import random
+try:
+    from shlex import *
+    import os.path
+    import traceback
+    from core.ui.consoleUi.rootMenu import *
+    from core.ui.consoleUi.callbackMenu import *
+    from core.ui.consoleUi.util import *
+    import core.ui.consoleUi.io.console as term
+    from core.ui.consoleUi.history import *
+    import core.ui.consoleUi.tables as tables
+    import core.controllers.w3afCore
+    import core.controllers.outputManager as om
+    import core.controllers.miscSettings as miscSettings
+    from core.controllers.w3afException import w3afException
+    import random
+except KeyboardInterrupt:
+    sys.exit(0)
 
 class consoleUi:
     '''
@@ -45,14 +47,12 @@ class consoleUi:
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
 
-    def __init__(self, scriptFile=None, commands=[], parent=None):
-        self._scriptFile = scriptFile
+    def __init__(self, commands=[], parent=None):
         self._commands = commands 
         self._line = [] # the line which is being typed
         self._position = 0 # cursor position
         self._history = historyTable() # each menu has array of (array, positionInArray)
         self._trace = []
-        self._disableConsole = False
 
         self._handlers = { '\t' : self._onTab, \
             '\r' : self._onEnter, \
@@ -63,6 +63,7 @@ class consoleUi:
             term.KEY_DOWN : self._onDown, \
             '^C' : self._backOrExit, \
             '^D' : self._backOrExit,
+            '^L' : self._clearScreen,
             '^W' : self._delWord,
             '^H' : self._onBackspace,
             '^A' : self._toLineStart,
@@ -81,53 +82,41 @@ class consoleUi:
     def __initFromParent(self, parent):
         self._context = parent._context
         self._w3af = parent._w3af
-
-    def disableConsoleIfNeed(self):
-        if self._disableConsole:
-            plugins = self._w3af.getEnabledPlugins('output')
-            if 'console' in plugins:
-                del plugins[plugins.index('console')]
-                self._w3af.setPlugins(plugins, 'output')
-
-    def enableConsole(self):
-        plugins = self._w3af.getEnabledPlugins('output')
-        if 'console' not in plugins:
-            plugins.append('console')
-            self._w3af.setPlugins(plugins, 'output')
-
         
     def sh(self, name='w3af', callback=None):
         '''
         Main cycle
         '''
-
-        om.out.console("WARNING: This branch is under development and unstable. \n\
-Please see http://w3af.sourceforge.net for the stable version info.")
-        if callback:
-            if hasattr(self, '_context'):
-                ctx = self._context
+        try:
+            if callback:
+                if hasattr(self, '_context'):
+                    ctx = self._context
+                else:
+                    ctx = None
+                self._context = callbackMenu(name, self, self._w3af, ctx, callback)
             else:
-                ctx = None
-            self._context = callbackMenu(name, self, self._w3af, ctx, callback)
-        else:
-            self._context = rootMenu(name, self, self._w3af)
-            
-        self._lastWasArrow = False
-        self._showPrompt()
-        self._active = True
-        term.setRawInputMode(True)
+                self._context = rootMenu(name, self, self._w3af)
+                
+            self._lastWasArrow = False
+            self._showPrompt()
+            self._active = True
+            term.setRawInputMode(True)
 
-        self._executePending()
+            self._executePending()
 
-        while self._active: 
-            try:
-                c = term.getch()
-                self._handleKey(c)
-            except Exception, e:
-                om.out.console(str(e))
+            while self._active: 
+                try:
+                    c = term.getch()
+                    self._handleKey(c)
+                except Exception, e:
+                    om.out.console(str(e))
 
-        term.setRawInputMode(False)
+            term.setRawInputMode(False)
+        except KeyboardInterrupt:
+            pass
+
         if not hasattr(self, '_parent'):
+            self._w3af.quit()
             om.out.console(self._randomMessage())
 
 
@@ -195,12 +184,17 @@ Please see http://w3af.sourceforge.net for the stable version info.")
             om.out.console('')
         else:
             cmd = exit and 'exit' or 'back'
-            self._initPrompt()
+            self._clearLine()
             self._paste(cmd)
             self._execute()
         if not exit:
             self._initPrompt()
             self._showPrompt()
+
+    def _clearLine(self):
+        self._toLineEnd()
+        while self._position:
+            self._onBackspace()
 
     def _onBackspace(self):
         if self._position >0:
@@ -217,6 +211,12 @@ Please see http://w3af.sourceforge.net for the stable version info.")
             del self._line[-1]
 #            term.write(' ')
 
+    def _clearScreen(self):
+        """Clears the screen"""
+        term.clearScreen()
+        self._initPrompt()
+        self._showPrompt()
+
     def _execute(self):
         # term.writeln()
 
@@ -232,6 +232,10 @@ Please see http://w3af.sourceforge.net for the stable version info.")
                 # If None, the menu is not changed.
                 params = self.inRawLineMode() and line or self._parseLine(line)
                 menu = self._context.execute(params)
+            except w3afMustStopException, wmse:
+                menu = None
+                self.exit()
+
             except w3afException, e:
                 menu = None
                 om.out.console( e.value )
@@ -262,7 +266,6 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         self._execute()
         self._initPrompt()
         self._showPrompt()
-
 
     def _delWord(self):
         filt = str.isspace
@@ -374,10 +377,16 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         parser = shlex(line)
         parser.whitespace_split = True
         while True:
-            token = parser.get_token()
-            if token == parser.eof:
+            try:
+                token = parser.get_token()
+            except ValueError, ve:
+                term.write( str(ve) + '\n')
+                result = []
                 break
-            result.append(token)
+            else:
+                if token == parser.eof:
+                    break
+                result.append(token)
 
         return result
 
@@ -396,7 +405,7 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         
 
     def _showPrompt(self):
-        term.write(self._context.getPath() + ">>>")
+        term.write(self._context.getPath() + ">>> ")
         
     def _showLine(self):
         strLine = self._getLineStr()
@@ -404,11 +413,10 @@ Please see http://w3af.sourceforge.net for the stable version info.")
         self._moveDelta(self._position - len(strLine))
 
     def _moveForward(self, steps=1):
-	for i in range(steps):
+        for i in range(steps):
             if self._position == len(self._line): term.bell()
-	    term.write(self._line[self._position])
-	    self._position += 1
-
+        term.write(self._line[self._position])
+        self._position += 1
 
     def _moveDelta(self, steps):
         if steps:

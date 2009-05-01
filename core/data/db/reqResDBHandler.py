@@ -20,13 +20,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-import gtk
-import gobject
 import core.data.kb.knowledgeBase as kb
 import core.controllers.outputManager as om
 import re
 from core.controllers.w3afException import w3afException
-   
+from core.data.db.persist import persist
+
 class reqResDBHandler:
     '''
     A handler for the database that stores requests and responses.
@@ -37,11 +36,11 @@ class reqResDBHandler:
         pass
     
     def _initDB( self ):
-        try:
-            self._db_req_res = kb.kb.getData('gtkOutput', 'db')
-        except:
+        if kb.kb.getData('gtkOutput', 'db') == []:
             return False
         else:
+            # Restore it from the kb
+            self._db = kb.kb.getData('gtkOutput', 'db')
             return True
     
     def searchById( self, search_id ):
@@ -52,12 +51,11 @@ class reqResDBHandler:
             raise w3afException('The database is not initialized yet.')
         else:
             try:
-                result = [ r for r in self._db_req_res if r.id == search_id ][0]
-            except Exception, e:
-                return None
-            else:
+                result = self._db.retrieve_all( 'id = ' + str(int(search_id)) )
                 return result
-            
+            except Exception, e:
+                raise e
+
     def validate(self, text):
         '''
         Validates if the text matches the regular expression
@@ -65,38 +63,22 @@ class reqResDBHandler:
         @param text: the text to validate
         @return: True if the text is ok.
         '''
-        ### WARNING !!!!
-        ### Remember that this regex controls what goes into a exec() function, so, THINK about what you are doing before allowing some characters
-        self._match = re.match('^(?:((?:r\\.(?:id|method|uri|http_version|request_headers|data|code|msg|response_headers|body))) (==|>|>=|<=|<|!=) ([\w\'\" /:\.]+)( (and|or) )?)*$', text )
-        ### WARNING !!!!
+        #FIXME: This re is buggy
+        self._match = re.match('^(?:((?:id|uri)) (=|>|>=|<=|<|<>|like) ([\w\'\" /:\.]+)( (and|or) )?)*$', text )
         if self._match:
             return True
         else:
             return False
             
-    def searchByString( self, search_string ):
+    def searchByString( self, search_string, result_limit=-1 ):
         '''
         @return: A request object that matches the search string.
         '''
         if not self._initDB():
             raise w3afException('The database is not initialized yet.')
         else:
-            if not self.validate( search_string ):
-                # The text that was entered by the user is not a valid search!
-                raise w3afException('Invalid search string.')
-            else:
-                return self._doSearch( search_string )
-
-    def _doSearch( self, condition ):
-        '''
-        Perform a search where only one (request of response) database is involved
-        '''
-        toExec = 'resultList = [ r for r in self._db_req_res if %s ]' % condition
-        
-        try:
-            exec( toExec )
-        except:
-            raise w3afException('Invalid search string, please try again.')
-        else:
-            return resultList
-    
+            try:
+                result = self._db.retrieve_all( search_string, result_limit=result_limit )
+                return result
+            except w3afException:
+                raise w3afException('You performed an invalid search. Please verify your syntax.')

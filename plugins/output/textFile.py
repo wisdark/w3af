@@ -22,16 +22,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from core.controllers.basePlugin.baseOutputPlugin import baseOutputPlugin
 from core.controllers.w3afException import w3afException
-from core.controllers.w3afException import w3afFileException
-import sys, os
-import time
-import codecs
+import core.data.kb.config as cf
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 # severity constants for vuln messages
 import core.data.constants.severity as severity
+
+import sys
+import time
+
 
 class textFile(baseOutputPlugin):
     '''
@@ -44,43 +46,64 @@ class textFile(baseOutputPlugin):
         baseOutputPlugin.__init__(self)
         
         # User configured parameters
-        self._fileName = 'output.txt'
-        self._httpFileName = 'output-http.txt'
-        self._showCaller = True
-        self.verbosity = 10
+        self._file_name = 'output.txt'
+        self._http_file_name = 'output-http.txt'
+        # I changed this to false because the performance is enhanced A LOT
+        # Show Caller False: Performed 4001 requests in 10 seconds (400.100000 req/sec)
+        # Show Caller True: Performed 4001 requests in 28 seconds (142.892857 req/sec)
+        self._show_caller = False
+        self.verbose = True
         
         # Internal variables
-        self._flushCounter = 0
-        self._flushNumber = 10
+        self._flush_counter = 0
+        self._flush_number = 10
         self._initialized = False
+        # File handlers
         self._file = None
+        self._http = None
 
     
     def _init( self ):
         self._initialized = True
         try:
-            self._file = codecs.open( self._fileName, "w", "utf-8", 'replace' )
+            #self._file = codecs.open( self._file_name, "w", "utf-8", 'replace' )
+            self._file = open( self._file_name, "w")
         except Exception, e:
-            raise w3afException('Cant open report file ' + self._httpFileName + ' for output. Exception: ' + str(e) )
+            msg = 'Cant open report file "' + self._http_file_name + '" for output. Exception: "'
+            msg += str(e) + '".'
+            raise w3afException( msg )
             
         try:
             # Images aren't ascii, so this file that logs every request/response, will be binary
-            self._http = file( self._httpFileName, "wb" )
+            #self._http = codecs.open( self._http_file_name, "wb", "utf-8", 'replace' )
+            self._http = open( self._http_file_name, "wb" )
         except Exception, e:
-            raise w3afException('Cant open HTTP log file ' + self._httpFileName + ' for output. Exception: ' + str(e) )
+            msg = 'Cant open report file "' + self._http_file_name + '" for output. Exception: "'
+            msg += str(e) + '".'
+            raise w3afException( msg )
         
     def __del__(self):
         if self._file != None:
             self._file.close()
     
-    def _writeToFile( self, msg ):
+    def _write_to_file( self, msg ):
+        '''
+        Write to the log file.
+        
+        @parameter msg: The text to write.
+        '''
         try:
             self._file.write( self._cleanString(msg) )
         except Exception, e:
             print 'An exception was raised while trying to write to the output file:', e
             sys.exit(1)
         
-    def _writeToHTTPLog( self, msg ):
+    def _write_to_HTTP_log( self, msg ):
+        '''
+        Write to the HTTP log file.
+        
+        @parameter msg: The text to write (a string representation of the HTTP req and res)
+        '''
         try:
             self._http.write( msg )
         except Exception, e:
@@ -95,22 +118,22 @@ class textFile(baseOutputPlugin):
         if not self._initialized:
             self._init()
             
-        if self.verbosity > 5:
-            toPrint = message
+        if self.verbose:
+            to_print = message
             
             now = time.localtime(time.time())
-            theTime = time.strftime("%c", now)
-            if self._showCaller:
-                timestamp = '[ ' + theTime + ' - debug - '+self.getCaller()+' ] '
+            the_time = time.strftime("%c", now)
+            if self._show_caller:
+                timestamp = '[ ' + the_time + ' - debug - '+self.getCaller()+' ] '
             else:
-                timestamp = '[ ' + theTime + ' - debug ] '
+                timestamp = '[ ' + the_time + ' - debug ] '
             
-            toPrint = timestamp + toPrint
-            toPrint = toPrint.replace('\n', '\n'+timestamp)
+            to_print = timestamp + to_print
+            to_print = to_print.replace('\n', '\n'+timestamp)
             if newLine == True:
-                toPrint += '\n'
+                to_print += '\n'
             
-            self._writeToFile( toPrint )
+            self._write_to_file( to_print )
             self._flush()
 
     
@@ -122,22 +145,22 @@ class textFile(baseOutputPlugin):
         if not self._initialized:
             self._init()
             
-        toPrint = message
+        to_print = message
     
         now = time.localtime(time.time())
-        theTime = time.strftime("%c", now)
-        if self._showCaller:
-            timestamp = '[ ' + theTime + ' - information - '+self.getCaller()+' ] '
+        the_time = time.strftime("%c", now)
+        if self._show_caller:
+            timestamp = '[ ' + the_time + ' - information - '+self.getCaller()+' ] '
         else:
-            timestamp = '[ ' + theTime + ' - information ] '
+            timestamp = '[ ' + the_time + ' - information ] '
         
-        toPrint = timestamp + toPrint
-        toPrint = toPrint.replace('\n', '\n'+timestamp)
+        to_print = timestamp + to_print
+        to_print = to_print.replace('\n', '\n'+timestamp)
         
         if newLine == True:
-            toPrint += '\n'
+            to_print += '\n'
             
-        self._writeToFile( toPrint )
+        self._write_to_file( to_print )
 
         self._flush()
 
@@ -150,18 +173,18 @@ class textFile(baseOutputPlugin):
         if not self._initialized:
             self._init()
         
-        toPrint = message
+        to_print = message
         if newLine == True:
-            toPrint += '\n'
+            to_print += '\n'
         
         now = time.localtime(time.time())
-        theTime = time.strftime("%c", now)
-        if self._showCaller:
-            timestamp = '[ ' + theTime + ' - error - '+self.getCaller()+' ] '
+        the_time = time.strftime("%c", now)
+        if self._show_caller:
+            timestamp = '[ ' + the_time + ' - error - '+self.getCaller()+' ] '
         else:
-            timestamp = '[ ' + theTime + ' - error ] '
+            timestamp = '[ ' + the_time + ' - error ] '
             
-        self._writeToFile( timestamp + toPrint )
+        self._write_to_file( timestamp + to_print )
 
         self._flush()
 
@@ -173,16 +196,16 @@ class textFile(baseOutputPlugin):
         if not self._initialized:
             self._init()
         
-        toPrint = message
+        to_print = message
         if newLine == True:
-            toPrint += '\n'
+            to_print += '\n'
         now = time.localtime(time.time())
-        theTime = time.strftime("%c", now)
-        if self._showCaller:
-            timestamp = '[ ' + theTime + ' - vulnerability - '+self.getCaller()+' ] '
+        the_time = time.strftime("%c", now)
+        if self._show_caller:
+            timestamp = '[ ' + the_time + ' - vulnerability - '+self.getCaller()+' ] '
         else:
-            timestamp = '[ ' + theTime + ' - vulnerability ] '
-        self._writeToFile( timestamp + toPrint )
+            timestamp = '[ ' + the_time + ' - vulnerability ] '
+        self._write_to_file( timestamp + to_print )
 
         self._flush()
         
@@ -192,26 +215,87 @@ class textFile(baseOutputPlugin):
         '''
         if not self._initialized:
             self._init()
-        toPrint = message
+        to_print = message
         if newLine == True:
-            toPrint += '\n'
+            to_print += '\n'
         now = time.localtime(time.time())
-        theTime = time.strftime("%c", now)
+        the_time = time.strftime("%c", now)
         
-        if self._showCaller:
-            timestamp = '[ ' + theTime + ' - console - '+self.getCaller()+' ] '
+        if self._show_caller:
+            timestamp = '[ ' + the_time + ' - console - '+self.getCaller()+' ] '
         else:
-            timestamp = '[ ' + theTime + ' - console ] '
+            timestamp = '[ ' + the_time + ' - console ] '
             
-        self._writeToFile( timestamp + toPrint )
+        self._write_to_file( timestamp + to_print )
         self._flush()
         
+    def logEnabledPlugins(self,  plugins_dict,  options_dict):
+        '''
+        This method is called from the output manager object. This method should take an action
+        for the enabled plugins and their configuration. Usually, write the info to a file or print
+        it somewhere.
+        
+        @parameter pluginsDict: A dict with all the plugin types and the enabled plugins for that
+                                               type of plugin.
+        @parameter optionsDict: A dict with the options for every plugin.
+        '''
+        now = time.localtime(time.time())
+        the_time = time.strftime("%c", now)
+        timestamp = '[ ' + the_time + ' - Enabled plugins ] '
+        
+        to_print = ''
+        
+        for plugin_type in plugins_dict:
+            to_print += self._create_plugin_info( plugin_type, plugins_dict[plugin_type], 
+                                                                  options_dict[plugin_type])
+        
+        # And now the target information
+        str_targets = ', '.join( cf.cf.getData('targets') )
+        to_print += 'target\n'
+        to_print += '    set target ' + str_targets + '\n'
+        to_print += '    back'
+        
+        to_print = to_print.replace('\n', '\n' + timestamp ) + '\n'
+        
+        self._write_to_file( timestamp + to_print )
+    
+    def _create_plugin_info(self, plugin_type, plugins_list, plugins_options):
+        '''
+        @return: A string with the information about enabled plugins and their options.
+        
+        @parameter plugin_type: audit, discovery, etc.
+        @parameter plugins_list: A list of the names of the plugins of plugin_type that are enabled.
+        @parameter plugins_options: The options for the plugins
+        '''
+        response = ''
+        
+        # Only work if something is enabled
+        if plugins_list:
+            response = 'plugins\n'
+            response += '    ' + plugin_type + ' ' + ', '.join(plugins_list) + '\n'
+            
+            for plugin_name in plugins_list:
+                if plugins_options.has_key(plugin_name):
+                    response += '    ' + plugin_type + ' config ' + plugin_name + '\n'
+                    
+                    for plugin_option in plugins_options[plugin_name]:
+                        name = str(plugin_option.getName())
+                        value = str(plugin_option.getValue())
+                        response += '        set ' + name + ' ' + value + '\n'
+                    
+                    response += '        back\n'
+            
+            response += '    back\n'
+            
+        # The response
+        return response
+    
     def _flush(self):
         '''
         textfile.flush is called every time a message is sent to this plugin.
-        self._file.flush() is called every self._flushNumber
+        self._file.flush() is called every self._flush_number
         '''
-        if self._flushCounter % self._flushNumber == 0:
+        if self._flush_counter % self._flush_number == 0:
             self._file.flush()
             
     def setOptions( self, OptionList ):
@@ -224,26 +308,26 @@ class textFile(baseOutputPlugin):
         
         @return: No value is returned.
         ''' 
-        self.verbosity = OptionList['verbosity']
-        self._fileName = OptionList['fileName']
-        self._httpFileName = OptionList['httpFileName']
-        self._showCaller = OptionList['showCaller']
+        self.verbose = OptionList['verbose'].getValue()
+        self._file_name = OptionList['fileName'].getValue()
+        self._http_file_name = OptionList['httpFileName'].getValue()
+        self._show_caller = OptionList['showCaller'].getValue()
     
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
         '''
-        d1 = 'Verbosity level for this plugin.'
-        o1 = option('verbosity', self.verbosity, d1, 'integer')
+        d1 = 'Enable if verbose output is needed'
+        o1 = option('verbose', self.verbose, d1, 'boolean')
         
         d2 = 'File name where this plugin will write to'
-        o2 = option('fileName', self._fileName, d2, 'string')
+        o2 = option('fileName', self._file_name, d2, 'string')
         
         d3 = 'File name where this plugin will write HTTP requests and responses'
-        o3 = option('httpFileName', self._httpFileName, d3, 'string')
+        o3 = option('httpFileName', self._http_file_name, d3, 'string')
         
         d4 = 'Enables a slightly more verbose output that shows who called the output manager'
-        o4 = option('showCaller', self._showCaller, d4, 'boolean')
+        o4 = option('showCaller', self._show_caller, d4, 'boolean')
         
         ol = optionList()
         ol.add(o1)
@@ -259,16 +343,16 @@ class textFile(baseOutputPlugin):
         @parameter response: A httpResponse object
         '''
         now = time.localtime(time.time())
-        theTime = time.strftime("%c", now)
+        the_time = time.strftime("%c", now)
         
-        msg = '='*40  + 'Request ' + str(response.id) + ' - '+ theTime+'='*40 + '\n'
-        self._writeToHTTPLog(  msg )
-        self._writeToHTTPLog( request.dump() )
-        msg2 = '\n' + '='*40  + 'Response ' + str(response.id) + ' - '+ theTime+'='*39 + '\n'
-        self._writeToHTTPLog( msg2 )
-        self._writeToHTTPLog( response.dump() )
+        msg = '='*40  + 'Request ' + str(response.id) + ' - '+ the_time+'='*40 + '\n'
+        self._write_to_HTTP_log(  msg )
+        self._write_to_HTTP_log( request.dump() )
+        msg2 = '\n' + '='*40  + 'Response ' + str(response.id) + ' - '+ the_time+'='*39 + '\n'
+        self._write_to_HTTP_log( msg2 )
+        self._write_to_HTTP_log( response.dump() )
         
-        self._writeToHTTPLog( '\n' + '='*(len(msg)-1) + '\n')
+        self._write_to_HTTP_log( '\n' + '='*(len(msg)-1) + '\n')
         self._http.flush()
 
     def getLongDesc( self ):
@@ -281,6 +365,6 @@ class textFile(baseOutputPlugin):
         Four configurable parameters exist:
             - fileName
             - httpFileName
-            - verbosity
+            - verbose
             - showCaller
         '''

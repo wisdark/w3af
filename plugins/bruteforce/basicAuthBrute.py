@@ -21,19 +21,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
-# options
-from core.data.options.option import option
-from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseBruteforcePlugin import baseBruteforcePlugin
-import core.data.kb.knowledgeBase as kb
 from core.controllers.w3afException import w3afException
-import core.data.kb.vuln as vuln
 from core.data.url.xUrllib import xUrllib
-import os.path
-from core.controllers.bruteforce.bruteforcer import bruteforcer
 import core.data.parsers.urlParser as urlParser
+
+import core.data.kb.knowledgeBase as kb
+import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
+
 
 class basicAuthBrute(baseBruteforcePlugin):
     '''
@@ -44,20 +41,26 @@ class basicAuthBrute(baseBruteforcePlugin):
     def __init__(self):
         baseBruteforcePlugin.__init__(self)
 
-    def _fuzzRequests(self, freq ):
+    def audit(self, freq ):
         '''
         Tries to bruteforce a basic HTTP auth. This aint fast!
         
         @param freq: A fuzzableRequest
         '''
-        authUrlList = [ urlParser.getDomainPath( i.getURL() ) for i in kb.kb.getData( 'httpAuthDetect', 'auth' )]
+        auth_url_list = [ urlParser.getDomainPath( i.getURL() ) for i in kb.kb.getData( 'httpAuthDetect', 'auth' )]
         
-        domPath = urlParser.getDomainPath( freq.getURL() )
+        domain_path = urlParser.getDomainPath( freq.getURL() )
         
-        if domPath in authUrlList:
-            if domPath not in self._alreadyTested:
-                om.out.information('Starting basic authentication bruteforce on URL: ' + domPath )
-                self._initBruteforcer( domPath )
+        if domain_path in auth_url_list:
+            if domain_path not in self._alreadyTested:
+                
+                # Save it (we don't want dups!)
+                self._alreadyTested.append( domain_path )
+                
+                # Let the user know what we are doing
+                msg = 'Starting basic authentication bruteforce on URL: "' + domain_path + '".'
+                om.out.information( msg )
+                self._initBruteforcer( domain_path )
 
                 while not self._found or not self._stopOnFirst:
                     combinations = []
@@ -67,10 +70,11 @@ class basicAuthBrute(baseBruteforcePlugin):
                             combinations.append( self._bruteforcer.getNext() )
                         except:
                             om.out.information('No more user/password combinations available.')
-                            self._alreadyTested.append( domPath )
                             return
                     
-                    self._bruteforce( domPath, combinations )
+                    # wraps around bruteWorker
+                    # the wrapper starts a new thread
+                    self._bruteforce( domain_path, combinations )
     
     def _bruteWorker( self, url, combinations ):
         '''
@@ -101,19 +105,20 @@ class basicAuthBrute(baseBruteforcePlugin):
             if not self._found or not self._stopOnFirst:
 
                 try:
-                    response = uriOpener.GET( url, useCache=False, analyze=False )
+                    response = uriOpener.GET( url, useCache=False, grepResult=False )
                 except w3afException, w3:
-                    om.out.debug('Exception while bruteforcing basic authentication, error message: ' + str(w3) )
-                except Exception, e:
-                    om.out.debug('Unhandled exception while bruteforcing basic authentication, error message: ' + str(e) )
+                    msg = 'Exception while bruteforcing basic authentication, error message: ' 
+                    msg += str(w3)
+                    om.out.debug( msg )
                 else:
                     # GET was OK
                     if response.getCode() == 200:
                         self._found = True
                         v = vuln.vuln()
                         v.setURL( url )
-                        v.setDesc( 'Found authentication credentials to: '+ url +
-                        ' . A correct user and password combination is: ' + user + '/' + passwd)
+                        v.setId(response.id)
+                        v.setDesc( 'Found authentication credentials to: "'+ url +
+                        '". A correct user and password combination is: ' + user + '/' + passwd)
                         v['user'] = user
                         v['pass'] = passwd
                         v['response'] = response

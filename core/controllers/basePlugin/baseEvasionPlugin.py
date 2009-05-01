@@ -21,14 +21,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 from core.controllers.basePlugin.basePlugin import basePlugin
+from core.controllers.w3afException import w3afException
 
 class baseEvasionPlugin(basePlugin):
     '''
     This is the base class for evasion plugins, all evasion plugins should inherit from it 
     and implement the following methods :
-        1. fuzzUrl(...)
+        1. modifyRequest(...)
         2. setOptions( OptionList )
-        3. getOptionsXML()
+        3. getOptions()
 
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''

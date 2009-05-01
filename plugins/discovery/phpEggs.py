@@ -21,17 +21,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
-import core.data.kb.knowledgeBase as kb
-from core.controllers.w3afException import w3afRunOnce
-import core.data.kb.info as info
-import difflib
+from core.controllers.misc.levenshtein import relative_distance
+from core.controllers.w3afException import w3afRunOnce, w3afException
 import core.data.parsers.urlParser as urlParser
+
+from core.data.db.temp_persist import disk_list
+
+import core.data.kb.knowledgeBase as kb
+import core.data.kb.info as info
+
 import md5
+
 
 class phpEggs(baseDiscoveryPlugin):
     '''
@@ -42,27 +48,158 @@ class phpEggs(baseDiscoveryPlugin):
         baseDiscoveryPlugin.__init__(self)
         self._exec = True
         
-        # This is a list of hashes and description of the egg for every PHP version.
-        self._eggDB = {}
-        self._eggDB['4.1.2'] = [('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'), ('\x85\xbe;K\xe7\xbf\xe89\xcb\xb3\xb4\xf2\xd3\x0f\xf9\x83', 'Easter Egg'),     ('tJ\xec\xef\x04\xf9\xed\x1b\xc3\x9a\xe7s\xc4\x00\x17\xd1', 'PHP Credits'),     ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo')]  
-        self._eggDB['4.3.2'] =[('\x8a\x8bJA\x91\x03\x07\x8d\x82p|\xf6\x82&\xa4\x82', 'PHP Credits'), ('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'), ("\xa5{\xd7>'\xbe\x03\xa6-\xd6\xb3\xe1\xb57\xa7,", 'Easter Egg'), ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo')]
-        self._eggDB['4.3.9'] = [('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'),    ('\xf9\xb5k6\x1f\xaf\xd2\x8bf\x8c\xc3I\x84%\xa2;', 'PHP Credits'),  ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo')]  
-        self._eggDB['4.3.10'] = [('\x8f\xbfH\xd5\xa2\xa6@e\xfc&\xdb>\x89\x0b\x98q', 'PHP Credits'),('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'), ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo')]  
-        self._eggDB['4.3.10'] =[('\x8f\xbfH\xd5\xa2\xa6@e\xfc&\xdb>\x89\x0b\x98q', 'PHP Credits'), ('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'), ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo'), ("\xa5{\xd7>'\xbe\x03\xa6-\xd6\xb3\xe1\xb57\xa7,", 'Easter Egg')]
-        self._eggDB['4.3.11'] =[('K,\x92@\x9c\xf0\xbc\xf4e\xd1\x99\xe9:\x15\xac?', 'Easter Egg'),   ('\x8f\xbfH\xd5\xa2\xa6@e\xfc&\xdb>\x89\x0b\x98q', 'PHP Credits'),  ('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'),    ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo')]
-        self._eggDB['4.4.0'] = [('K,\x92@\x9c\xf0\xbc\xf4e\xd1\x99\xe9:\x15\xac?', 'Easter Egg'),   ('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'),    ('\xdd\xf1n\xc6~\x07\x0e\xc6$~\xc1\x90\x8cR7~', 'PHP Credits'),     ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo')]
-        self._eggDB['4.4.4'] = [('K,\x92@\x9c\xf0\xbc\xf4e\xd1\x99\xe9:\x15\xac?', 'Easter Egg'),   ('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'),    ('\xbe\xd7\xce\xff\t\xe9fm\x96\xfd\xf3Q\x8a\xf7\x8e\x0e', 'PHP Credits'),   ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo')]
-        self._eggDB['4.4.7'] = [('K,\x92@\x9c\xf0\xbc\xf4e\xd1\x99\xe9:\x15\xac?', 'Easter Egg'),   ('i*\x87\xca,QR<\x17\xf5\x97%6S\xc7w', 'PHP Credits'),  ('\x11\xb9\xcf\xe3\x06\x00O\xceY\x9a\x1f\x81\x80\xb6\x12f', 'PHP Logo'),    ('\xda-\xae\x87\xb1f\xb7p\x9d\xbd@a7[t\xcb', 'Zend Logo')]
+        # Already analyzed extensions
+        self._already_analyzed_ext = disk_list()
         
-        self._eggDB['5.1.1'] =[('U\x18\xa0*\xf4\x14x\xcf\xc4\x92\xc90\xac\xe4Z\xe5', 'PHP Credits'), ('\x8a\xc5\xa6\x86\x13[\x926d\xf6O\xe7\x18\xeaU\xcd', 'PHP Logo'), ('vu\xf1\xd0\x1c\x92\x7f\x9ejGR\xcf\x18#E\xa2', 'Zend Logo')]
-        self._eggDB['5.1.6'] = [('\x82\xfa-j\xa1_\x97\x1f}\xad\xef\xe4\xf2\xac \xe3', 'PHP Credits'),   ('\xc4\x8b\x07\x89\x99\x17\xdf\xb5\xd5\x91\x03 \x07\x04\x1a\xe3', 'PHP Logo'),  ('vu\xf1\xd0\x1c\x92\x7f\x9ejGR\xcf\x18#E\xa2', 'Zend Logo')]   
-        self._eggDB['5.1.6'] =[('\x82\xfa-j\xa1_\x97\x1f}\xad\xef\xe4\xf2\xac \xe3', 'PHP Credits'), ('\xc4\x8b\x07\x89\x99\x17\xdf\xb5\xd5\x91\x03 \x07\x04\x1a\xe3', 'PHP Logo'), ('vu\xf1\xd0\x1c\x92\x7f\x9ejGR\xcf\x18#E\xa2', 'Zend Logo'), ('P\xca\xaf&\x8bO=&\rr\n\x1a)\xc5\xfe!', 'Easter Egg')]       
-        self._eggDB['5.2.0-8+etch7'] =[('P\xca\xaf&\x8bO=&\rr\n\x1a)\xc5\xfe!', 'Easter Egg'), ("j\x1c!\x1f'3\x0f\x1a\xb6\x02\xc7\xc5t\xf3\xa2y", 'PHP Credits'), ('\xc4\x8b\x07\x89\x99\x17\xdf\xb5\xd5\x91\x03 \x07\x04\x1a\xe3', 'PHP Logo'), ('vu\xf1\xd0\x1c\x92\x7f\x9ejGR\xcf\x18#E\xa2', 'Zend Logo')]
-        self._eggDB['5.2.1'] = [('\xd3\x89N\x19#=\x97\x9d\xb0}b?`\x8bn\xce', 'PHP Credits'),('\xc4\x8b\x07\x89\x99\x17\xdf\xb5\xd5\x91\x03 \x07\x04\x1a\xe3', 'PHP Logo'), ('vu\xf1\xd0\x1c\x92\x7f\x9ejGR\xcf\x18#E\xa2', 'Zend Logo'),    ('P\xca\xaf&\x8bO=&\rr\n\x1a)\xc5\xfe!', 'Easter Egg')]
-        self._eggDB['5.2.2'] = [('P\xca\xaf&\x8bO=&\rr\n\x1a)\xc5\xfe!', 'Easter Egg'), ('V\xf985\x87\xeb\xcc\x94U\x8e\x11\xec\x08XO\x05', 'PHP Credits'),  ('\xc4\x8b\x07\x89\x99\x17\xdf\xb5\xd5\x91\x03 \x07\x04\x1a\xe3', 'PHP Logo'),  ('vu\xf1\xd0\x1c\x92\x7f\x9ejGR\xcf\x18#E\xa2', 'Zend Logo')]
-        self._eggDB['5.2.3-1+b1'] = [('P\xca\xaf&\x8bO=&\rr\n\x1a)\xc5\xfe!', 'Easter Egg'),    ('\xc4\x8b\x07\x89\x99\x17\xdf\xb5\xd5\x91\x03 \x07\x04\x1a\xe3', 'PHP Logo'),  ('vu\xf1\xd0\x1c\x92\x7f\x9ejGR\xcf\x18#E\xa2', 'Zend Logo'),   ('\xc3|\x96\xe8r\x8d\xc9Y\xc5R\x19\xd4\x7f-T?', 'PHP Credits')]     
-        self._eggDB['5.2.5'] = [('P\xca\xaf&\x8bO=&\rr\n\x1a)\xc5\xfe!', 'Easter Egg'),    ('\xc4\x8b\x07\x89\x99\x17\xdf\xb5\xd5\x91\x03 \x07\x04\x1a\xe3', 'PHP Logo'),  ('vu\xf1\xd0\x1c\x92\x7f\x9ejGR\xcf\x18#E\xa2', 'Zend Logo'),   ('\xc3|\x96\xe8r\x8d\xc9Y\xc5R\x19\xd4\x7f-T?', 'PHP Credits')]     
-        self._eggDB['5.2.4'] = [('\x8f\xe9z\x7f\xa0,)Q\x1dR\x07\xa8G\xa6\x91\xff','PHP Logo'), ('\x8f\xe9z\x7f\xa0,)Q\x1dR\x07\xa8G\xa6\x91\xff', 'ZendLogo'), ('\x8f\xe9z\x7f\xa0,)Q\x1dR\x07\xa8G\xa6\x91\xff', 'PHP Credits'),('\x8f\xe9z\x7f\xa0,)Q\x1dR\x07\xa8G\xa6\x91\xff', 'Easter Egg')]
+        # This is a list of hashes and description of the egg for every PHP version.
+        self._egg_DB = {}
+        self._egg_DB["4.1.2"] = [ 
+                ("744aecef04f9ed1bc39ae773c40017d1", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("85be3b4be7bfe839cbb3b4f2d30ff983", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.2.2"] = [ 
+                ("758ccaa9094cdeedcfc60017e768137e", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("85be3b4be7bfe839cbb3b4f2d30ff983", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.3.10"] = [ 
+                ("1e8fe4ae1bf06be222c1643d32015f0c", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("a57bd73e27be03a62dd6b3e1b537a72c", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.3.10-18"] = [ 
+                ("1e8fe4ae1bf06be222c1643d32015f0c", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("4b2c92409cf0bcf465d199e93a15ac3f", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.3.11"] = [ 
+                ("1e8fe4ae1bf06be222c1643d32015f0c", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("a8ad323e837fa00771eda6b709f40e37", "PHP Logo 2"), 
+                ("a8ad323e837fa00771eda6b709f40e37", "Zend Logo") ]
+        self._egg_DB["4.3.2"] = [ 
+                ("8a8b4a419103078d82707cf68226a482", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("a57bd73e27be03a62dd6b3e1b537a72c", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.3.8"] = [ 
+                ("96714a0fbe23b5c07c8be343adb1ba90", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("a57bd73e27be03a62dd6b3e1b537a72c", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.3.9"] = [ 
+                ("f9b56b361fafd28b668cc3498425a23b", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.4.0"] = [ 
+                ("ddf16ec67e070ec6247ec1908c52377e", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("4b2c92409cf0bcf465d199e93a15ac3f", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.4.0 for Windows"] = [ 
+                ("6d974373683ecfcf30a7f6873f2d234a", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("4b2c92409cf0bcf465d199e93a15ac3f", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.4.4"] = [ 
+                ("bed7ceff09e9666d96fdf3518af78e0e", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("4b2c92409cf0bcf465d199e93a15ac3f", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.4.4-8+etch6"] = [ 
+                ("31a2553efc348a21b85e606e5e6c2424", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("4b2c92409cf0bcf465d199e93a15ac3f", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.4.7"] = [ 
+                ("72b7ad604fe1362f1e8bf4f6d80d4edc", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("4b2c92409cf0bcf465d199e93a15ac3f", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["4.4.8"] = [ 
+                ("4cdfec8ca11691a46f4f63839e559fc5", "PHP Credits"), 
+                ("11b9cfe306004fce599a1f8180b61266", "PHP Logo"), 
+                ("4b2c92409cf0bcf465d199e93a15ac3f", "PHP Logo 2"), 
+                ("da2dae87b166b7709dbd4061375b74cb", "Zend Logo") ]
+        self._egg_DB["5.0.3"] = [ 
+                ("def61a12c3b0a533146810403d325451", "PHP Credits"), 
+                ("8ac5a686135b923664f64fe718ea55cd", "PHP Logo"), 
+                ("37e194b799d4aaff10e39c4e3b2679a2", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.1.1"] = [ 
+                ("5518a02af41478cfc492c930ace45ae5", "PHP Credits"), 
+                ("8ac5a686135b923664f64fe718ea55cd", "PHP Logo"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.1.6"] = [ 
+                ("4b689316409eb09b155852e00657a0ae", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.0"] = [ 
+                ("e566715bcb0fd2cb1dc43ed076c091f1", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.0-8+etch10"] = [ 
+                ("e566715bcb0fd2cb1dc43ed076c091f1", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.0-8+etch7"] = [ 
+                ("307f5a1c02155ca38744647eb94b3543", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.1"] = [ 
+                ("d3894e19233d979db07d623f608b6ece", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.2"] = [ 
+                ("56f9383587ebcc94558e11ec08584f05", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.3-1+b1"] = [ 
+                ("c37c96e8728dc959c55219d47f2d543f", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.4"] = [ 
+                ("74c33ab9745d022ba61bc43a5db717eb", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.5"] = [ 
+                ("f26285281120a2296072f21e21e7b4b0", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.4-2ubuntu5.3"] = [ 
+                ("f26285281120a2296072f21e21e7b4b0", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.5-3"] = [ 
+                ("b7e4385bd7f07e378d92485b4722c169", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("0152ed695f4291488741d98ba066d280", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.6"] = [ 
+                ("bbd44c20d561a0fc5a4aa76093d5400f", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB["5.2.6RC4-pl0-gentoo"] = [ 
+                ("d03b2481f60d9e64cb5c0f4bd0c87ec1", "PHP Credits"), 
+                ("c48b07899917dfb5d591032007041ae3", "PHP Logo"), 
+                ("50caaf268b4f3d260d720a1a29c5fe21", "PHP Logo 2"), 
+                ("7675f1d01c927f9e6a4752cf182345a2", "Zend Logo") ]
+        self._egg_DB['5.2.8-pl1-gentoo'] = [
+                ('c48b07899917dfb5d591032007041ae3', 'PHP Logo'), 
+                ('40410284d460552a6c9e10c1f5ae7223', 'PHP Credits'), 
+                ('50caaf268b4f3d260d720a1a29c5fe21', 'PHP Logo 2'), 
+                ('7675f1d01c927f9e6a4752cf182345a2', 'Zend Logo')]
         
     def discover(self, fuzzableRequest ):
         '''
@@ -74,75 +211,104 @@ class phpEggs(baseDiscoveryPlugin):
             # This will remove the plugin from the discovery plugins to be runned.
             raise w3afRunOnce()
         else:
-            getResults = []
-            originalResponse = self._urlOpener.GET( fuzzableRequest.getURL(), useCache=True )
+            # Get the extension of the URL (.html, .php, .. etc)
+            ext = urlParser.getExtension( fuzzableRequest.getURL() )
             
-            for egg, desc in self._getEggs():
-                eggURL = urlParser.uri2url( fuzzableRequest.getURL() ) + egg
-                try:
-                    response = self._urlOpener.GET( eggURL, useCache=True )
-                except KeyboardInterrupt,e:
-                    raise e
-                else:
-                    if difflib.SequenceMatcher( None, originalResponse.getBody(), response.getBody() ).ratio() < 0.1:
-                        # Found an egg, save it.
-                        i = info.info()
-                        i.setName('PHP Egg')
-                        i.setURL( eggURL )
-                        i.setDesc( 'The PHP framework running on the remote server has an easter egg, example URL: '+  eggURL )
-                        kb.kb.append( self, 'eggs', i )
-                        om.out.information( i.getDesc() )
-                        
-                        getResults.append( (response, desc) )
-                        self._exec = False
+            # Only perform this analysis if we haven't already analyzed this type of extension
+            # OR if we get an URL like http://f00b5r/4/     (Note that it has no extension)
+            # This logic will perform some extra tests... but we won't miss some special cases
+            # Also, we aren't doing something like "if 'php' in ext:" because we never depend
+            # on something so changable as extensions to make decisions.
+            if ext == '' or ext not in self._already_analyzed_ext:
                 
-            self._analyzeEgg( getResults )
+                # Init some internal variables
+                GET_results = []
+                original_response = self._urlOpener.GET( fuzzableRequest.getURL(), useCache=True )
+                
+                # Perform the GET requests to see if we have a phpegg
+                for egg, egg_desc in self._get_eggs():
+                    egg_URL = urlParser.uri2url( fuzzableRequest.getURL() ) + egg
+                    try:
+                        response = self._urlOpener.GET( egg_URL, useCache=True )
+                    except KeyboardInterrupt,e:
+                        raise e
+                    except w3afException, w3:
+                        raise w3
+                    else:
+                        if relative_distance(original_response.getBody(), response.getBody()) < 0.1:
+                            # Found an egg, save it.
+                            i = info.info()
+                            i.setName('PHP Egg - ' + egg_desc)
+                            i.setURL( egg_URL )
+                            desc = 'The PHP framework running on the remote server has a "'
+                            desc += egg_desc +'" easter egg, access to the PHP egg is possible'
+                            desc += ' through the URL: "'+  egg_URL + '".'
+                            i.setDesc( desc )
+                            kb.kb.append( self, 'eggs', i )
+                            om.out.information( i.getDesc() )
+                            
+                            GET_results.append( (response, egg_desc) )
+                            self._exec = False
+                
+                # analyze the info to see if we can identify the version
+                self._analyze_egg( GET_results )
+                
+                # Now we save the extension as one of the already analyzed
+                if ext != '':
+                    self._already_analyzed_ext.append(ext)
         
         return []
     
-    def _analyzeEgg( self, response ):
+    def _analyze_egg( self, response ):
         '''
-        Analyzes the eggs and tries to deduce a PHP version number ( which is saved to the kb ).
+        Analyzes the eggs and tries to deduce a PHP version number
+        ( which is then saved to the kb ).
         '''
         if not response:
             return None
         else:
-            cmpList = []
+            cmp_list = []
             for r in response:
-                cmpList.append( (md5.new(r[0].getBody()).digest(), r[1] ) )
-            cmpSet = set( cmpList )
+                cmp_list.append( (md5.new(r[0].getBody()).hexdigest(), r[1] ) )
+            cmp_set = set( cmp_list )
             
             found = False
-            matchingVersions = []
-            for version in self._eggDB:
-                versionHashes = set( self._eggDB[ version ] )
+            matching_versions = []
+            for version in self._egg_DB:
+                version_hashes = set( self._egg_DB[ version ] )
             
-                if len( cmpSet ) == len( cmpSet.intersection( versionHashes ) ):
-                    matchingVersions.append( version )
+                if len( cmp_set ) == len( cmp_set.intersection( version_hashes ) ):
+                    matching_versions.append( version )
                     found = True
             
-            if versionHashes:
+            if matching_versions:
                 i = info.info()
                 i.setName('PHP Egg')
-                i.setDesc( 'The PHP framework version running on the remote server was identified as: '+  ' / '.join(matchingVersions) )
-                i['version'] = matchingVersions
+                msg = 'The PHP framework version running on the remote server was identified as:'
+                for m_ver in matching_versions:
+                    msg += '\n- ' + m_ver
+                i.setDesc( msg )
+                i['version'] = matching_versions
                 kb.kb.append( self, 'version', i )
                 om.out.information( i.getDesc() )
 
             if not found:
                 version = 'unknown'
-                poweredByHeaders = kb.kb.getData( 'serverHeader' , 'poweredBy' )
+                powered_by_headers = kb.kb.getData( 'serverHeader' , 'poweredByString' )
                 try:
-                    for v in poweredByHeaders:
+                    for v in powered_by_headers:
                         if 'php' in v.lower():
                             version = v.split('/')[1]
                 except:
                     pass
-                om.out.information('The PHP version could not be identified using PHP eggs, please send this signature and the \
-PHP version to the w3af project. Signature: self._eggDB[\''+ version + '\'] =' + str(list(cmpSet)) )
-                om.out.information('The serverHeader plugin reported this PHP version: ' + version )
+                msg = 'The PHP version could not be identified using PHP eggs, please send this'
+                msg += ' signature and the PHP version to the w3af project develop mailing list.'
+                msg += ' Signature: self._egg_DB[\''+ version + '\'] = ' + str(list(cmp_set))
+                msg += '\n'
+                msg += 'The serverHeader plugin reported this PHP version: "' + version + '".'
+                om.out.information( msg )
             
-    def _getEggs( self ):
+    def _get_eggs( self ):
         '''
         @return: A list of tuples with the egg url and a description.
         '''
@@ -150,7 +316,7 @@ PHP version to the w3af project. Signature: self._eggDB[\''+ version + '\'] =' +
         res.append( ('?=PHPB8B5F2A0-3C92-11d3-A3A9-4C7B08C10000', 'PHP Credits') )
         res.append( ('?=PHPE9568F34-D428-11d2-A769-00AA001ACF42', 'PHP Logo') )
         res.append( ('?=PHPE9568F35-D428-11d2-A769-00AA001ACF42', 'Zend Logo') )
-        res.append( ('?=PHPE9568F36-D428-11d2-A769-00AA001ACF42', 'Easter Egg') )
+        res.append( ('?=PHPE9568F36-D428-11d2-A769-00AA001ACF42', 'PHP Logo 2') )
         return res
         
     def getOptions( self ):
@@ -189,5 +355,5 @@ PHP version to the w3af project. Signature: self._eggDB[\''+ version + '\'] =' +
             - http://php.net/?=PHPB8B5F2A0-3C92-11d3-A3A9-4C7B08C10000 ( PHP Credits )
             - http://php.net/?=PHPE9568F34-D428-11d2-A769-00AA001ACF42  ( PHP Logo )
             - http://php.net/?=PHPE9568F35-D428-11d2-A769-00AA001ACF42  ( Zend Logo )
-            - http://php.net/?=PHPE9568F36-D428-11d2-A769-00AA001ACF42  ( Easter Egg )
+            - http://php.net/?=PHPE9568F36-D428-11d2-A769-00AA001ACF42  ( PHP Logo 2 )
         '''

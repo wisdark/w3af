@@ -20,19 +20,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-import core.data.parsers.htmlParser as htmlParser
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
-import core.data.parsers.urlParser as urlParser
-import urllib
-import re
-from core.data.getResponseType import *
 import core.data.constants.severity as severity
+from core.data.constants.common_directories import get_common_directories
+
+import core.data.parsers.urlParser as urlParser
+import re
+
 
 class pathDisclosure(baseGrepPlugin):
     '''
@@ -43,106 +46,147 @@ class pathDisclosure(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
-        self._urlList = []
-
-    def _testResponse(self, request, response):
         
-        if isTextOrHtml(response.getHeaders()):
+        # Internal variables
+        self._already_added = []
+        
+        # Compile all regular expressions now
+        self._path_disc_regex_list = []
+        self._compile_regex()
+        
+    def _compile_regex(self):
+        '''
+        @return: None, the result is saved in self._path_disc_regex_list
+        '''
+        for path_disclosure_string in self._get_path_disclosure_strings():
+            regex_string = '('+path_disclosure_string + '.*?)[^A-Za-z0-9\._\-\\/\+~]'
+            regex = re.compile( regex_string,  re.IGNORECASE)
+            self._path_disc_regex_list.append(regex)
+
+    def grep(self, request, response):
+        '''
+        Identify the path disclosure vulnerabilities.
+        
+        @return: None, the result is saved in the kb.
+        '''
+        if response.is_text_or_html():
             # Decode the realurl
             realurl = urlParser.urlDecode( response.getURL() )
             
-            htmlString = response.getBody()
-            for pathDisclosureString in self._getPathDisclosureStrings():
-                matches = re.findall( pathDisclosureString + '.*?[:|\'|"|<|\n|\r|\t]', htmlString  )
-                for match in matches:
-                    match = match[:-1]
+            html_string = response.getBody()
+            for path_disc_regex in self._path_disc_regex_list:
+                match_list = path_disc_regex.findall( html_string  )
+                
+                for match in match_list:
                     
-                    # The if is to avoid false positives
-                    if not self._wasSent( request, pathDisclosureString ):
+                    # This if is to avoid false positives
+                    if not self._wasSent( request, match ) and not \
+                    self._attr_value( match, html_string ):
                         
-                        v = vuln.vuln()
-                        v.setURL( realurl )
-                        v.setId( response.id )
-                        v.setDesc( 'The URL : ' + v.getURL() + ' has a path disclosure problem. This is it: "' + match  + '". ')
-                        v.setSeverity(severity.LOW)
-                        v.setName( 'Path disclosure vulnerability' )
-                        v['path'] = match
-                        kb.kb.append( self, 'pathDisclosure', v )
+                        # Check for dups
+                        if (realurl, match) in self._already_added:
+                            continue
+                        else:
+                            # It's a new one, report!
+                            self._already_added.append( (realurl, match) )
+                            
+                            v = vuln.vuln()
+                            v.setURL( realurl )
+                            v.setId( response.id )
+                            msg = 'The URL: "' + v.getURL() + '" has a path disclosure '
+                            msg += 'vulnerability which discloses: "' + match  + '".'
+                            v.setDesc( msg )
+                            v.setSeverity(severity.LOW)
+                            v.setName( 'Path disclosure vulnerability' )
+                            v['path'] = match
+                            v.addToHighlight( match )
+                            kb.kb.append( self, 'pathDisclosure', v )
         
-        self._updateKBPathList( response.getURL() )
-                        
-    def _updateKBPathList( self, url ):
+        self._update_KB_path_list()
+    
+    def _attr_value(self, path_disclosure_string, response_body ):
+        '''
+        This method was created to remove some false positives.
+        
+        @return: True if path_disclosure_string is the value of an attribute inside a tag.
+        
+        Examples:
+            path_disclosure_string = '/home/image.png'
+            response_body = '....<img src="/home/image.png">...'
+            return: True
+            
+            path_disclosure_string = '/home/image.png'
+            response_body = '...<b>Error while processing /home/image.png</b>...'
+            return: False
+        '''
+        regex_res = re.findall('<.+?(["|\']'+ re.escape(path_disclosure_string) +'["|\']).*?>', response_body)
+        in_attr = path_disclosure_string in regex_res
+        return in_attr
+    
+    def _update_KB_path_list( self ):
         '''
         If a path disclosure was found, I can create a list of full paths to all URLs ever visited.
         This method updates that list.
         '''
-        self._urlList.append( url )
-        
-        pathDiscVulns = kb.kb.getData( 'pathDisclosure', 'pathDisclosure' ) 
-        if len( pathDiscVulns ) == 0:
-            # I cant calculate the list !
+        path_disc_vulns = kb.kb.getData( 'pathDisclosure', 'pathDisclosure' ) 
+        if len( path_disc_vulns ) == 0:
+            # I can't calculate the list !
             pass
         else:
+            # Init the kb variables
+            kb.kb.save( self, 'listFiles', [] )
+            
             # Note that this list is recalculated every time a new page is accesed
             # this is goood :P
-            urlList = kb.kb.getData( 'urls', 'urlList' )
-            match = False
-            for pathDiscVuln in pathDiscVulns:
-                for url in urlList:
-                    pathAndFile = urlParser.getPath( url )
-                    
-                    if pathDiscVuln['path'].endswith( pathAndFile ):
-                        match = True
-                        
-                        if urlParser.baseUrl( urlList[0] ) not in urlList:
-                            urlList.append( urlParser.baseUrl( urlList[0] ) )
-                        
-                        webroot = pathDiscVuln['path'].replace( pathAndFile, '' )
-                        tmp = []
-                        for url in urlList:
-                            tmp.append( webroot + urlParser.getPath( url ) )
-                        
-                        tmp.extend( kb.kb.getData( self, 'listFiles') )
-                        paths = list( set( tmp ) )
-                        kb.kb.save( self, 'listFiles', tmp )
-                        
-                        # Now I create the path list based on the file list
-                        # I have to be extra carefull, cause :
-                        # - I cant use os.path.dirname [cause i', working with a remote server]
-                        # - Windows and linux paths are diff :P
-                        pathSep = '/'
-                        if webroot[0]!='/':
-                            pathSep = '\\'
-                        paths = []
-                        for file in tmp:
-                            # I need to get the path
-                            path = pathSep.join( file.split( pathSep )[:-1] ) + pathSep
-                            paths.append( (webroot,path) )
-                            
-                        paths.extend( kb.kb.getData( self, 'listPaths') )
-                        paths = list( set( paths ) )
-                        kb.kb.save( self, 'listPaths', paths ) 
+            url_list = kb.kb.getData( 'urls', 'urlList' )
             
-            if not match:
-                kb.kb.save( self, 'listFiles', [] ) 
-                kb.kb.save( self, 'listPaths', [] ) 
+            # Now I find the longest match between one of the URLs that w3af has
+            # discovered, and one of the path disclosure strings that this plugin has
+            # found. I use the longest match because with small match_list I have more
+            # probability of making a mistake.
+            longest_match = ''
+            longest_path_disc_vuln = None
+            for path_disc_vuln in path_disc_vulns:
+                for url in url_list:
+                    path_and_file = urlParser.getPath( url )
 
-            
-    def _wasSent( self, request, pathDisclosureString ):
-        '''
-        Checks if the pathDisclosureString was sent in the request.
-        '''
-        url = urllib.unquote( request.getURI() )
-        if request.getMethod().upper() == 'POST':
-            sentData = request.getData()
-            sentData = urllib.unquote( sentData )
-        else:
-            sentData = ''
-        
-        if url.count( pathDisclosureString ) or sentData.count( pathDisclosureString ):
-            return True
-        else:
-            return False
+                    if path_disc_vuln['path'].endswith( path_and_file ):
+                        if len(longest_match) < len(path_and_file):
+                            longest_match = path_and_file
+                            longest_path_disc_vuln = path_disc_vuln
+                        
+            # Now I recalculate the place where all the resources are in disk, all this
+            # is done taking the longest_match as a reference, so... if we don't have a
+            # longest_match, then nothing is actually done
+            if longest_match:
+                
+                # Get the webroot
+                webroot = longest_path_disc_vuln['path'].replace( longest_match, '' )
+                
+                #
+                #   This if fixes a strange case reported by Olle
+                #           if webroot[0] == '/':
+                #           IndexError: string index out of range
+                #   That seems to be because the webroot == ''
+                #
+                if webroot:
+                    kb.kb.save( self, 'webroot', webroot )
+                    
+                    # Check what path separator we should use (linux / windows)
+                    if webroot[0] == '/':
+                        path_sep = '/'
+                    else:
+                        # windows
+                        path_sep = '\\'
+                    
+                    # Create the remote locations
+                    remote_locations = []
+                    for url in url_list:
+                        remote_path = urlParser.getPath( url ).replace('/', path_sep)
+                        remote_locations.append( webroot + remote_path )
+                    remote_locations = list( set( remote_locations ) )
+                    
+                    kb.kb.save( self, 'listFiles', remote_locations )
         
     def setOptions( self, OptionList ):
         pass
@@ -158,9 +202,7 @@ class pathDisclosure(baseGrepPlugin):
         '''
         This method is called when the plugin wont be used anymore.
         '''
-        inform = []
-        for v in kb.kb.getData( 'pathDisclosure', 'pathDisclosure' ):
-            inform.append( v )
+        inform = kb.kb.getData( 'pathDisclosure', 'pathDisclosure' )
         
         tmp = {}
         ids = {}
@@ -182,31 +224,25 @@ class pathDisclosure(baseGrepPlugin):
         for url in tmp.keys():
             om.out.information( 'The URL: ' + url + ' has the following path disclosure problems:' )
             for path in tmp[ url ]:
-                toPrint = '- ' + path + ' . Found in request id\'s: '
-                toPrint += str( list( set( ids[ path ] ) ) )
-                om.out.information( toPrint )
+                to_print = '- ' + path + ' . Found in request id\'s: '
+                
+                list_of_id_list = ids[ path ]
+                complete_list = []
+                for list_of_id in list_of_id_list:
+                    complete_list.extend(list_of_id)
+                to_print += str( list( set( complete_list ) ) )
+                om.out.information( to_print )
 
-    def _getPathDisclosureStrings(self):
+    def _get_path_disclosure_strings(self):
         '''
         Return a list of regular expressions to be tested.
         '''
         
-        dirIndexStr = []
-        dirIndexStr.append(r"[A-Z]:\\") 
-        dirIndexStr.append("/root/")
-        dirIndexStr.append("/var/")
-        dirIndexStr.append("/htdocs/")
-        dirIndexStr.append("/usr/")
-        dirIndexStr.append("/home/")
-        dirIndexStr.append("/etc/")
-        dirIndexStr.append("/bin/")
-        dirIndexStr.append("/lib/")
-        dirIndexStr.append("/opt/")
-        dirIndexStr.append("/sbin/")
-        dirIndexStr.append("/sys/")
-        dirIndexStr.append("/mnt/")
-        dirIndexStr.append("/tmp/")
-        return dirIndexStr
+        path_disclosure_strings = []
+        path_disclosure_strings.append(r"[A-Z]:\\")
+        path_disclosure_strings.append(r"file:///?[A-Z]\|")
+        path_disclosure_strings.extend( get_common_directories() )
+        return path_disclosure_strings
 
     def getPluginDeps( self ):
         '''
@@ -220,5 +256,11 @@ class pathDisclosure(baseGrepPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin greps every page for traces of path disclosure problems.
+        This plugin greps every page for path disclosure vulnerabilities like:
+        
+            - C:\www\files\...
+            - /var/www/htdocs/...
+            
+        The results are saved to the KB, and used by all the plugins that need to know the location
+        of a file inside the remote web server.
         '''

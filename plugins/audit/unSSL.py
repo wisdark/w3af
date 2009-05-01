@@ -21,16 +21,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
-import core.data.kb.knowledgeBase as kb
 from core.controllers.w3afException import w3afException
+from core.data.parsers.urlParser import getProtocol, allButScheme
+
+import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
-from core.data.parsers.urlParser import *
 import core.data.constants.severity as severity
+
 
 class unSSL(baseAuditPlugin):
     '''
@@ -40,34 +43,67 @@ class unSSL(baseAuditPlugin):
 
     def __init__(self):
         baseAuditPlugin.__init__(self)
+        
+        # Internal variables
+        self._first_run = True
+        self._ignore_next_calls = False
 
-    def _fuzzRequests(self, freq ):
+    def audit(self, freq ):
         '''
         Check if the protocol specified in freq is https and fetch the same URL using http. 
         ie:
-            input: https://a/
-            check: http://a/
+            - input: https://a/
+            - check: http://a/
         
         @param freq: A fuzzableRequest
         '''
-
-        if 'HTTPS' == getProtocol( freq.getURL() ).upper():
+        if self._ignore_next_calls:
+            return
+        else:            
+            # Define some variables
             secure = freq.getURL()
-            unsecure = 'http://' + allButScheme(freq.getURL())
+            insecure = secure.replace('https://', 'http://')
             
-            httpsResponse = self._sendMutant( freq )
-            freq.setURL( unsecure )
-            httpResponse = self._sendMutant( freq )
-            
-            if httpResponse.getCode() == httpsResponse.getCode():
-                if httpResponse.getBody() == httpsResponse.getBody():
-                    v = vuln.vuln( freq )
-                    v.setName( 'Secure content over insecure channel' )
-                    v.setSeverity(severity.MEDIUM)
-                    v.setDesc( 'Secure content can be accesed using insecure protocol http. The URLs are: ' + secure + ' - ' + unsecure + ' .' )
-                    v.setId( httpResponse.id )
-                    kb.kb.append( self, 'unSSL', v )
-                    om.out.vulnerability( v.getDesc(), severity=v.getSeverity() )
+            if self._first_run:
+                try:
+                    self._urlOpener.GET( insecure )
+                except:
+                    # The request failed because the HTTP port is closed or something like that
+                    # we shouldn't test any other fuzzable requests.
+                    self._ignore_next_calls = True
+                    msg = 'HTTP port seems to be closed. Not testing any other URLs in unSSL.'
+                    om.out.debug( msg )
+                    return
+                else:
+                    # Only perform the initial check once.
+                    self._first_run = False
+                
+            # It seems that we can request the insecure HTTP URL
+            # (checked with the GET request)
+            if 'HTTPS' == getProtocol( freq.getURL() ).upper():
+
+                # We are going to perform requests that (in normal cases)
+                # are going to fail, so we set the ignore errors flag to True
+                self._urlOpener.ignore_errors( True )
+                
+                https_response = self._sendMutant( freq )
+                freq.setURL( insecure )
+                http_response = self._sendMutant( freq )
+                
+                if http_response.getCode() == https_response.getCode():
+                    if http_response.getBody() == https_response.getBody():
+                        v = vuln.vuln( freq )
+                        v.setName( 'Secure content over insecure channel' )
+                        v.setSeverity(severity.MEDIUM)
+                        msg = 'Secure content can be accesed using the insecure protocol HTTP.'
+                        msg += ' The vulnerable URLs are: "' + secure + '" - "' + insecure + '" .'
+                        v.setDesc( msg )
+                        v.setId( [http_response.id, https_response.id] )
+                        kb.kb.append( self, 'unSSL', v )
+                        om.out.vulnerability( v.getDesc(), severity=v.getSeverity() )
+
+                # Disable error ignoring
+                self._urlOpener.ignore_errors( False )
     
     def _analyzeResult( self, fuzzableRequest, res ):
         pass

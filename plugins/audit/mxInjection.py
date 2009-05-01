@@ -20,18 +20,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-from core.data.fuzzer.fuzzer import *
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
-import core.data.kb.knowledgeBase as kb
+from core.data.fuzzer.fuzzer import createMutants
 from core.controllers.w3afException import w3afException
+
+import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
+
 import re
+
 
 class mxInjection(baseAuditPlugin):
     '''
@@ -39,16 +43,15 @@ class mxInjection(baseAuditPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    '''
-    Plugin added just for completeness... I dont really expect to find one of this bugs
-    in my life... but well.... if someone , somewhere in the planet ever finds a bug of using
-    this plugin... THEN my job has been done :P
-    '''
-    
     def __init__(self):
+        '''
+        Plugin added just for completeness... I dont really expect to find one of this bugs
+        in my life... but well.... if someone , somewhere in the planet ever finds a bug of using
+        this plugin... THEN my job has been done :P
+        '''
         baseAuditPlugin.__init__(self)
 
-    def _fuzzRequests(self, freq ):
+    def audit(self, freq ):
         '''
         Tests an URL for mx injection vulnerabilities.
         
@@ -57,8 +60,8 @@ class mxInjection(baseAuditPlugin):
         om.out.debug( 'mxInjection plugin is testing: ' + freq.getURL() )
         
         oResponse = self._sendMutant( freq , analyze=False ).getBody()
-        mxInjectionStrings = self._getmxInjectionStrings()
-        mutants = createMutants( freq , mxInjectionStrings, oResponse=oResponse )
+        mx_injection_strings = self._get_MX_injection_strings()
+        mutants = createMutants( freq , mx_injection_strings, oResponse=oResponse )
             
         for mutant in mutants:
             if self._hasNoBug( 'mxInjection' , 'mxInjection' , mutant.getURL() , mutant.getVar() ):
@@ -72,14 +75,15 @@ class mxInjection(baseAuditPlugin):
         '''
         Analyze results of the _sendMutant method.
         '''
-        mxErrorList = self._findmxError( response )
-        for mxError in mxErrorList:
-            if not re.search( mxError, mutant.getOriginalResponseBody(), re.IGNORECASE ):
+        mx_error_list = self._find_MX_error( response )
+        for mx_error in mx_error_list:
+            if not re.search( mx_error, mutant.getOriginalResponseBody(), re.IGNORECASE ):
                 v = vuln.vuln( mutant )
                 v.setName( 'MX injection vulnerability' )
                 v.setSeverity(severity.MEDIUM)
-                v.setDesc( 'MX injection was found at: ' + response.getURL() + ' . Using method: ' + v.getMethod() + '. The data sent was: ' + str(mutant.getDc()) )
+                v.setDesc( 'MX injection was found at: ' + mutant.foundAt() )
                 v.setId( response.id )
+                v.addToHighlight( mx_error )
                 kb.kb.append( self, 'mxInjection', v )
     
     def end(self):
@@ -89,19 +93,19 @@ class mxInjection(baseAuditPlugin):
         self._tm.join( self )
         self.printUniq( kb.kb.getData( 'mxInjection', 'mxInjection' ), 'VAR' )
     
-    def _getmxInjectionStrings( self ):
+    def _get_MX_injection_strings( self ):
         '''
         Gets a list of strings to test against the web app.
         
         @return: A list with all mxInjection strings to test. Example: [ '\"','f00000']
         '''
-        mxInjectionStrings = []
-        mxInjectionStrings.append('"')
-        mxInjectionStrings.append('iDontExist')
-        mxInjectionStrings.append('')
-        return mxInjectionStrings
+        mx_injection_strings = []
+        mx_injection_strings.append('"')
+        mx_injection_strings.append('iDontExist')
+        mx_injection_strings.append('')
+        return mx_injection_strings
 
-    def _findmxError( self, response ):
+    def _find_MX_error( self, response ):
         '''
         This method searches for mx errors in html's.
         
@@ -109,24 +113,27 @@ class mxInjection(baseAuditPlugin):
         @return: A list of errors found on the page
         '''
         res = []
-        for mxError in self._getmxErrors():
-            match = re.search( mxError, response.getBody() , re.IGNORECASE )
+        for mx_error in self._get_MX_errors():
+            match = re.search( mx_error, response.getBody() )
             if  match:
-                # Commented because of false positives with the A000 and A001 strings
-                #om.out.information('Found MX injection. The error showed by the web application is (only a fragment is shown): "' + response.getBody()[match.start():match.end()]  + '". The error was found on response with id ' + str(response.id) + '.')
-                res.append(mxError)
+                res.append(mx_error)
         return res
 
-    def _getmxErrors(self):
+    def _get_MX_errors(self):
+        '''
+        @return: A list of MX errors.
+        '''
         errors = []
         
         errors.append( 'Unexpected extra arguments to Select' )
-        errors.append( 'Bad or malformed request' )     
-        errors.append( 'Could not access the following folders' )       
-        errors.append( 'To check for outside changes to the folder list go to the folders page' )       
-        errors.append( 'A000' )     
-        errors.append( 'A001' )     
-        errors.append( 'Invalid mailbox name' )     
+        errors.append( 'Bad or malformed request' )
+        errors.append( 'Could not access the following folders' )
+        errors.append( 'A000' )
+        errors.append( 'A001' )
+        errors.append( 'Invalid mailbox name' )
+        
+        error_msg = 'To check for outside changes to the folder list go to the folders page'
+        errors.append( error_msg )
         
         return errors
         
@@ -159,7 +166,8 @@ class mxInjection(baseAuditPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin will find MX injections. This kind of web application errors are mostly seen in webmail software.
-        The tests are simple, for every injectable parameter a string with special meaning in the mail server is sent, and if
-        in the response I find a mail server error, a vulnerability was found.
+        This plugin will find MX injections. This kind of web application errors are mostly seen in
+        webmail software. The tests are simple, for every injectable parameter a string with 
+        special meaning in the mail server is sent, and if in the response I find a mail server error,
+        a vulnerability was found.
         '''

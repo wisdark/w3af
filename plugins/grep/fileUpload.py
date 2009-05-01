@@ -24,11 +24,12 @@ import core.controllers.outputManager as om
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
+
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
-from core.data.parsers.urlParser import *
-from core.data.getResponseType import *
+
 import re
 
 class fileUpload(baseGrepPlugin):
@@ -40,21 +41,35 @@ class fileUpload(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
-        self._input = re.compile('< *input(.*?)>',re.IGNORECASE)
-        self._file = re.compile('type= *"file"?',re.IGNORECASE)
 
-    def _testResponse(self, request, response):
-        
-        if isTextOrHtml(response.getHeaders()):
-            input_res = self._input.search( response.getBody() )
-            if input_res: # input tag found
-                file_res = self._file.search(input_res.group())
-                if file_res:
+        # FIXME: This method sucks, I should do something like
+        # input_elems = html_parser.get_elements_of_type('input')
+        # for input in input_elems:
+        # ...
+        # ...
+        # The bad thing about this is that I have to store all the
+        # response in memory, and right now I only store the parsed
+        # information.
+        self._input = re.compile('< *input(.*?)>', re.IGNORECASE)
+        self._file = re.compile('type= *"file"?', re.IGNORECASE)
+
+    def grep(self, request, response):
+        '''
+        Plugin entry point, verify if the HTML has a form with file uploads.
+        @return: None
+        '''
+        if response.is_text_or_html():
+            for input_tag in self._input.findall( response.getBody() ):
+                tag = self._file.search( input_tag )
+                if tag:
                     i = info.info()
                     i.setName('File upload form')
                     i.setURL( response.getURL() )
                     i.setId( response.id )
-                    i.setDesc( "The URL : " + response.getURL() + " has form with file upload capabilities." )
+                    msg = 'The URL: "' + response.getURL() + '" has form '
+                    msg += 'with file upload capabilities.'
+                    i.setDesc( msg )
+                    i.addToHighlight( tag.group(0) )
                     kb.kb.append( self , 'fileUpload' , i ) 
     
     def setOptions( self, OptionList ):

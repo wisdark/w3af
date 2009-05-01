@@ -19,6 +19,7 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
+from __future__ import with_statement
 
 import os,sys
 from core.controllers.w3afException import w3afException
@@ -26,6 +27,7 @@ import thread
 import core.data.kb.vuln as vuln
 import core.data.kb.info as info
 import core.data.kb.shell as shell
+
 
 class knowledgeBase:
     '''
@@ -37,14 +39,8 @@ class knowledgeBase:
     
     def __init__(self):
         self._kb = {}
-        self.createLock()
-    
-    def destroyLock( self ):
-        self._kbLock = None
-    
-    def createLock( self ):
-        self._kbLock = thread.allocate_lock()
-        
+        self._kb_lock = thread.allocate_lock()
+
     def save( self, callingInstance, variableName, value ):
         '''
         This method saves the variableName value to a dict.
@@ -54,12 +50,11 @@ class knowledgeBase:
         else:
             name = callingInstance.getName()
         
-        if self.getLock():
+        with self._kb_lock:
             if name not in self._kb.keys():
                 self._kb[ name ] = {variableName: value}
             else:
                 self._kb[ name ][ variableName ] = value
-            self.releaseLock()
         
     def append( self, callingInstance, variableName, value ):
         '''
@@ -70,7 +65,7 @@ class knowledgeBase:
         else:
             name = callingInstance.getName()
         
-        if self.getLock():
+        with self._kb_lock:
             if name not in self._kb.keys():
                 self._kb[ name ] = {variableName:[value,]}
             else:
@@ -78,53 +73,43 @@ class knowledgeBase:
                     self._kb[ name ][ variableName ].extend( [value,] )
                 else:
                     self._kb[ name ][ variableName ] = [value,]
-            self.releaseLock()
         
     def getData( self, pluginWhoSavedTheData, variableName ):
         '''
         @return: Returns the data that was saved by another plugin.
         '''
+        if isinstance( pluginWhoSavedTheData, basestring ):
+            name = pluginWhoSavedTheData
+        else:
+            name = pluginWhoSavedTheData.getName()
+            
         res = []
-        if self.getLock():
-            if pluginWhoSavedTheData not in self._kb.keys():
+        
+        with self._kb_lock:
+            if name not in self._kb.keys():
                 res = []
             else:
-                if variableName not in self._kb[pluginWhoSavedTheData].keys():
+                if variableName not in self._kb[name].keys():
                     res = []
                 else:
-                    res = self._kb[pluginWhoSavedTheData][variableName]
-            self.releaseLock()
+                    res = self._kb[name][variableName]
+                    
         return res
-    
-    def getLock(self):
-        try:
-            self._kbLock.acquire()
-        except:
-            return False
-        else:
-            return True
-    
-    def releaseLock(self):
-        try:
-            self._kbLock.release()
-        except:
-            return False
-        else:
-            return True
 
     def getAllEntriesOfClass( self, klass ):
         '''
         @return: A list of all objects of class == klass that are saved in the kb.
         '''
         res = []
-        if self.getLock():
+        
+        with self._kb_lock:
             for pluginName in self._kb:
                 for savedName in self._kb[ pluginName ]:
                     if isinstance( self._kb[ pluginName ][ savedName ], list ):
                         for i in self._kb[ pluginName ][ savedName ]:
-                            if isinstance( i, klass ):
+                            if isinstance(i, klass) :
                                 res.append( i )
-            self.releaseLock()
+
         return res
     
     def getAllVulns( self ):

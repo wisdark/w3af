@@ -24,6 +24,7 @@ import os
 import commands
 import core.controllers.outputManager as om
 from core.controllers.w3afException import w3afException
+import time
 
 SCRIPT_DIR = 'scripts/'
 
@@ -43,17 +44,41 @@ def getScripts():
     
     return res, withOutAssert
 
-def runScript( scriptName ):
-    om.out.information('Running: ' + scriptName )
+def run_script( scriptName ):
+    '''
+    Actually run the script.
+    '''
+
+    start_time = time.time()
+
+    om.out.information('Running: ' + scriptName + ' ...', newLine=False )
     try:
-        output = commands.getoutput('python w3af -s ' + scriptName)
+        output = commands.getoutput('python w3af_console -s ' + scriptName)
     except KeyboardInterrupt, k:
         output = ''
-        om.out.information('User cancelled the test.')
-        raise k
+        msg = 'User cancelled the script. Hit Ctrl+C again to cancel all the test or wait two'
+        msg += ' seconds to continue with the next script.'
+        om.out.information( msg )
+        try:
+            time.sleep(2)
+        except:
+            om.out.information('User cancelled the WHOLE test.')
+            raise k
+        else:
+            om.out.information('Continuing with the next script..., please wait.')
+            return output
+
+    end_time = time.time()
+    took = end_time - start_time
+    
+    if took > 9:
+        om.out.information(' Run took ' + str(took) + ' seconds!')
+    else:
+        om.out.information('')
+            
     return output
     
-def analyzeResult( resultString ):
+def analyze_result( resultString ):
     lines = resultString.split('\n')
     error = False
     for line in lines:
@@ -71,28 +96,31 @@ def w3afTest():
     '''
     Test all scripts that have an assert call.
     '''
-    assertScriptList, scriptsWithoutAssert = getScripts()
-    badCount = okCount = 0
+    assert_script_list, scriptsWithoutAssert = getScripts()
+    bad_list = []
+    ok_list = []
     
-    om.out.console( 'Going to test '+ str(len(assertScriptList)) + ' scripts.' )
+    om.out.console( 'Going to test '+ str(len(assert_script_list)) + ' scripts.' )
     
-    for assertScript in assertScriptList:
+    for assert_script in assert_script_list:
         try:
-            result = runScript( assertScript )
-            analyzeResult( result )
-        except KeyboardInterrupt, k:
+            result = run_script( assert_script )
+            analyze_result( result )
+        except KeyboardInterrupt:
             break
-        except w3afException, w3:
-            badCount += 1
+        except w3afException:
+            bad_list.append(assert_script)
         else:
-            okCount += 1
+            ok_list.append(assert_script)
     
     om.out.console( '')
     om.out.console( 'Results:')
     om.out.console( '========')
-    om.out.console( '- ' + str(okCount + badCount) + '/' +str(len(assertScriptList)) + ' scripts have been tested.')
-    om.out.console( '- ' + str(okCount) + ' OK.')
-    om.out.console( '- ' + str(badCount) + ' Failed.')
-    om.out.console( '- ' + str(len(scriptsWithoutAssert)) + ' scripts don\'t have assert statements. This is the list of scripts without assert statements:')
+    om.out.console( '- ' + str(len(ok_list) + len(bad_list)) + '/ ', newLine=False)
+    om.out.console( str(len(assert_script_list)) + ' scripts have been tested.')
+    om.out.console( '- ' + str(len(ok_list)) + ' OK.')
+    om.out.console( '- ' + str(len(bad_list)) + ' Failed: ' + ', '.join(bad_list))
+    om.out.console( '- ' + str(len(scriptsWithoutAssert)) + ' scripts don\'t have', newLine=False)
+    om.out.console( ' assert statements. This is the list of scripts without assert statements:')
     scriptsWithoutAssert.sort()
     om.out.console( '- ' + ' , '.join(scriptsWithoutAssert) )

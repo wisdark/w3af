@@ -21,13 +21,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
+
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseDiscoveryPlugin import baseDiscoveryPlugin
-import core.data.kb.knowledgeBase as kb
 from core.controllers.w3afException import w3afRunOnce
+
+import core.data.kb.knowledgeBase as kb
+import core.data.kb.info as info
+
 
 class serverHeader(baseDiscoveryPlugin):
     '''
@@ -35,25 +39,23 @@ class serverHeader(baseDiscoveryPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    '''
-    Nothing strange, just do a GET request to the url and save the server headers
-    to the kb. A smarter way to check the server type is with the hmap plugin.
-    
-    @author: Andres Riancho ( andres.riancho@gmail.com )
-    '''
-
     def __init__(self):
         baseDiscoveryPlugin.__init__(self)
-        self._execOneTime = True
+        
+        # Internal variables
         self._exec = True
-        self._xpowered = True
+        self._x_powered = True
+        
+        # User configured variables
+        self._exec_one_time = True        
 
     def discover(self, fuzzableRequest ):
         '''
         Nothing strange, just do a GET request to the url and save the server headers
         to the kb. A smarter way to check the server type is with the hmap plugin.
         
-        @parameter fuzzableRequest: A fuzzableRequest instance that contains (among other things) the URL to test.
+        @parameter fuzzableRequest: A fuzzableRequest instance that contains
+                                                      (among other things) the URL to test.
         '''
         if not self._exec:
             # This will remove the plugin from the discovery plugins to be runned.
@@ -70,61 +72,100 @@ class serverHeader(baseDiscoveryPlugin):
                         server = response.getHeaders()[h]
                 
                 if server != '':
-                    # Output the results
-                    om.out.information('The Server header for this HTTP server is: ' + server )
-                    # Save the results in the KB so that other plugins can use this information
-                    kb.kb.save( self , 'server' , server )
+                    i = info.info()
+                    i.setName('Server header')
+                    i.setId( response.getId() )
+                    i.setDesc('The server header for the remote web server is: "' + server + '".' )
+                    i['server'] = server
+                    om.out.information( i.getDesc() )
+                    
+                    # Save the results in the KB so the user can look at it
+                    kb.kb.append( self, 'server', i )
+                    
+                    # Also save this for easy internal use
+                    # other plugins can use this information
+                    kb.kb.save( self , 'serverString' , server )
+                    
                 else:
                     # strange !
-                    om.out.information('The remote HTTP Server ommited the "Server" header in its response.' )
-    
-                if self._execOneTime:
+                    i = info.info()
+                    i.setName('Omited server header')
+                    i.setId( response.getId() )
+                    msg = 'The remote HTTP Server ommited the "server" header in it\'s response.'
+                    i.setDesc( msg )
+                    om.out.information( i.getDesc() )
+                    
+                    # Save the results in the KB so that other plugins can use this information
+                    kb.kb.append( self, 'omitedHeader', i )
+                    
+                if self._exec_one_time:
                     self._exec = False
                 
-        if self._xpowered:
-            self._checkXPower( fuzzableRequest )
+        if self._x_powered:
+            self._check_x_power( fuzzableRequest )
         
         return []
         
-    def _checkXPower( self, fuzzableRequest ):
+    def _check_x_power( self, fuzzableRequest ):
+        '''
+        Analyze X-Powered-By header.
+        '''
         try:
             response = self._urlOpener.GET( fuzzableRequest.getURL(), useCache=True )
         except:
             pass
         else:
-            poweredBy = ''
-            for h in response.getHeaders().keys():
-                for d in [ 'ASPNET','POWERED']:
-                    if d in h.upper() or h.upper() in d :
-                        poweredBy = response.getHeaders()[h]
-                        # Output the results
-                        om.out.information( h + ' header for this HTTP server is: ' + poweredBy )
+            powered_by = ''
+            for header_name in response.getHeaders().keys():
+                for i in [ 'ASPNET', 'POWERED']:
+                    if i in header_name.upper() or header_name.upper() in i:
+                        powered_by = response.getHeaders()[header_name]
+                        
+                        i = info.info()
+                        i.setName('Powered by header')
+                        i.setId( response.getId() )
+                        msg = '"' + header_name + '" header for this HTTP server is: "'
+                        msg += powered_by + '".'
+                        i.setDesc( msg )
+                        i['poweredBy'] = powered_by
+                        om.out.information( i.getDesc() )
+                        
                         # Save the results in the KB so that other plugins can use this information
                         
-                        # Before knowing that some servers may return more than one poweredby header I had:
-                        #kb.kb.save( self , 'poweredBy' , poweredBy )
-                        # But I have seen an IIS server with PHP that returns both the ASP.NET and the PHP headers
-                        if poweredBy not in kb.kb.getData( 'serverHeader', 'poweredBy' ):
-                            kb.kb.append( self , 'poweredBy' , poweredBy )
+                        # Before knowing that some servers may return more than one poweredby
+                        # header I had:
+                        # - kb.kb.save( self , 'poweredBy' , poweredBy )
+                        # But I have seen an IIS server with PHP that returns both the ASP.NET and
+                        # the PHP headers
+                        powered_by_in_kb = [ j['poweredBy'] for j in kb.kb.getData( 'serverHeader', 'poweredBy' ) ]
+                        if powered_by not in powered_by_in_kb:
+                            kb.kb.append( self , 'poweredBy' , i )
                         
-                        if self._execOneTime:
-                            self._xpowered = False          
-            
-            if poweredBy == '':
-                # not as strange as the one above, this is because of a config or simply
-                # cause I requested a static "html" file.
-                # I will save the server header as the poweredBy, its the best choice I have right now
-                if kb.kb.getData( 'serverHeader' , 'server' ) not in kb.kb.getData( 'serverHeader', 'poweredBy' ):
-                    kb.kb.append( self , 'poweredBy' , kb.kb.getData( 'serverHeader' , 'server' ) )
+                        # Also save this for easy internal use
+                        kb.kb.append( self , 'poweredByString' , powered_by )
+                        
+                        if self._exec_one_time:
+                            self._x_powered = False          
+
+            # not as strange as the one above, this is because of a config or simply
+            # cause I requested a static "html" file.
+            if powered_by == '':
+                
+                # I will save the server header as the poweredBy, its the best choice I have
+                # right now
+                if kb.kb.getData( 'serverHeader' , 'serverString' ) not in \
+                kb.kb.getData( 'serverHeader', 'poweredByString' ):
+                    kb.kb.append( self , 'poweredByString' , \
+                                            kb.kb.getData( 'serverHeader' , 'serverString' ) )
     
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
         '''
         d1 = 'Execute plugin only one time'
-        h1 = 'Generally the server header wont change during a scan to \
-    a same site, so executing this plugin only one time is a safe choice.'
-        o1 = option('execOneTime', str(self._execOneTime), d1, 'boolean', help=h1)
+        h1 = 'Generally the server header wont change during a scan to a same site, so executing'
+        h1 += ' this plugin only one time is a safe choice.'
+        o1 = option('execOneTime', self._exec_one_time, d1, 'boolean', help=h1)
         
         ol = optionList()
         ol.add(o1)
@@ -138,7 +179,7 @@ class serverHeader(baseDiscoveryPlugin):
         @parameter optionsMap: A dictionary with the options for the plugin.
         @return: No value is returned.
         ''' 
-        self._execOneTime = optionsMap['execOneTime']
+        self._exec_one_time = optionsMap['execOneTime'].getValue()
 
     def getPluginDeps( self ):
         '''
@@ -152,5 +193,8 @@ class serverHeader(baseDiscoveryPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin gets the server header and saves the result to the knowledgeBase.
+        This plugin GETs the server header and saves the result to the knowledge base.
+        
+        Nothing strange, just do a GET request to the url and save the server headers
+        to the kb. A smarter way to check the server type is with the hmap plugin.
         '''
