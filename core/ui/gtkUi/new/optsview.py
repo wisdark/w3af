@@ -18,7 +18,6 @@ class OptsView(gtk.TreeView):
         # 2nd column will store (optionType, optionValue)
         self._model = gtk.ListStore(\
                 gobject.TYPE_STRING, # name
-                gobject.TYPE_STRING, # type
                 gobject.TYPE_PYOBJECT, # option object
                 gobject.TYPE_PYOBJECT # value
         )
@@ -36,9 +35,9 @@ class OptsView(gtk.TreeView):
         valCol = gtk.TreeViewColumn('Value')
         valCell = DispatcherValueRenderer()
         valCol.pack_start(valCell)
-        valCol.add_attribute(valCell, 'option', 2)
-        valCol.add_attribute(valCell, 'value', 3)
-        valCell.connect('value-changed', self._on_change, 3)
+        valCol.add_attribute(valCell, 'option', 1)
+        valCol.add_attribute(valCell, 'value', 2)
+        valCell.connect('value-changed', self._on_change, 2)
 
         self.append_column(nameCol)
         self.append_column(valCol)
@@ -56,14 +55,9 @@ class OptsView(gtk.TreeView):
         self._cache[name] = value
         self._model.set_value(it, col, value)
 
-    def addOption(self, *params):
-        if len(params)==1:
-            opt = params[0]
-            opt = [opt.getName(), opt.getType(), opt, opt.getDefaultValue()]
-        else:
-            opt = params
-
-        self._model.append(opt)
+    def addOption(self, opt, value=None):
+        if value is None: value = opt.getDefaultValue()
+        self._model.append([opt.getName(), opt, value])
 
 ##### Test
 

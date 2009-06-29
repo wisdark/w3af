@@ -85,10 +85,10 @@ class BooleanValueRenderer(OptionRenderer):
     def __init__(self):
         gtk.GenericCellRenderer.__init__(self)
         self.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
-        self._actor = gtk.CellRendererToggle()
-        self._actor.set_property('activatable', True)
-        self._actor.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
-        self.type = None
+        actor = gtk.CellRendererToggle()
+        actor.set_properties(activatable=True, 
+                mode=gtk.CELL_RENDERER_MODE_EDITABLE)
+        self._actor = actor
 
     def relevant(self):
         return self.type == 'boolean'
@@ -112,11 +112,13 @@ class TextValueRenderer(OptionRenderer):
 
     def __init__(self):
         super(TextValueRenderer, self).__init__()
-        self._actor = gtk.CellRendererText()
-        self._actor.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
+        actor = gtk.CellRendererText()
+        actor.set_properties(editable=True,
+                mode=gtk.CELL_RENDERER_MODE_EDITABLE)
+        actor.connect('edited', self.__propagate)
+
+        self._actor = actor
         self.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
-        self._actor.set_property('editable', True)
-        self._actor.connect('edited', self.__propagate)
 
     def __propagate(self, widg, path, value):
         if self.validate(value):
@@ -185,7 +187,7 @@ class ComboBoxRenderer(OptionRenderer):
         self._cachedChange = None
 
     def __propagate(self, widg, path, value):
-        if value in self._choices:
+        if self._choices and value in self._choices:
             self.emit('value-changed', path, value)
 
     def relevant(self):
