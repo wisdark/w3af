@@ -19,6 +19,7 @@ class OptsView(gtk.TreeView):
         self._model = gtk.ListStore(\
                 gobject.TYPE_STRING, # name
                 gobject.TYPE_STRING, # type
+                gobject.TYPE_PYOBJECT, # option object
                 gobject.TYPE_PYOBJECT # value
         )
 
@@ -35,13 +36,9 @@ class OptsView(gtk.TreeView):
         valCol = gtk.TreeViewColumn('Value')
         valCell = DispatcherValueRenderer()
         valCol.pack_start(valCell)
-        valCol.add_attribute(valCell, 'type', 1)
-        valCol.add_attribute(valCell, 'value', 2)
-        valCell.connect('value-changed', self._on_change, 2)
-
-        col = gtk.TreeViewColumn('test')
-        cell = BooleanValueRenderer()
-        cell.connect('value-changed', self._on_change, 2)
+        valCol.add_attribute(valCell, 'option', 2)
+        valCol.add_attribute(valCell, 'value', 3)
+        valCell.connect('value-changed', self._on_change, 3)
 
         self.append_column(nameCol)
         self.append_column(valCol)
@@ -61,14 +58,36 @@ class OptsView(gtk.TreeView):
 
     def addOption(self, *params):
         if len(params)==1:
-            opt = [opt.getName(), opt.getType(), opt.getDefaultValue()]
+            opt = params[0]
+            opt = [opt.getName(), opt.getType(), opt, opt.getDefaultValue()]
         else:
             opt = params
 
-        name, otype, value = opt
-        self._model.append([name, otype, value])
+        self._model.append(opt)
 
 ##### Test
+
+class OptMock:
+    def __init__(self, name, type, default, *choices):
+        self.name = name
+        self.type = type
+        self.default = default
+        if choices:
+            self.choices = choices[0]
+
+    def getType(self):
+        return self.type
+
+    def getDefaultValue(self):
+        return self.default
+
+    def getComboOptions(self):
+        return self.choices
+
+    def getName(self):
+        return self.name
+
+
 def main():
     def close(*ignore):
         gtk.main_quit()
@@ -79,9 +98,10 @@ def main():
     table = OptsView()
     window.add(table)
 
-    table.addOption('boolOption1', 'boolean', True)
-    table.addOption('textOption1', 'string', 'test' * 10)
-    table.addOption('ipOption', 'ip', '127.0.0.1')
+    table.addOption(OptMock('boolOption1', 'boolean', True))
+    table.addOption(OptMock('textOption1', 'string', 'test' * 10))
+    table.addOption(OptMock('ipOption', 'ip', '127.0.0.1'))
+    table.addOption(OptMock('comboOption', 'combo', '1', ['1','2','3','4']))
 
     window.show_all()
     gtk.main()

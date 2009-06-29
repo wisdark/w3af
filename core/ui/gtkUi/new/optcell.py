@@ -6,7 +6,8 @@ import traceback
 GPROPERTIES = {
         'value': (gobject.TYPE_PYOBJECT, 'value', 'value',
             gobject.PARAM_READWRITE),
-        'type': (gobject.TYPE_STRING, 'value', 'value', '', gobject.PARAM_READWRITE)
+        'option': (gobject.TYPE_PYOBJECT, 'option', 'option',
+            gobject.PARAM_READWRITE),
 }
 
 GSIGNALS = {
@@ -35,6 +36,7 @@ class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
         self._actors = (
                 BooleanValueRenderer(), 
                 IPTextValueRenderer(),
+                ComboBoxRenderer(),
                 TextValueRenderer())
 
     def getActor(self):
@@ -59,9 +61,19 @@ class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
         return self.getActor().get_property(prop.name)
 
 
-class BooleanValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
+class OptionRenderer(RenderMixIn, gtk.GenericCellRenderer):
     __gproperties__ = GPROPERTIES
     __gsignals__ = GSIGNALS
+
+    def do_set_property(self, prop, value):
+        if prop.name=='option':
+            self.option = value
+            self.type = value.getType()
+
+
+class BooleanValueRenderer(OptionRenderer):
+#    __gproperties__ = GPROPERTIES
+#    __gsignals__ = GSIGNALS
 
     def getActor(self):
         return self._actor
@@ -79,19 +91,17 @@ class BooleanValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
 
     def do_set_property(self, prop, value):
         name = prop.name
-        if name=='type':
-            self.type = value
-        elif name=='value':
+        if name=='value':
             self.value = True if value else False
-            return self._actor.set_property('active', self.value)
+            self._actor.set_property('active', self.value)
+        else:
+            super(BooleanValueRenderer, self).do_set_property(prop, value)
 
     def on_start_editing(self, evt, widg, path, *other):
         self.emit('value-changed', path, not self.value)
 
 
-class TextValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
-    __gproperties__ = GPROPERTIES
-    __gsignals__ = GSIGNALS
+class TextValueRenderer(OptionRenderer):
 
     def getActor(self):
         return self._actor
@@ -115,12 +125,10 @@ class TextValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
         return True
 
     def do_set_property(self, prop, value):
-        name = prop.name
-        if name=='type':
-            self.type = value
+        if prop.name=='value':
+            self._actor.set_property('text', value)
         else:
-            realName = name if name!='value' else 'text'
-            return self._actor.set_property(realName, value)
+            super(TextValueRenderer, self).do_set_property(prop, value)
 
 
 class IPTextValueRenderer(TextValueRenderer):
@@ -143,12 +151,53 @@ class IPTextValueRenderer(TextValueRenderer):
     def relevant(self):
         return self.type=='ip'
 
-class ComboBoxRenderer(RenderMixIn, gtk.GenericCellRenderer):
+
+class ComboBoxRenderer(OptionRenderer):
     def __init__(self):
         super(ComboBoxRenderer, self).__init__()
-        self._actor = gtk.CellRendererCombo()
-#        self._actor.
+        actor = gtk.CellRendererCombo()
+        actor.set_properties(\
+                mode=gtk.CELL_RENDERER_MODE_EDITABLE, editable=True)
+      #  self._actor.connect('changed', self.__changed)
+        actor.connect('edited', self.__propagate)
+        self._actor = actor
+        self._store = None
 
-gobject.type_register(BooleanValueRenderer)
-gobject.type_register(TextValueRenderer)
+        self.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
+        self._cachedChange = None
+
+    def __propagate(self, widg, path, value):
+        if value in self._choices:
+            self.emit('value-changed', path, value)
+
+    def relevant(self):
+        return self.type=='combo'
+
+    def getActor(self):
+        if self._choices is None:
+            store = gtk.ListStore(gobject.TYPE_STRING)
+            choices = [] # a cache for the simpler access
+            self._actor.set_property('model', store)
+            self._actor.set_property('text-column', 0)
+
+            for s in self.option.getComboOptions():
+                store.append([s])
+                choices.append(s)
+
+            self._choices = choices
+
+        return self._actor
+
+    def do_set_property(self, prop, value):
+        name = prop.name
+        if name=='value':
+            self._choices = None # the new lifecycle has started
+            self._actor.set_property('text', str(value))
+        else:   
+            super(ComboBoxRenderer, self).do_set_property(prop, value)
+
+
+gobject.type_register(OptionRenderer)
+#gobject.type_register(BooleanValueRenderer)
+#gobject.type_register(TextValueRenderer)
 gobject.type_register(DispatcherValueRenderer)
