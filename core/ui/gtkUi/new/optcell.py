@@ -15,8 +15,15 @@ GSIGNALS = {
         'value-changed' : (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, 
             (gobject.TYPE_STRING, gobject.TYPE_PYOBJECT,))
 }
+
+CRME = gtk.CELL_RENDERER_MODE_EDITABLE
    
 class RenderMixIn:
+    '''
+    Convenience methods for all the custom renderers
+    in this module.
+    getActor() method must be implemented by any subclass.
+    '''
     def on_render(self, *params):
         return self.getActor().render(*params)
 
@@ -28,12 +35,15 @@ class RenderMixIn:
         return result
 
 class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
+    '''
+    A dispatching renderer. Contains all the option renderers
+    and delegates the control to them depending on the type.
+    '''
     __gproperties__ = GPROPERTIES
     __gsignals__ = GSIGNALS
 
     def __init__(self):
         super(DispatcherValueRenderer, self).__init__()
-        self.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
         self._actors = (
                 BooleanValueRenderer(), 
                 IPTextValueRenderer(),
@@ -43,8 +53,12 @@ class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
                 TypedTextValueRenderer('regex', re.compile),
                 TextValueRenderer())
 
+        for a in self._actors:
+            a.set_property('mode', CRME) # All renderers are editable
+        self.set_property('mode', CRME)  # And me too
+
     def getActor(self):
-        for actor in self._actors:
+        for actor in self._actors: # choose who will make the job
             if actor.relevant():
                 actor.connect('value-changed', self.__propagate)
                 return actor
@@ -52,10 +66,13 @@ class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
     def __propagate(self, widg, path, value):
         self.emit('value-changed', path, value)
 
-    def on_get_size(self, *params):
-        act = self.getActor()
-        result = act.get_size(*params)
-        return result
+    def on_get_size(self, *params): 
+        '''
+        By the moment, when on_get_size() and other on_*() are called,
+        all the properties are already set. So getActor() will always work,
+        here and in those renderers below.
+        '''
+        return self.getActor().get_size(*params)
 
     def do_set_property(self, prop, value):
         for actor in self._actors:
@@ -66,6 +83,14 @@ class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
 
 
 class OptionRenderer(RenderMixIn, gtk.GenericCellRenderer):
+    '''
+    Basic class for all the option renderers.
+    Every subclass will have the fields 'option' and 'type'
+    set (type is for the easier access, as anyone needs it)
+
+    super(cls, self).do_set_property() should be used
+    by the subclasses
+    '''
     __gproperties__ = GPROPERTIES
     __gsignals__ = GSIGNALS
 
@@ -76,22 +101,14 @@ class OptionRenderer(RenderMixIn, gtk.GenericCellRenderer):
 
 
 class BooleanValueRenderer(OptionRenderer):
-#    __gproperties__ = GPROPERTIES
-#    __gsignals__ = GSIGNALS
-
-    def getActor(self):
-        return self._actor
-
     def __init__(self):
-        gtk.GenericCellRenderer.__init__(self)
-        self.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
+        super(BooleanValueRenderer, self).__init__()
         actor = gtk.CellRendererToggle()
-        actor.set_properties(activatable=True, 
-                mode=gtk.CELL_RENDERER_MODE_EDITABLE)
+        actor.set_properties(activatable=True, mode=CRME)
         self._actor = actor
 
-    def relevant(self):
-        return self.type == 'boolean'
+    def getActor(self): return self._actor
+    def relevant(self): return self.type == 'boolean'
 
     def do_set_property(self, prop, value):
         name = prop.name
@@ -106,29 +123,21 @@ class BooleanValueRenderer(OptionRenderer):
 
 
 class TextValueRenderer(OptionRenderer):
-
-    def getActor(self):
-        return self._actor
-
     def __init__(self):
         super(TextValueRenderer, self).__init__()
         actor = gtk.CellRendererText()
-        actor.set_properties(editable=True,
-                mode=gtk.CELL_RENDERER_MODE_EDITABLE)
+        actor.set_properties(editable=True, mode=CRME)
         actor.connect('edited', self.__propagate)
 
         self._actor = actor
-        self.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
 
     def __propagate(self, widg, path, value):
         if self.validate(value):
             self.emit('value-changed', path, value)
 
-    def validate(self, value):
-        return True
-
-    def relevant(self):
-        return True
+    def getActor(self): return self._actor
+    def validate(self, value): return True
+    def relevant(self): return True
 
     def do_set_property(self, prop, value):
         if prop.name=='value':
@@ -176,15 +185,10 @@ class ComboBoxRenderer(OptionRenderer):
     def __init__(self):
         super(ComboBoxRenderer, self).__init__()
         actor = gtk.CellRendererCombo()
-        actor.set_properties(\
-                mode=gtk.CELL_RENDERER_MODE_EDITABLE, editable=True)
-      #  self._actor.connect('changed', self.__changed)
+        actor.set_properties(mode=CRME, editable=True)
         actor.connect('edited', self.__propagate)
         self._actor = actor
         self._store = None
-
-        self.set_property('mode', gtk.CELL_RENDERER_MODE_EDITABLE)
-        self._cachedChange = None
 
     def __propagate(self, widg, path, value):
         if self._choices and value in self._choices:
