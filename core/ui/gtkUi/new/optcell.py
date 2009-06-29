@@ -2,6 +2,7 @@ import gtk
 import gobject
 from collections import defaultdict
 import traceback
+import re
 
 GPROPERTIES = {
         'value': (gobject.TYPE_PYOBJECT, 'value', 'value',
@@ -37,6 +38,9 @@ class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
                 BooleanValueRenderer(), 
                 IPTextValueRenderer(),
                 ComboBoxRenderer(),
+                TypedTextValueRenderer('float', float),
+                TypedTextValueRenderer('integer', int),
+                TypedTextValueRenderer('regex', re.compile),
                 TextValueRenderer())
 
     def getActor(self):
@@ -151,7 +155,21 @@ class IPTextValueRenderer(TextValueRenderer):
     def relevant(self):
         return self.type=='ip'
 
+class TypedTextValueRenderer(TextValueRenderer):
+    def __init__(self, type, validator):
+        super(TypedTextValueRenderer, self).__init__()
+        self.__type = type
+        self.__validator = validator
 
+    def relevant(self): return self.type == self.__type
+
+    def validate(self, value):
+        try:
+            self.__validator(value)
+            return True
+        except:
+            return False
+        
 class ComboBoxRenderer(OptionRenderer):
     def __init__(self):
         super(ComboBoxRenderer, self).__init__()
@@ -198,6 +216,4 @@ class ComboBoxRenderer(OptionRenderer):
 
 
 gobject.type_register(OptionRenderer)
-#gobject.type_register(BooleanValueRenderer)
-#gobject.type_register(TextValueRenderer)
 gobject.type_register(DispatcherValueRenderer)

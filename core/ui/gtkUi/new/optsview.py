@@ -102,6 +102,9 @@ def main():
     table.addOption(OptMock('textOption1', 'string', 'test' * 10))
     table.addOption(OptMock('ipOption', 'ip', '127.0.0.1'))
     table.addOption(OptMock('comboOption', 'combo', '1', ['1','2','3','4']))
+    table.addOption(OptMock('regexOption', 'regex', 'http://.*google.*'))
+    table.addOption(OptMock('integerOption', 'integer', '123'))
+    table.addOption(OptMock('floatOption', 'float', '123.123'))
 
     window.show_all()
     gtk.main()
