@@ -31,8 +31,7 @@ class RenderMixIn:
         return self.getActor().get_size(*params)
 
     def on_start_editing(self, *params):
-        result = self.getActor().start_editing(*params)
-        return result
+        return self.getActor().start_editing(*params)
 
 class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
     '''
@@ -44,7 +43,9 @@ class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
 
     def __init__(self):
         super(DispatcherValueRenderer, self).__init__()
-        self._actors = (
+        self._actors = ( 
+                # TODO wouldn't be better to rewrite this as a dict?
+                # Will see how this perform, then think.
                 BooleanValueRenderer(), 
                 IPTextValueRenderer(),
                 ComboBoxRenderer(),
@@ -55,12 +56,12 @@ class DispatcherValueRenderer(RenderMixIn, gtk.GenericCellRenderer):
 
         for a in self._actors:
             a.set_property('mode', CRME) # All renderers are editable
+            a.connect('value-changed', self.__propagate)
         self.set_property('mode', CRME)  # And me too
 
     def getActor(self):
         for actor in self._actors: # choose who will make the job
             if actor.relevant():
-                actor.connect('value-changed', self.__propagate)
                 return actor
 
     def __propagate(self, widg, path, value):
