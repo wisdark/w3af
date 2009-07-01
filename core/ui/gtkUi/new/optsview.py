@@ -47,29 +47,58 @@ class OptsView(gtk.TreeView):
         self.append_column(valCol)
 
         self._baseline = {} # values for rollback
-        self._cache = {}  # to store the values between commits
+        self._delta = {}  # to store the values between commits
+        self._optsInd = {} # model indicies to find a row fast
+
+    def isUnsaved(self):
+        return len(self._delta)>0
 
     def commit(self):
-        self._baseline.update(self._cache)
-        self.emit('edited', dict(self._cache))
-        self._cache.clear()
+        if not self._delta: # nothing to do
+            return
+        self._baseline.update(self._delta)
+        self.emit('edited', dict(self._delta))
+        self._delta.clear()
 
     def rollback(self):
         for r in self._model:
             name = r[0]
             r[2] = self._baseline[name]
-        self._cache.clear()
+        self._delta.clear()
+        self.emit('restored')
 
     def resetDefaults(self):
         for r in self._model:
-            opt = r[1]
             name = r[0]
+            opt = r[1]
             value = opt.getDefaultValue()
-            if self._baseline[name] != value: # otherwise nothing to change
-                self._cache[name] = value
+            self.setOptionValue(name, value)
+
+    def setOptionValue(self, name, value):
+        if name not in self._optsInd:
+            return
+
+        idx = self._optsInd[name]
+        row = self._model[idx]
+        oldValue = row[2]
+        if value==oldValue: return # nothing to do 
+
+        baseValue = self._baseline[name]
+
+        if value == baseValue:  
+            if name in self._delta:
+                del self._delta[name]
+                if not self._delta: # changed everything back
+                    self.rollback()
+                    return
+        else:
+            self._delta[name] = value
+
+        self._model[idx][2] = value
+        self.emit('changed', name, value)
 
     def __getOptValue(self, name):
-        result = self._cache.get(name, None)
+        result = self._delta.get(name, None)
         if result is None:
             result = self._defaults[name]
         return result
@@ -77,15 +106,13 @@ class OptsView(gtk.TreeView):
     def _on_change(self, widg, path, value, col):
         it = self._model.get_iter_from_string(path)
         name = self._model.get_value(it, 0)
-        #self.emit('option-changed', name, value)
-        self.emit('changed', name, value)
-        self._cache[name] = value
-        self._model.set_value(it, col, value)
+        self.setOptionValue(name, value)
 
     def addOption(self, opt, value=None):
         if value is None: value = opt.getDefaultValue()
         name = opt.getName()
         self._baseline[name] = value
+        self._optsInd[name] = len(self._model)
         self._model.append([name, opt, value])
 
 gobject.type_register(OptsView)

@@ -1,5 +1,5 @@
 from optsview import OptsView
-from optseditor import EditorPage
+from optseditor import EditorNotebook
 import gtk
 ##### Test
 
@@ -20,7 +20,7 @@ def main():
         gtk.main_quit()
 
     window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-    window.set_size_request(400, 300)
+    window.set_size_request(500, 500)
     window.connect('delete-event', close)
 #    table = OptsView()
 #    window.add(table)
@@ -35,8 +35,11 @@ def main():
     ]
 
 #    map(table.addOption, options)
-    page = EditorPage(options, {})
-    window.add(page)
+    editor = EditorNotebook()
+    editor.open('somePlugin', options, {})
+    editor.open('otherPlugin', options, {})
+    
+    window.add(editor)
 
     window.show_all()
     gtk.main()
