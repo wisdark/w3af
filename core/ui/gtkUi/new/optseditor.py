@@ -11,20 +11,29 @@ class EditorPage(gtk.VBox):
          # should not allow to be closed in an inconsistent state
     }
  
-    def __init__(self, optList, values):
+    def __init__(self, optList, changedList=None):
         super(EditorPage, self).__init__()
+
         view = OptsView()
         for opt in optList:
             name = opt.getName()
-            value = values[name] if name in values else opt.getDefaultValue()
-            view.addOption(opt, value)
+            try:
+                actualOpt = changedList[name]
+            except:
+                actualOpt = opt
+
+            view.addOption(opt)
         
         view.connect('edited', self.__edited)
         view.connect('changed', self.__changed)
         view.connect('restored', self.__restored)
         self._view = view
-        self.__fillContent()
+        self._values = {}
+        if changedList:
+            for opt in changedList:
+                self._values[opt.getName()] = opt.getDefaultValue()
 
+        self.__fillContent()
 
     # view callbacks
     def __edited(self, widg, opts):
@@ -66,6 +75,8 @@ class EditorPage(gtk.VBox):
 
         self.emit('closed')
 
+    close = __close
+
 
     def __fillContent(self):
         self.pack_start(self._view)
@@ -87,18 +98,27 @@ class EditorPage(gtk.VBox):
 
 
 class EditorNotebook(gtk.Notebook):
+#    __gsignals__ = {
+#         'edited' : (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str, object.TYPE_PYOBJECT,)), 
+#         'restored': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str,)),
+#         'changed': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str,)),
+#         'closed': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str,)),
+         # should not allow to be closed in an inconsistent state
+#     }
     def __init__(self):
         super(EditorNotebook, self).__init__()
         self._pagesByName = {} # name --> (index, page)
         self._pagesByIdx = {} # index --> (name, page)
     
-    def open(self, name, optList, values):
+    def open(self, name, optList, editedValues):
         if name in self._pagesByName:
             idx, page = self._pagesByName[name]
             self.set_current_page(idx)
             return page
 
-        page = EditorPage(optList, values)
+        page = EditorPage(optList, editedValues)
+        page.show_all()
+
         label = gtk.Label(name)
         idx = self.append_page(page, tab_label=label)
         self._pagesByName[name] = (idx, page)
@@ -109,6 +129,9 @@ class EditorNotebook(gtk.Notebook):
         page.connect('changed', self.__markLabel, name) 
         page.connect('closed', self.__closed, name)
 
+        self.set_current_page(idx)
+        return page
+    
     def __setLabel(self, page, text):
         label = self.get_tab_label(page)
         if label:
@@ -126,4 +149,6 @@ class EditorNotebook(gtk.Notebook):
         idx = self._pagesByName[name][0]
         self.remove_page(idx)
 
+
 gobject.type_register(EditorPage)
+gobject.type_register(EditorNotebook)

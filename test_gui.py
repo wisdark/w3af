@@ -1,6 +1,9 @@
-from optsview import OptsView
-from optseditor import EditorNotebook
+from core.ui.gtkUi.new.optsview import OptsView
+from core.ui.gtkUi.new.optseditor import EditorNotebook
 import gtk
+from core.controllers.w3afCore import w3afCore
+from core.ui.gtkUi.new.confighub import ConfigHub
+
 ##### Test
 
 class OptMock(dict):
@@ -35,11 +38,19 @@ def main():
     ]
 
 #    map(table.addOption, options)
-    editor = EditorNotebook()
-    editor.open('somePlugin', options, {})
-    editor.open('otherPlugin', options, {})
+
+    cfgHub = ConfigHub(w3afCore())
     
-    window.add(editor)
+    box = gtk.HBox()
+    window.add(box)
+    box.pack_start(cfgHub.getNavigationWidget())
+    box.pack_start(cfgHub.getEditorWidget())
+
+    #editor = EditorNotebook()
+    #editor.open('somePlugin', options, {})
+    #editor.open('otherPlugin', options, {})
+    
+#    window.add(editor)
 
     window.show_all()
     gtk.main()
