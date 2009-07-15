@@ -122,6 +122,7 @@ class phpinfo(baseDiscoveryPlugin):
                                 v = vuln.vuln()
                                 v.setId( response.id )
                                 v.setName( 'phpinfo() file found' )
+                                v.setW3afId('00006')
                                 v.setSeverity(severity.MEDIUM)
                                 v.setURL( response.getURL() )
                                 desc = 'The phpinfo() file was found at: ' + v.getURL()
@@ -160,6 +161,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'register_globals: On' )
+                v.setW3afId('00007')
                 v.setSeverity(severity.MEDIUM)
                 v.setURL( response.getURL() )
                 desc = 'The phpinfo()::register_globals is on.'            
@@ -180,6 +182,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'allow_url_fopen: On' )
+            v.setW3afId('00008')
             v.setSeverity(severity.MEDIUM)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::allow_url_fopen is enabled.'            
@@ -195,6 +198,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'allow_url_include: On' )
+            v.setW3afId('00009')
             v.setSeverity(severity.MEDIUM)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::allow_url_include is enabled.'            
@@ -210,6 +214,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'display_errors: On' )
+            v.setW3afId('00010')
             v.setSeverity(severity.MEDIUM)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::display_errors is enabled.'            
@@ -225,6 +230,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'expose_php: On' )
+            v.setW3afId('00011')
             v.setSeverity(severity.MEDIUM)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::expose_php is enabled.'            
@@ -246,6 +252,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'lowest_privilege_test:fail' )
+                v.setW3afId('00012')
                 v.setSeverity(severity.MEDIUM)
                 v.setURL( response.getURL() )
                 desc = 'phpinfo()::PHP may be executing as a higher privileged group. '
@@ -276,6 +283,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'disable_functions:few' )
+                v.setW3afId('00013')
                 v.setSeverity(severity.MEDIUM)
                 v.setURL( response.getURL() )
                 desc = 'The phpinfo()::disable_functions are set to few.'
@@ -317,6 +325,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'curl_file_support:not_fixed' )
+                v.setW3afId('00014')
                 v.setSeverity(severity.MEDIUM)
                 v.setURL( response.getURL() )
                 desc = 'The phpinfo()::cURL::file_support has a security hole present in this version of PHP allows the cURL functions to bypass safe_mode and open_basedir restrictions.  .'
@@ -334,6 +343,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'cgi_force_redirect: Off' )
+                v.setW3afId('00015')
                 v.setSeverity(severity.MEDIUM)
                 v.setURL( response.getURL() )
                 desc = 'The phpinfo()::CGI::force_redirect is disabled.'
@@ -349,6 +359,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'session.cookie_httponly: Off' )
+            v.setW3afId('00016')
             v.setSeverity(severity.MEDIUM)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::session.cookie_httponly is off.'
@@ -364,6 +375,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'session_save_path:Everyone' )
+            v.setW3afId('00017')
             v.setSeverity(severity.LOW)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::session.save_path may be set to world-accessible directory.'
@@ -379,6 +391,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'session_use_trans: On' )
+            v.setW3afId('00018')
             v.setSeverity(severity.MEDIUM)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::session.use_trans is enabled. This makes session hijacking easier.'
@@ -394,6 +407,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'default_charset: Off' )
+            v.setW3afId('00019')
             v.setSeverity(severity.MEDIUM)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::default_charset is set to none. This makes PHP scripts vulnerable to variable charset encoding XSS.'
@@ -412,6 +426,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'enable_dl: On' )
+                v.setW3afId('00020')
                 v.setSeverity(severity.MEDIUM)
                 v.setURL( response.getURL() )
                 desc = 'The phpinfo()::enable_dl is on.'            
@@ -435,6 +450,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'memory_limit:high' )
+                v.setW3afId('00021')
                 v.setSeverity(severity.MEDIUM)
                 v.setURL( response.getURL() )
                 desc = 'The phpinfo()::memory_limit is set to higher value (' + memory_limit.group(1) + ').'
@@ -455,6 +471,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'post_max_size:high' )
+                v.setW3afId('00022')
                 v.setSeverity(severity.LOW)
                 v.setURL( response.getURL() )
                 desc = 'The phpinfo()::post_max_size is set to higher value (' + post_max_size.group(1) + ').'
@@ -475,6 +492,7 @@ class phpinfo(baseDiscoveryPlugin):
                 v = vuln.vuln()
                 v.setId( response.id )
                 v.setName( 'post_max_size:high' )
+                v.setW3afId('00023')
                 v.setSeverity(severity.LOW)
                 v.setURL( response.getURL() )
                 desc = 'The phpinfo()::upload_max_filesize is set to higher value (' + upload_max_filesize.group(1) + ').'
@@ -490,6 +508,7 @@ class phpinfo(baseDiscoveryPlugin):
             v = vuln.vuln()
             v.setId( response.id )
             v.setName( 'upload_tmp_dir:Everyone' )
+            v.setW3afId('00024')
             v.setSeverity(severity.LOW)
             v.setURL( response.getURL() )
             desc = 'The phpinfo()::upload_tmp_dir may be set to world-accessible directory.'

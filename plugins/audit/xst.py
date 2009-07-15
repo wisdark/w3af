@@ -83,7 +83,7 @@ class xst(baseAuditPlugin):
                 v.setId( response.id )
                 v.setSeverity(severity.LOW)
                 v.setName( 'Cross site tracing vulnerability' )
-                v.setW3afId('00001') 
+                v.setW3afId('00056')                
                 msg = 'The web server at "'+ response.getURL() +'" is vulnerable to'
                 msg += ' Cross Site Tracing.'
                 v.setDesc( msg )

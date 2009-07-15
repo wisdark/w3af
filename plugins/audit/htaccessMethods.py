@@ -91,6 +91,7 @@ class htaccessMethods(baseAuditPlugin):
             v = vuln.vuln()
             v.setURL( url )
             v.setName( 'Misconfigured access control' )
+            v.setW3afId('00048')            
             v.setSeverity(severity.MEDIUM)
             msg = 'The resource: "'+ url + '" requires authentication but the access'
             msg += ' is misconfigured and can be bypassed using these methods: ' 

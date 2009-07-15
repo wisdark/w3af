@@ -136,6 +136,7 @@ class osCommanding(baseAuditPlugin):
                 # Create the vuln obj
                 v = vuln.vuln( mutant )
                 v.setName( 'OS commanding vulnerability' )
+                v.setW3afId('00043')                
                 v.setSeverity(severity.HIGH)
                 v['os'] = sentOs
                 v['separator'] = sentSeparator
@@ -201,6 +202,7 @@ class osCommanding(baseAuditPlugin):
                 # Now I can be sure that I found a vuln, I control the time of the response.
                 v = vuln.vuln( mutant )
                 v.setName( 'OS commanding vulnerability' )
+                v.setW3afId('00043')                
                 v.setSeverity(severity.HIGH)
                 v['os'] = sentOs
                 v['separator'] = sentSeparator

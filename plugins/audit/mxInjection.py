@@ -80,6 +80,7 @@ class mxInjection(baseAuditPlugin):
             if not re.search( mx_error, mutant.getOriginalResponseBody(), re.IGNORECASE ):
                 v = vuln.vuln( mutant )
                 v.setName( 'MX injection vulnerability' )
+                v.setW3afId('00044')                
                 v.setSeverity(severity.MEDIUM)
                 v.setDesc( 'MX injection was found at: ' + mutant.foundAt() )
                 v.setId( response.id )

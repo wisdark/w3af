@@ -131,6 +131,7 @@ class localFileInclude(baseAuditPlugin):
                 v = vuln.vuln( mutant )
                 v.setId( response.id )
                 v.setName( 'Local file inclusion vulnerability' )
+                v.setW3afId('00047')                
                 v.setSeverity(severity.MEDIUM)
                 v.setDesc( 'Local File Inclusion was found at: ' + mutant.foundAt() )
                 v['file_pattern'] = file_content

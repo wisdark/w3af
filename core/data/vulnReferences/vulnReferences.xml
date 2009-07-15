@@ -15,7 +15,161 @@
                 <source>OWASP</source>
                 <url>http://www.owasp.org/index.php/ASP.NET_Misconfigurations</url>
         </reference>        
-    </vulnerability>    
+    </vulnerability>   
+       <vulnerability>
+        <vulnid>00006</vulnid>
+        <vulnname>phpinfo() file found</vulnname>
+        <reference>
+                <source>PHP.net</source>
+                <url>http://www.php.net/manual/en/function.phpinfo.php</url>
+        </reference>        
+    </vulnerability>       
+      <vulnerability>
+      	<vulnid>00007</vulnid>
+      	<vulnname>register_globals: On</vulnname>
+      	<reference>
+     		<source>PHP.net</source>
+    		<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+      	</reference>
+      </vulnerability>    
+	  <vulnerability>
+		<vulnid>00008</vulnid>
+		<vulnname>allow_url_fopen: On</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00009</vulnid>
+		<vulnname>allow_url_include: On</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00010</vulnid>
+		<vulnname>display_errors: On</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00011</vulnid>
+		<vulnname>expose_php: On</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00012</vulnid>
+		<vulnname>lowest_privilege_test:fail</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00013</vulnid>
+		<vulnname>disable_functions:few</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00014</vulnid>
+		<vulnname>curl_file_support:not_fixed</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00015</vulnid>
+		<vulnname>cgi_force_redirect: Off</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00016</vulnid>
+		<vulnname>session.cookie_httponly: Off</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00017</vulnid>
+		<vulnname>session_save_path:Everyone</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>	
+	<vulnerability>
+		<vulnid>00018</vulnid>
+		<vulnname>session_use_trans: On</vulnname>
+		<reference>	
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00019</vulnid>
+		<vulnname>default_charset: Off</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00020</vulnid>
+		<vulnname>enable_dl: On</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00021</vulnid>
+		<vulnname>memory_limit:high</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00022</vulnid>
+		<vulnname>post_max_size:high</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00023</vulnid>
+		<vulnname>post_max_size:high</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	<vulnerability>
+		<vulnid>00024</vulnid>
+		<vulnname>upload_tmp_dir:Everyone</vulnname>
+		<reference>
+			<source>PHP.net</source>
+			<url>http://www.php.net/manual/en/function.phpinfo.php</url>
+		</reference>
+	</vulnerability>
+	
+     
     <vulnerability>
         <vulnid>00032</vulnid>
         <vulnname>Unidentified vulnerability</vulnname>
@@ -43,14 +197,34 @@
                 <source>OWASP</source>
                 <url>http://www.owasp.org/index.php/Insecure_Transport</url>
         </reference>                 
-    </vulnerability>          
+    </vulnerability> 
+     <vulnerability>
+        <vulnid>00035</vulnid>
+        <vulnname>Unsafe usage of preg_replace</vulnname>
+        <reference>
+                <source>SecurityFocus</source>
+                <url>http://www.securityfocus.com/bid/13823</url>
+        </reference>                 
+    </vulnerability>             
     <vulnerability>
         <vulnid>00036</vulnid>
         <vulnname>SQL injection vulnerability</vulnname>
         <reference>
                 <source>OWASP</source>
                 <url>http://www.owasp.org/index.php/SQL_injection</url>
-        </reference>                 
+        </reference>   
+        <reference>
+                <source>Microsoft</source>
+                <url>http://msdn.microsoft.com/msdnmag/issues/04/09/SQLInjection/default.aspx</url>
+        </reference>   
+        <reference>
+                <source>Microsoft</source>
+                <url>http://support.microsoft.com/default.aspx?scid=kb;en-us;302570</url>
+        </reference>                    
+        <reference>
+                <source>SQLSecurity.com</source>
+                <url>http://www.sqlsecurity.com/DesktopDefault.aspx</url>
+        </reference>                                       
     </vulnerability>     
     <vulnerability>
         <vulnid>00037</vulnid>
@@ -59,21 +233,95 @@
                 <source>OWASP</source>
                 <url>http://www.owasp.org/index.php/Cross_site_scripting</url>
         </reference>                 
-    </vulnerability>      
+    </vulnerability>          
     <vulnerability>
         <vulnid>00038</vulnid>
-        <vulnname>Permanent cross site scripting vulnerability</vulnname>
+        <vulnname>Permanent cross site scripting</vulnname>
         <reference>
                 <source>OWASP</source>
                 <url>http://www.owasp.org/index.php/Cross_site_scripting</url>
-        </reference>                 
-    </vulnerability>       
-    <vulnerability>
-        <vulnid>00038</vulnid>
+        </reference>                  
+    </vulnerability>         
+    
+    
+        <vulnerability>
+        <vulnid>00039</vulnid>
         <vulnname>eval() input injection vulnerability</vulnname>
         <reference>
                 <source>OWASP</source>
                 <url>http://www.owasp.org/index.php/Direct_Dynamic_Code_Evaluation_('Eval_Injection')</url>
-        </reference>                 
-    </vulnerability>         
+        </reference>                  
+    </vulnerability>      
+        <vulnerability>
+        <vulnid>00050</vulnid>
+        <vulnname>Server side include vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Server-Side_Includes_(SSI)_Injection</url>
+        </reference>                  
+    </vulnerability>      
+    <vulnerability>
+        <vulnid>00051</vulnid>
+        <vulnname>Cross site request forgery vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Cross-Site_Request_Forgery</url>
+        </reference>                  
+    </vulnerability>    
+   <vulnerability>
+        <vulnid>00052</vulnid>
+        <vulnname>Format string vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Format_string_attack</url>
+        </reference>                  
+    </vulnerability>     
+       <vulnerability>
+        <vulnid>00053</vulnid>
+        <vulnname>LDAP injection vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/LDAP_injection</url>
+        </reference>                  
+    </vulnerability>    
+    <vulnerability>
+        <vulnid>00054</vulnid>
+        <vulnname>XPATH injection vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/XPATH_Injection</url>
+        </reference>                  
+    </vulnerability> 
+    <vulnerability>
+        <vulnid>00055</vulnid>
+        <vulnname>Remote file inclusion vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/PHP_File_Inclusion</url>
+        </reference>                  
+    </vulnerability>    
+    <vulnerability>
+        <vulnid>00056</vulnid>
+        <vulnname>Cross site tracing vulnerability</vulnname>
+        <reference>
+                <source>OWASP</source>
+                <url>http://www.owasp.org/index.php/Cross_Site_Tracing</url>
+        </reference>                  
+    </vulnerability>    
+    <vulnerability>
+        <vulnid>00058</vulnid>
+        <vulnname>SVN user disclosure vulnerability</vulnname>
+        <reference>
+                <source>OSVDB</source>
+                <url>http://osvdb.org/show/osvdb/53381</url>
+        </reference>                  
+    </vulnerability>       
+    <vulnerability>
+        <vulnid>00070</vulnid>
+        <vulnname>Private IP disclosure vulnerability</vulnname>
+        <reference>
+                <source>Microsoft</source>
+                <url>http://support.microsoft.com/support/kb/articles/Q218/1/80.ASP</url>
+        </reference>                  
+    </vulnerability>      
 </w3afvulnmap>

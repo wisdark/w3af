@@ -152,6 +152,7 @@ class remoteFileInclude(baseAuditPlugin):
             v.setId( response.id )
             v.setSeverity(severity.HIGH)
             v.setName( 'Remote file inclusion vulnerability' )
+            v.setW3afId('00055')
             v.setDesc( 'Remote file inclusion was found at: ' + mutant.foundAt() )
             kb.kb.append( self, 'remoteFileInclude', v )
     

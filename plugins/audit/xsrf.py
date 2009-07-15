@@ -79,6 +79,7 @@ class xsrf(baseAuditPlugin):
                 v.setURL( freq.getURL() )
                 v.setDc( freq.getDc() )
                 v.setName( 'Cross site request forgery vulnerability' )
+                v.setW3afId('00051')
                 v.setSeverity(severity.LOW)
                 v.setMethod( freq.getMethod() )
                 v.setDesc( 'The URL: ' + freq.getURL() + ' is vulnerable to cross site request forgery.' )
@@ -98,6 +99,7 @@ class xsrf(baseAuditPlugin):
                 v.setSeverity(severity.LOW)
                 v.setDc( freq.getDc() )
                 v.setName( 'Cross site request forgery vulnerability' )
+                v.setW3afId('00051')
                 v.setMethod( freq.getMethod() )
                 msg = 'The URL: ' + freq.getURL() + ' is vulnerable to cross site request forgery.'
                 msg += ' It allows the attacker to exchange the method from POST to GET when sending'

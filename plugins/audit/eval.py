@@ -130,6 +130,7 @@ class eval(baseAuditPlugin):
                 v.setId( response.id )
                 v.setSeverity(severity.HIGH)
                 v.setName( 'eval() input injection vulnerability' )
+                v.setW3afId('00039')                
                 v.setDesc( 'eval() input injection was found at: ' + mutant.foundAt() )
                 kb.kb.append( self, 'eval', v )
 
@@ -156,6 +157,7 @@ class eval(baseAuditPlugin):
                 v.setId( response.id )
                 v.setSeverity(severity.HIGH)
                 v.setName( 'eval() input injection vulnerability' )
+                v.setW3afId('00039')                
                 v.setDesc( 'eval() input injection was found at: ' + mutant.foundAt() )
                 kb.kb.append( self, 'eval', v )
             else:

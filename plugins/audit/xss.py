@@ -327,6 +327,7 @@ class xss(baseAuditPlugin):
             v = vuln.vuln( mutant )
             v.setId( response.id )
             v.setName( 'Cross site scripting vulnerability' )
+            v.setW3afId('00037')
             v.setSeverity(severity.MEDIUM)
             msg = 'Cross Site Scripting was found at: ' + mutant.foundAt() 
             msg += ' This vulnerability affects ' + ','.join(mutant.affected_browsers)
@@ -403,6 +404,7 @@ class xss(baseAuditPlugin):
                         v['write_payload'] = mutant
                         v['read_payload'] = fuzzable_request
                         v.setName( 'Permanent cross site scripting vulnerability' )
+                        v.setW3afId('00038')                        
                         v.setSeverity(severity.HIGH)
                         msg = 'Permanent Cross Site Scripting was found at: ' + response.getURL()
                         msg += ' . Using method: ' + v.getMethod() + '. The XSS was sent to the'

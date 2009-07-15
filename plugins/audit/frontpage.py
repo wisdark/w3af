@@ -158,6 +158,7 @@ class frontpage(baseAuditPlugin):
                 v.setId( [upload_id, res.id] )
                 v.setSeverity(severity.HIGH)
                 v.setName( 'Insecure Frontpage extensions configuration' )
+                v.setW3afId('00041')                
                 v.setMethod( 'POST' )
                 msg = 'An insecure configuration in the frontpage extensions allows'
                 msg += ' unauthenticated users to upload files to the remote web server.' 

@@ -164,6 +164,7 @@ class fileUpload(baseAuditPlugin):
                     v.setId( [mutant_response.id, get_response.id] )
                     v.setSeverity(severity.HIGH)
                     v.setName( 'Insecure file upload' )
+                    v.setW3afId('00045')                  
                     v['fileDest'] = get_response.getURL()
                     v['fileVars'] = mutant.getFileVariables()
                     msg = 'A file upload to a directory inside the webroot was found at: '

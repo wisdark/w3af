@@ -68,6 +68,7 @@ class ssn(baseGrepPlugin):
                 v.setId( response.id )
                 v.setSeverity(severity.LOW)
                 v.setName( 'US Social Security Number disclosure' )
+                v.setW3afId('00059')
                 msg = 'The URL: "' + v.getURL() + '" possibly discloses a US '
                 msg += 'Social Security Number: "'+ validated_ssn +'"'
                 v.setDesc( msg )

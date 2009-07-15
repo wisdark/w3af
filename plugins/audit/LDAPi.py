@@ -84,6 +84,7 @@ class LDAPi(baseAuditPlugin):
                 v.setId( response.id )
                 v.setSeverity(severity.HIGH)
                 v.setName( 'LDAP injection vulnerability' )
+                v.setW3afId('00053')
                 v.setDesc( 'LDAP injection was found at: ' + mutant.foundAt() )
                 kb.kb.append( self, 'LDAPi', v )
     

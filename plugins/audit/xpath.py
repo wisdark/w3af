@@ -86,6 +86,7 @@ class xpath(baseAuditPlugin):
             if not re.search( xpath_error, mutant.getOriginalResponseBody(), re.IGNORECASE ):
                 v = vuln.vuln( mutant )
                 v.setName( 'XPATH injection vulnerability' )
+                v.setW3afId('00054')
                 v.setSeverity(severity.MEDIUM)
                 v.setDesc( 'XPATH injection was found at: ' + mutant.foundAt() )
                 v.setId( response.id )

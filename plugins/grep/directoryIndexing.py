@@ -68,6 +68,7 @@ class directoryIndexing(baseGrepPlugin):
                     v.setSeverity(severity.LOW)
                     path = urlParser.getPath( response.getURL() )
                     v.setName( 'Directory indexing - ' + path )
+                    v.setW3afId('00057')
                     
                     kb.kb.append( self , 'directory' , v )
                     break

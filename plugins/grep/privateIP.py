@@ -74,6 +74,7 @@ class privateIP(baseGrepPlugin):
                     v.setId( response.id )
                     v.setSeverity(severity.LOW)
                     v.setName( 'Private IP disclosure vulnerability' )
+                    v.setW3afId('00070')
                     
                     msg = 'The URL: "' + v.getURL() + '" returned an HTTP header '
                     msg += 'with an IP address: "' +  match + '".'
@@ -105,6 +106,7 @@ class privateIP(baseGrepPlugin):
                         v.setId( response.id )
                         v.setSeverity(severity.LOW)
                         v.setName( 'Private IP disclosure vulnerability' )
+                        v.setW3afId('00070')
                         
                         msg = 'The URL: "' + v.getURL() + '" returned an HTML document '
                         msg += 'with an IP address: "' +  match + '".'

@@ -98,6 +98,7 @@ class phishingVector(baseAuditPlugin):
                     v.setId( response.id )
                     v.setSeverity(severity.LOW)
                     v.setName( 'Phishing vector' )
+                    v.setW3afId('00042')                    
                     v.setDesc( 'A phishing vector was found at: ' + mutant.foundAt() )
                     res.append( v )
         return res

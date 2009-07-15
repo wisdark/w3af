@@ -154,6 +154,7 @@ class buffOverflow(baseAuditPlugin):
                     v.setId( response.id )
                     v.setSeverity(severity.MEDIUM)
                     v.setName( 'Buffer overflow vulnerability' )
+                    v.setW3afId('00040')                    
                     msg = 'A possible buffer overflow (detection is really hard...) was found at: '
                     msg += mutant.foundAt()
                     v.setDesc( msg )

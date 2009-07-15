@@ -75,6 +75,7 @@ class formatString(baseAuditPlugin):
                     v.setId( response.id )
                     v.setSeverity(severity.MEDIUM)
                     v.setName( 'Format string vulnerability' )
+                    v.setW3afId('00052')
                     msg = 'A possible (detection is really hard...) format string was found at: '
                     msg += mutant.foundAt()
                     v.setDesc( msg )

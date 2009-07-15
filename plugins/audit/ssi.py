@@ -97,6 +97,7 @@ class ssi(baseAuditPlugin):
             if not re.search( ssi_error, mutant.getOriginalResponseBody(), re.IGNORECASE ):
                 v = vuln.vuln( mutant )
                 v.setName( 'Server side include vulnerability' )
+                v.setW3afId('00050')
                 v.setSeverity(severity.HIGH)
                 v.setDesc( 'Server Side Include was found at: ' + mutant.foundAt() )
                 v.setId( response.id )
