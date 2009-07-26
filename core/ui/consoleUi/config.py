@@ -36,7 +36,7 @@ class configMenu(menu):
     def __init__(self, name, console, w3af, parent, configurable):
         menu.__init__(self, 'config:' + name, console, w3af, parent)
         self._configurable = configurable
-        self._options = self._configurable.getOptions()
+        self._options = self._configurable.getCurrentOptions()
         self._optDict = {}
         self._memory = {}
         self._plainOptions = {}
@@ -86,18 +86,21 @@ class configMenu(menu):
             name = params[0]
             value = ''.join(params[1:])
 
-            self._options[name].setValue( value )
+#            self._options[name]e( value )
             self._plainOptions[name] = value
             mem = self._memory[name]
             if value not in mem:
                 mem.append(value)
-            if isinstance( self._configurable, basePlugin ):
-                self._w3af.setPluginOptions( self._configurable.getType(), self._configurable.getName(), self._options )
-            else:
-                try:
-                    self._configurable.setOptions( self._options )
-                except w3afException, w3:
-                    om.out.error( str(w3) )
+
+            self._configurable.configure({name: value})
+#            if isinstance( self._configurable, basePlugin ):
+#                configurable.configure({name: value})
+##                self._w3af.setPluginOptions( self._configurable.getType(), self._configurable.getName(), self._options )
+#            else:
+#                try:
+#                    self._configurable.setOptions( self._options )
+#                except w3afException, w3:
+#                    om.out.error( str(w3) )
 
 
     def _para_set(self, params, part):

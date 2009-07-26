@@ -46,6 +46,8 @@ import copy
 import Queue
 import re
 
+from collections import defaultdict
+
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.config as cf
 from core.data.request.frFactory import createFuzzableRequests
@@ -129,8 +131,8 @@ class w3afCore:
         self._strPlugins = {'audit':[], 'grep':[], 'bruteforce':[], 'discovery':[], \
         'evasion':[], 'mangle':[], 'output':[]}
 
-        self._pluginsOptions = {'audit':{}, 'grep':{}, 'bruteforce':{}, 'discovery':{}, \
-        'evasion':{}, 'mangle':{}, 'output':{}, 'attack':{}}
+#        self._pluginsOptions = {'audit':{}, 'grep':{}, 'bruteforce':{}, 'discovery':{}, \
+#        'evasion':{}, 'mangle':{}, 'output':{}, 'attack':{}}
 
     
     def getHomePath( self ):
@@ -146,7 +148,8 @@ class w3afCore:
         '''
         # A dict with plugin types as keys and a list of plugin instances as values
         self._plugins = {'audit':[], 'grep':[], 'bruteforce':[], 'discovery':[], \
-        'evasion':[], 'mangle':[], 'output':[]}
+                'evasion':[], 'mangle':[], 'output':[] }
+        self._instCache = defaultdict(dict)
         
         self._fuzzableRequestList  = []
         
@@ -194,7 +197,7 @@ class w3afCore:
             self._strPlugins[pluginType] = strReqPlugins
                 
         for pluginName in strReqPlugins:
-            plugin = factory( 'plugins.' + pluginType + '.' + pluginName )
+            plugin = self.getPluginInstance(pluginName, pluginType)
 
             # Now we are going to check if the plugin dependencies are met
             for dep in plugin.getPluginDeps():
@@ -215,11 +218,9 @@ class w3afCore:
                 else:
                     if depPlugin not in self._strPlugins[depType]:
                         if cf.cf.getData('autoDependencies'):
-                            dependObj = factory( 'plugins.' + depType + '.' + depPlugin )
-                            dependObj.setUrlOpener( self.uriOpener )
-                            if dependObj not in self._plugins[depType]:
-                                self._plugins[depType].insert( 0, dependObj )
-                                self._strPlugins[depType].append( depPlugin )
+                            dependObj = getPluginInstance( 'plugins.' + depType + '.' + depPlugin )
+                            if depPlugin not in self._strPlugins[depType]:
+                                self._strPlugins.insert(0, depPlugin)
                             om.out.information('Auto-enabling plugin: ' + depType + '.' + depPlugin)
                         else:
                             raise w3afException('Plugin '+ pluginName +' depends on plugin ' + dep + ' and ' + dep + ' is not enabled. ')
@@ -229,12 +230,12 @@ class w3afCore:
                         self._strPlugins[depType].insert( 0, depPlugin )
             
             # Now we set the plugin options
-            if pluginName in self._pluginsOptions[ pluginType ]:
-                pOptions = self._pluginsOptions[ pluginType ][ pluginName ]
-                plugin.setOptions( pOptions )
+#            if pluginName in self._pluginsOptions[ pluginType ]:
+#                pOptions = self._pluginsOptions[ pluginType ][ pluginName ]
+#                plugin.setOptions( pOptions )
                 
             # This sets the url opener for each module that is called inside the for loop
-            plugin.setUrlOpener( self.uriOpener )
+#            plugin.setUrlOpener( self.uriOpener )
             # Append the plugin to the list
             requestedPluginsList.append ( plugin )
 
@@ -285,6 +286,7 @@ class w3afCore:
         
         # First, create an instance of each requested plugin and add it to the plugin list
         # Plugins are added taking care of plugin dependencies
+
         self._plugins['audit'] = self._rPlugFactory( self._strPlugins['audit'] , 'audit')
         
         self._plugins['bruteforce'] = self._rPlugFactory( self._strPlugins['bruteforce'] , 'bruteforce')        
@@ -420,7 +422,7 @@ class w3afCore:
         
         # Let the output plugins know what kind of plugins we're
         # using during the scan
-        om.out.logEnabledPlugins(self._strPlugins, self._pluginsOptions)
+#        om.out.logEnabledPlugins(self._strPlugins, self._pluginsOptions)
         
         try:
             # Just in case the gtkUi / consoleUi forgot to do this...
@@ -886,43 +888,43 @@ class w3afCore:
                 
         return res
 
-    def setPluginOptions(self, pluginType, pluginName, pluginOptions ):
-        '''
-        @parameter pluginType: The plugin type, like 'audit' or 'discovery'
-        @parameter pluginName: The plugin name, like 'sqli' or 'webSpider'
-        @parameter pluginOptions: An optionList object with the option objects for a plugin.
-        
-        @return: No value is returned.
-        '''
-        if pluginType.lower() == 'output':
-            om.out.setPluginOptions(pluginName, pluginOptions)
-            
-        # The following lines make sure that the plugin will accept the options
-        # that the user is setting to it.
-        pI = self.getPluginInstance( pluginName, pluginType )
-        try:
-            pI.setOptions( pluginOptions )
-        except Exception, e:
-            raise e
-        else:
-            # Now that we are sure that these options are valid, lets save them
-            # so we can use them later!
-            self._pluginsOptions[ pluginType ][ pluginName ] = pluginOptions
+#    def setPluginOptions(self, pluginType, pluginName, pluginOptions ):
+#        '''
+#        @parameter pluginType: The plugin type, like 'audit' or 'discovery'
+#        @parameter pluginName: The plugin name, like 'sqli' or 'webSpider'
+#        @parameter pluginOptions: An optionList object with the option objects for a plugin.
+#        
+#        @return: No value is returned.
+#        '''
+#        if pluginType.lower() == 'output':
+#            om.out.setPluginOptions(pluginName, pluginOptions)
+#            
+#        # The following lines make sure that the plugin will accept the options
+#        # that the user is setting to it.
+#        pI = self.getPluginInstance( pluginName, pluginType )
+#        try:
+#            pI.setOptions( pluginOptions )
+#        except Exception, e:
+#            raise e
+#        else:
+#            # Now that we are sure that these options are valid, lets save them
+#            # so we can use them later!
+#            self._pluginsOptions[ pluginType ][ pluginName ] = pluginOptions
     
-    def getPluginOptions(self, pluginType, pluginName):
-        '''
-        Get the options for a plugin.
-        
-        IMPORTANT NOTE: This method only returns the options for a plugin that was previously configured using setPluginOptions.
-        If you wan't to get the default options for a plugin, get a plugin instance and perform a plugin.getOptions()
-        
-        @return: An optionList with the plugin options.
-        '''
-        if pluginType in self._pluginsOptions:
-            if pluginName in self._pluginsOptions[pluginType]:
-                return self._pluginsOptions[ pluginType ][ pluginName ]
-        return None
-        
+#    def getPluginOptions(self, pluginType, pluginName):
+#        '''
+#        Get the options for a plugin.
+#        
+#        IMPORTANT NOTE: This method only returns the options for a plugin that was previously configured using setPluginOptions.
+#        If you wan't to get the default options for a plugin, get a plugin instance and perform a plugin.getOptions()
+#        
+#        @return: An optionList with the plugin options.
+#        '''
+#        if pluginType in self._pluginsOptions:
+#            if pluginName in self._pluginsOptions[pluginType]:
+#                return self._pluginsOptions[ pluginType ][ pluginName ]
+#        return None
+#        
     def getEnabledPlugins( self, pluginType ):
         return self._strPlugins[ pluginType ]
     
@@ -1112,14 +1114,19 @@ class w3afCore:
         '''
         @return: An instance of a plugin.
         '''
+        if pluginName in self._instCache[pluginType]:
+            return self._instCache[pluginType][pluginName]
+
         pluginInst = factory('plugins.' + pluginType + '.' + pluginName)
         pluginInst.setUrlOpener( self.uriOpener )
-        if pluginName in self._pluginsOptions[ pluginType ].keys():
-            pluginInst.setOptions( self._pluginsOptions[ pluginType ][pluginName] )
+#        if pluginName in self._pluginsOptions[ pluginType ].keys():
+#            pluginInst.setOptions( self._pluginsOptions[ pluginType ][pluginName] )
                 
         # This will init some plugins like mangle and output
         if pluginType == 'attack' and not self._initialized:
             self.initPlugins()
+
+        self._instCache[pluginType][pluginName] = pluginInst
         return pluginInst
     
     def saveCurrentToNewProfile( self, profile_name, profileDesc='' ):

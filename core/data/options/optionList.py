@@ -38,6 +38,9 @@ class optionList:
     
     def __len__( self ):
         return len(self._oList)
+
+    def __iter__(self):
+        return iter(self._oList)
     
     def __repr__(self):
         '''
