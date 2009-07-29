@@ -1115,6 +1115,7 @@ class w3afCore:
         @return: An instance of a plugin.
         '''
         if pluginName in self._instCache[pluginType]:
+            print "Returning %s from cache" % pluginName
             return self._instCache[pluginType][pluginName]
 
         pluginInst = factory('plugins.' + pluginType + '.' + pluginName)

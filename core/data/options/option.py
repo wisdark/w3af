@@ -86,10 +86,11 @@ class option:
             elif self._type == 'float':
                 res = float(value)
             elif self._type == 'boolean':
-                if value.lower() == 'true':
-                    res = True
-                else:
-                    res = False
+                res = value
+#                if value.lower() == 'true':
+#                    res = True
+#                else:
+#                    res = False
             elif self._type == 'list':
                 res = []
                 # Yes, we are regex dummies

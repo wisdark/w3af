@@ -11,17 +11,12 @@ class EditorPage(gtk.VBox):
          # should not allow to be closed in an inconsistent state
     }
  
-    def __init__(self, optList, changedList=None):
+    def __init__(self, optList): #optList, changedList=None):
         super(EditorPage, self).__init__()
 
         view = OptsView()
         for opt in optList:
-            name = opt.getName()
-            try:
-                actualOpt = changedList[name]
-            except:
-                actualOpt = opt
-
+            #name = opt.getName()
             view.addOption(opt)
         
         view.connect('edited', self.__edited)
@@ -29,9 +24,9 @@ class EditorPage(gtk.VBox):
         view.connect('restored', self.__restored)
         self._view = view
         self._values = {}
-        if changedList:
-            for opt in changedList:
-                self._values[opt.getName()] = opt.getDefaultValue()
+#        if changedList:
+#            for opt in changedList:
+#                self._values[opt.getName()] = opt.getDefaultValue()
 
         self.__fillContent()
 
@@ -110,13 +105,13 @@ class EditorNotebook(gtk.Notebook):
         self._pagesByName = {} # name --> (index, page)
         self._pagesByIdx = {} # index --> (name, page)
     
-    def open(self, name, optList, editedValues):
+    def open(self, name, optList):
         if name in self._pagesByName:
             idx, page = self._pagesByName[name]
             self.set_current_page(idx)
             return page
 
-        page = EditorPage(optList, editedValues)
+        page = EditorPage(optList)
         page.show_all()
 
         label = gtk.Label(name)
@@ -148,6 +143,7 @@ class EditorNotebook(gtk.Notebook):
     def __closed(self, page, name):
         idx = self._pagesByName[name][0]
         self.remove_page(idx)
+        del self._pagesByName[name]
 
 
 gobject.type_register(EditorPage)

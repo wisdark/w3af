@@ -24,8 +24,8 @@ from core.controllers.w3afException import w3afException
 
 class configurable:
     '''
-    This is mostly "an interface", this "interface" states that all classes that implement it, should
-    implement the following methods :
+    This is a template for any entity, configurable through UIs ;
+    all classes that extend it, should implement the following methods :
         1. setOptions( optionsMap )
         2. getOptions()
         
@@ -64,6 +64,7 @@ class configurable:
         return self.__getValues().copy()
 
     def configure(self, optDict):
+        print "Configure: ", optDict
         opts = self.getCurrentOptions()
         for n,v in optDict.items():
             opts[n].setValue(v)

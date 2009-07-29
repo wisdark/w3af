@@ -3,6 +3,8 @@ from core.ui.gtkUi.new.optseditor import EditorNotebook
 import gtk
 from core.controllers.w3afCore import w3afCore
 from core.ui.gtkUi.new.confighub import ConfigHub
+from core.ui.gtkUi.new.optseditor import EditorNotebook
+from core.ui.gtkUi.new.plugintree import PluginTree
 
 ##### Test
 
@@ -39,12 +41,16 @@ def main():
 
 #    map(table.addOption, options)
 
+    core = w3afCore()
     cfgHub = ConfigHub(w3afCore())
+
+    editor = EditorNotebook()
+    navigator = PluginTree(editor, core)
     
     box = gtk.HBox()
     window.add(box)
-    box.pack_start(cfgHub.getNavigationWidget())
-    box.pack_start(cfgHub.getEditorWidget())
+    box.pack_start(navigator)
+    box.pack_start(editor)
 
     #editor = EditorNotebook()
     #editor.open('somePlugin', options, {})

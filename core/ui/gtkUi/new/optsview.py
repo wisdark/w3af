@@ -108,8 +108,8 @@ class OptsView(gtk.TreeView):
         name = self._model.get_value(it, 0)
         self.setOptionValue(name, value)
 
-    def addOption(self, opt, value=None):
-        if value is None: value = opt.getDefaultValue()
+    def addOption(self, opt):
+        value = opt.getValue()
         name = opt.getName()
         self._baseline[name] = value
         self._optsInd[name] = len(self._model)

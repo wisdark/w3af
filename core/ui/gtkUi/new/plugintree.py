@@ -9,9 +9,9 @@ class PluginTree(gtk.TreeView):
 #                 (gobject.TYPE_STRING,gobject.TYPE_STRING))
 #    }
 
-    def __init__(self, hub, core, *params):
+    def __init__(self, editor, core, *params):
         super(PluginTree, self).__init__(*params)
-        self._hub = hub
+        self._editor = editor
         self._core = core
         self._model = gtk.TreeStore(str, str, go.TYPE_BOOLEAN, gdk.Pixbuf)
         column = gtk.TreeViewColumn('Plugin')
@@ -54,13 +54,17 @@ class PluginTree(gtk.TreeView):
 
             idx = self._model.append(root, [pname, pname, isActive, pix])
             self._indicies[ptype][pname] = idx
-            self._byPath[self._model.get_path(idx)] = (ptype, pname)
+            self._byPath[self._model.get_path(idx)] = (pname, ptype)
             
 
     def __open(self, widg, path, column):
-        typeAndName = self._byPath[path]
-        page = self._hub.open(*typeAndName)
-        page.connect('edited', self.__restored, path)
+        pname, ptype = self._byPath[path]
+        print pname, ptype
+        print type(pname), type(ptype)
+        plugin = self._core.getPluginInstance(pname, ptype)
+        opts = plugin.getCurrentOptions()
+        page = self._editor.open("%s:%s" % (ptype, pname), opts)
+        page.connect('edited', self.__edited, plugin, path)
         page.connect('restored', self.__restored, path)
         page.connect('changed', self.__changed, path)
 #        self.emit('open-plugin', *self._byPath[path])
@@ -72,13 +76,16 @@ class PluginTree(gtk.TreeView):
     def __changed(*_):
         pass
 
+    def __edited(self, widget, opts, plugin, path):
+        plugin.configure(opts)
+
 #    def setEditor(self, editor):
 #        self._editor
 
     def addPlugin(self, plugin, options):
-        optDict = {}
-        for o in options:
-            optDict[o.getName()] = o.getDefaultValue()
+#        optDict = {}
+#        for o in options:
+#            optDict[o.getName()] = o.getDefaultValue()
             
         self_model.append([plugin.getName(), plugin.getName(), \
                 False, False, None])
