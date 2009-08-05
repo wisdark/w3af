@@ -26,6 +26,7 @@ from . import confpanel, entries, helpers
 from core.ui.gtkUi.pluginEditor import pluginEditor
 
 from core.controllers.misc.homeDir import get_home_dir
+from core.ui.gtkUi.new.optseditor import *
 
 # support for <2.5
 if sys.version_info[:2] < (2,5):
@@ -90,13 +91,6 @@ class OptionsPanel(gtk.VBox):
         @params like_initial: If the config is like the initial one
         '''
         self.plugin_tree.configChanged(like_initial)
-
-    def configSaved(self):
-        self.plugin_tree.configSaved()
-
-    def configReverted(self):
-        self.plugin_tree.configReverted()
-
 
 
 class ConfigPanel(gtk.VBox):
@@ -201,11 +195,10 @@ class PluginTree(gtk.TreeView):
 
     @author: Facundo Batista <facundobatista =at= taniquetil.com.ar>
     '''
-    def __init__(self, w3af, style, config_panel):
+    def __init__(self, w3af, style, editor):
         self.mainwin = w3af.mainwin 
         self.w3af = w3af
-        self.config_panel = config_panel
-        self._unsaved_plugin = None
+        self.editor = editor
         self._current_path = None
 
         # create the TreeStore, with the following columns:
@@ -258,7 +251,7 @@ class PluginTree(gtk.TreeView):
 
         # we will not ask for the plugin instances until needed, we'll
         # keep them here:
-        self.plugin_instances = {}
+#        self.plugin_instances = {}
 
         # we'll supervise the status of all changed configurations (if it
         # does not exist here, never was changed)
@@ -309,31 +302,25 @@ class PluginTree(gtk.TreeView):
         options = plugin.getOptions()
         return bool(len(options))
 
-    def configSaved(self):
-        self._unsaved_plugin = None
 
-    def configReverted(self):
-        self._unsaved_plugin = None
-
-    def configChanged(self, like_initial):
-        '''Shows in the tree when a plugin configuration changed.
+    def _plugin_status_changed(self, path, reconciled):
+        '''shows in the tree when a plugin configuration changed.
 
         @param like_initial: if some of the configuration changed
         
-        If changed, puts the plugin name in bold. If any of the plugin in a
+        if changed, puts the plugin name in bold. if any of the plugin in a
         type is bold, the type name is also bold.
         '''
         # modify the label of the leaf in the tree
         path = self.get_cursor()[0]
         row = self.treestore[path]
-        if like_initial:
+        if reconciled:
             row[0] = row[3]
             # we just alert the changing here, as if it's not saved, the
             # profile shouldn't really be changed
             plugin = self._getPluginInstance(path)
-            self.mainwin.profiles.profileChanged(plugin)
+#            self.mainwin.profiles.profilechanged(plugin)
         else:
-            self._unsaved_plugin = self._getPluginInstance(path)
             row[0] = "<b>%s</b>" % row[3]
 
         # update the general config status, and check if the plugin
@@ -341,7 +328,7 @@ class PluginTree(gtk.TreeView):
         pathfather = path[0]
         father = self.treestore[pathfather]
         children = self.config_status.setdefault(pathfather, {})
-        children[path] = like_initial
+        children[path] = reconciled 
         if all(children.values()):
             father[0] = father[3]
         else:
@@ -351,16 +338,13 @@ class PluginTree(gtk.TreeView):
         isallok = all([all(children.values()) for children in self.config_status.values()])
         self.mainwin.scanok.change(self, isallok)
 
+
     def _getPluginInstance(self, path):
         '''Caches the plugin instance.
 
         @param path: where the user is in the plugin tree
         @return The plugin
         '''
-        try:
-            return self.plugin_instances[path]
-        except KeyError:
-            pass
 
         # path can be a tuple of one or two values here
         if len(path) == 1:
@@ -370,9 +354,7 @@ class PluginTree(gtk.TreeView):
         pname = self.treestore[path][3]
         ptype = self.treestore[path[:1]][3]
         plugin = self.w3af.getPluginInstance(pname, ptype)
-        plugin.pname = pname
-        plugin.ptype = ptype
-        self.plugin_instances[path] = plugin
+
         return plugin
 
     def popup_menu( self, tv, event ):
@@ -437,35 +419,34 @@ class PluginTree(gtk.TreeView):
         if path is None:
             return
 
-        if self._unsaved_plugin is not None \
-                and self._unsaved_plugin is not self._getPluginInstance(path):
-            diag = gtk.MessageDialog()
-            diag.set_title(_("Configuration is not saved!"))
-            diag.set_markup(_("You have not saved the plugin configuration. Before running the scan either save the configuration or revert it."))
-            diag.add_button(gtk.STOCK_OK, gtk.RESPONSE_OK)
-            diag.add_button(_("Back to this plugin"), gtk.RESPONSE_CANCEL)
-            response = diag.run()
-            diag.destroy()
-            if response == gtk.RESPONSE_OK:
-                self._unsaved_plugin = None
-            else:
-                path, column = self._current_path
-                self.set_cursor(*self._current_path)
-
         self._current_path = (path, column)
 
+#        if len(path) == 1:
+#            pluginType = self.treestore[path][3]
+#            self.w3af.getPluginTypesDesc( pluginType )
+#            label = helpers.cleanDescription( self.w3af.getPluginTypesDesc( pluginType ) )
+#            self.config_panel.clear(label=label )
+#        else:
+        plugin = self._getPluginInstance(path)
+        #longdesc = plugin.getLongDesc()
+        #longdesc = helpers.cleanDescription(longdesc)
+#        self.mainwin.profiles.pluginConfig(plugin)
+        if plugin:
+            page = self.editor.open(plugin.getName(), plugin.getCurrentOptions())
+            page.connect('edited', self._plugin_edited, path, plugin)
+            page.connect('changed', self._plugin_changed, path, plugin)
+            page.connect('restored', self._plugin_restored, path, plugin)
 
-        if len(path) == 1:
-            pluginType = self.treestore[path][3]
-            self.w3af.getPluginTypesDesc( pluginType )
-            label = helpers.cleanDescription( self.w3af.getPluginTypesDesc( pluginType ) )
-            self.config_panel.clear(label=label )
-        else:
-            plugin = self._getPluginInstance(path)
-            longdesc = plugin.getLongDesc()
-            longdesc = helpers.cleanDescription(longdesc)
-            self.mainwin.profiles.pluginConfig(plugin)
-            self.config_panel.config(self, plugin, longdesc)
+    def _plugin_edited(self, widget, optsDict, path, plugin):
+        plugin.configure(optsDict)
+        self._plugin_status_changed(path, True)
+
+    def _plugin_restored(self, widget, path, plugin):
+        self._plugin_status_changed(path, True)
+
+    def _plugin_changed(self, widget, path, plugin):
+        self._plugin_status_changed(path, False)
+    # TODO : here...
 
     def _getChildren(self, path):
         '''Finds the children of a path.
@@ -628,7 +609,7 @@ class PluginConfigBody(gtk.VBox):
         '''Builds the panel.'''
         pan = entries.RememberingHPaned(self.w3af, "pane-plugconfigbody", 250)
         leftpan = entries.RememberingVPaned(self.w3af, "pane-plugconfigleft", 280)
-        self.config_panel = ConfigPanel(profileDescription)
+        self.config_panel = EditorNotebook()
         
         # upper left
         scrollwin1u = gtk.ScrolledWindow()

@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import gtk
-from . import entries, helpers
+from . import entries, helpers, optsview
 from core.controllers.w3afException import w3afException
 
 from core.controllers.basePlugin.basePlugin import basePlugin
@@ -130,6 +130,14 @@ class OnlyOptions(gtk.VBox):
 
         Also, the configurable widget gets a tooltip for a small description.
         '''
+        table = optsview.OptsView(self._changedWidget)
+        for opt in options:
+            table.addOption(opt)
+
+        result = table.getView()
+        result.show()
+        return result
+
         table = entries.EasyTable(len(options), 3)
         tooltips = gtk.Tooltips()
         for i,opt in enumerate(options):

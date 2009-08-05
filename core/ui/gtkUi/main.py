@@ -434,7 +434,7 @@ class MainApp(object):
             # and by reporting it to the user in a toolbar
             self.profiles = profiles.ProfileList(self.w3af, initial=None)
             self.sb( str(ve) )
-            
+
         pan.pack1(self.profiles)
         pan.pack2(self.pcbody)
         pan.show_all()

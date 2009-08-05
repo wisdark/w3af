@@ -33,11 +33,9 @@ class EditorPage(gtk.VBox):
     # view callbacks
     def __edited(self, widg, opts):
         self.emit('edited', opts)
-        print opts
 
     def __changed(self, widg, *opt):
         self.emit('changed')
-        print opt
 
     def __restored(self, *_):
         self.emit('restored')
@@ -86,10 +84,14 @@ class EditorPage(gtk.VBox):
         closeButton = gtk.Button("Close")
         closeButton.connect('clicked', self.__close)
 
-        self.pack_end(okButton)
-        self.pack_end(undoButton)
-        self.pack_end(defaultButton)
-        self.pack_end(closeButton)
+        buttons_box = gtk.HButtonBox()
+
+        buttons_box.pack_end(okButton)
+        buttons_box.pack_end(undoButton)
+        buttons_box.pack_end(defaultButton)
+        buttons_box.pack_end(closeButton)
+
+        self.pack_end(buttons_box, expand=False)
 
 
 class EditorNotebook(gtk.Notebook):

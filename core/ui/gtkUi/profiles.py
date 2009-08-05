@@ -28,6 +28,12 @@ from core.data.profile.profile import profile as profile
 
 import cgi
 
+class ProfilesPane(entries.RememberingHPaned):
+    def __init__(self, w3af, *args, **kwargs):
+        entries.RememberingHPaned.__init__(w3af, *args)
+        self._profileList = ProfileList(w3af, kwargs)
+        self.pack1(self._profileList)
+
 
 class ProfileList(gtk.TreeView):
     '''A list showing all the profiles.
@@ -155,7 +161,8 @@ class ProfileList(gtk.TreeView):
         # Check plugins config
         for ptype in self.w3af.getPluginTypes():
             for pname in self.w3af.getPluginList(ptype):
-                opts = self.w3af.getPluginOptions(ptype, pname)
+                inst = self.w3af.getPluginInstance(pname, ptype)
+                opts = inst.getCurrentOptions()
                 if not opts:
                     continue
 
