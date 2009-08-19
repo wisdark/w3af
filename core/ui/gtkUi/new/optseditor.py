@@ -24,9 +24,6 @@ class EditorPage(gtk.VBox):
         view.connect('restored', self.__restored)
         self._view = view
         self._values = {}
-#        if changedList:
-#            for opt in changedList:
-#                self._values[opt.getName()] = opt.getDefaultValue()
 
         self.__fillContent()
 
@@ -95,13 +92,6 @@ class EditorPage(gtk.VBox):
 
 
 class EditorNotebook(gtk.Notebook):
-#    __gsignals__ = {
-#         'edited' : (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str, object.TYPE_PYOBJECT,)), 
-#         'restored': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str,)),
-#         'changed': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str,)),
-#         'closed': (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (str,)),
-         # should not allow to be closed in an inconsistent state
-#     }
     def __init__(self):
         super(EditorNotebook, self).__init__()
         self._pagesByName = {} # name --> (index, page)
@@ -149,4 +139,3 @@ class EditorNotebook(gtk.Notebook):
 
 
 gobject.type_register(EditorPage)
-gobject.type_register(EditorNotebook)

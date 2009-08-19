@@ -92,22 +92,25 @@ class option:
 #                else:
 #                    res = False
             elif self._type == 'list':
-                res = []
-                # Yes, we are regex dummies
-                value += ','
-                tmp = re.findall('(".*?"|\'.*?\'|.*?),', value)
-                if tmp != []:
-                    tmp = [y.strip() for y in tmp if y != '']
-                    
-                    # Now I check for single and double quotes
-                    for u in tmp:
-                        if ( u.startswith('"') and u.endswith('"') ) or ( u.startswith("'") and u.endswith("'") ):
-                            res.append( u[1:-1] )
-                        else:
-                            res.append( u )
-
+                if hasattr(value, '__iter__'):
+                    res = value
                 else:
-                    raise ValueError
+                    res = []
+                # Yes, we are regex dummies
+                    value += ','
+                    tmp = re.findall('(".*?"|\'.*?\'|.*?),', value)
+                    if tmp != []:
+                        tmp = [y.strip() for y in tmp if y != '']
+                    
+                        # Now I check for single and double quotes
+                        for u in tmp:
+                            if ( u.startswith('"') and u.endswith('"') ) or ( u.startswith("'") and u.endswith("'") ):
+                                res.append( u[1:-1] )
+                            else:
+                                res.append( u )
+
+                    else:
+                        raise ValueError
             elif self._type in ('string', 'ipport'):
                 res = str(value)
             elif self._type == 'regex':

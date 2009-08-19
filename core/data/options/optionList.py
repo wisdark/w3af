@@ -70,7 +70,7 @@ class optionList:
             for o in self._oList:
                 if o.getName() == item_name:
                     return o
-            raise w3afException('The optionList object doesn\'t contain an option with the name: ' + item_name )
+            raise w3afException('The optionList object doesn\'t contain an option with the name: ' + str(item_name) )
         else:
             # An integer
             return self._oList[ item_name ]

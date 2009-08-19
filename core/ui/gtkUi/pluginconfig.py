@@ -399,7 +399,7 @@ class PluginTree(gtk.TreeView):
         This is a callback that is called when the plugin editor finishes.
         '''
         # remove the edited plugin from cache
-        del self.plugin_instances[path]
+        #del self.plugin_instances[path]
         
         # Reload the plugin
         self.w3af.reloadModifiedPlugin(pluginType,  pluginName)
@@ -431,7 +431,9 @@ class PluginTree(gtk.TreeView):
         #longdesc = plugin.getLongDesc()
         #longdesc = helpers.cleanDescription(longdesc)
 #        self.mainwin.profiles.pluginConfig(plugin)
+        print plugin
         if plugin:
+            print plugin.getCurrentOptions()
             page = self.editor.open(plugin.getName(), plugin.getCurrentOptions())
             page.connect('edited', self._plugin_edited, path, plugin)
             page.connect('changed', self._plugin_changed, path, plugin)
@@ -640,6 +642,7 @@ class PluginConfigBody(gtk.VBox):
         pan.pack1(leftpan)
         pan.pack2(scrollwin2)
         pan.show()
+        self.config_panel.show()
         return pan
 
     def _advancedTarget(self, widg):
@@ -702,6 +705,7 @@ class PluginConfigBody(gtk.VBox):
         self.remove(self.pan)
         self.pack_start(newpan)
         self.pan = newpan
+        print pan
 
     def _key(self, widg, event):
         '''Handles keystrokes.'''

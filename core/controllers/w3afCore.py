@@ -1226,8 +1226,9 @@ class w3afCore:
                     pluginOptions = profileInstance.getPluginOptions( pluginType, pluginName )
                     try:
                         # FIXME: Does this work with output plugin options? What about target, http-settings, etc?
-                        self.setPluginOptions( pluginType, pluginName, pluginOptions )
+                        self.getPluginInstance(pluginName, pluginType).configure(pluginOptions)
                     except Exception, e:
+                        traceback.print_exc()
                         # This is because of an invalid plugin, or something like that...
                         # Added as a part of the fix of bug #1937272
                         raise w3afException('The profile you are trying to load seems to be corrupt, or one of the enabled plugins has a bug. If your profile is ok, please report this as a bug to the w3af sourceforge page: Exception while setting '+ pluginName +' plugin options: "' + str(e) + '"' )
@@ -1237,8 +1238,8 @@ class w3afCore:
             
             # Set the misc and http settings
             misc_settings = miscSettings.miscSettings()
-            misc_settings.setOptions( profileInstance.getMiscSettings() )
-            self.uriOpener.settings.setOptions( profileInstance.getHttpSettings() )
+            misc_settings.configure( profileInstance.getMiscSettings() )
+            self.uriOpener.settings.configure( profileInstance.getHttpSettings() )
     
 # """"Singleton""""
 wCore = w3afCore()

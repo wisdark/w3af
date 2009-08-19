@@ -66,7 +66,13 @@ class configurable:
     def configure(self, optDict):
         print "Configure: ", optDict
         opts = self.getCurrentOptions()
-        for n,v in optDict.items():
+        for o in optDict:
+            if hasattr(o, "getName"):
+                n,v = o.getName(), o.getValue()
+            else:
+                n, v = o, optDict[o]
+
+            print v, str(v)
             opts[n].setValue(v)
         
         # a legacy design support: propagate to the plugin
