@@ -104,8 +104,10 @@ class OptionRenderer(RenderMixIn, gtk.GenericCellRenderer):
 class BooleanValueRenderer(OptionRenderer):
     def __init__(self):
         super(BooleanValueRenderer, self).__init__()
-        actor = gtk.CellRendererToggle()
-        actor.set_properties(activatable=True, mode=CRME)
+#        actor = gtk.CellRendererToggle()
+#        actor.set_properties(activatable=True, mode=CRME)
+        actor = gtk.CellRendererText()
+        actor.set_properties(editable=True, mode=CRME)
         self._actor = actor
 
     def getActor(self): return self._actor
@@ -115,7 +117,7 @@ class BooleanValueRenderer(OptionRenderer):
         name = prop.name
         if name=='value':
             self.value = True if value else False
-            self._actor.set_property('active', self.value)
+            self._actor.set_property('text', str(self.value))
         else:
             super(BooleanValueRenderer, self).do_set_property(prop, value)
 

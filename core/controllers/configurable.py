@@ -32,17 +32,6 @@ class configurable:
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
        
-    def __getValues(self):
-        try:
-            self.__values
-        except:
-            values = {}
-            for o in self.getOptions():
-                values[o.getName()] = o.getDefaultValue()
-            self.__values = values
-
-        return self.__values
-
     def getCurrentOptions(self):
         '''
         This method replaces the former getOptions() method.
@@ -60,9 +49,6 @@ class configurable:
 
         return self.__currentOptions
 
-    def getValues(self):
-        return self.__getValues().copy()
-
     def configure(self, optDict):
         print "Configure: ", optDict
         opts = self.getCurrentOptions()
@@ -72,7 +58,6 @@ class configurable:
             else:
                 n, v = o, optDict[o]
 
-            print v, str(v)
             opts[n].setValue(v)
         
         # a legacy design support: propagate to the plugin

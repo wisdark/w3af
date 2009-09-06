@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import gtk
 from . import entries, helpers, optsview
+from new.optseditor import EditorPage
 from core.controllers.w3afException import w3afException
 
 from core.controllers.basePlugin.basePlugin import basePlugin
@@ -273,31 +274,18 @@ class ConfigDialog(gtk.Dialog):
     def __init__(self, title, w3af, plugin, overwriter=None, showDesc=False):
         super(ConfigDialog,self).__init__(title, None, gtk.DIALOG_MODAL, ())
         self.set_icon_from_file('core/ui/gtkUi/data/w3af_icon.png')
-        if overwriter is None:
-            overwriter = {}
-
-        # buttons and config panel
-        save_btn = self._button("Save configuration")
-        rvrt_btn = self._button("Revert to previous configuration")
-        close_btn = self._button(stock=gtk.STOCK_CLOSE)
-        close_btn.connect("clicked", self._btn_close)
-        plugin.pname, plugin.ptype = plugin.getName(), plugin.getType()
-        
-        # Show the description
-        if showDesc:
-            # The long description of the plugin
-            longLabel = gtk.Label()
-            longLabel.set_text( plugin.getLongDesc() )
-            longLabel.set_alignment(0.0, 0.5)
-            longLabel.show()
-            self.vbox.pack_start(longLabel)
-        
+       
         # Save it , I need it when I inherit from this class
         self._plugin = plugin
-        self._panel = OnlyOptions(self, w3af, plugin, save_btn, rvrt_btn, overwriter)
-        self.vbox.pack_start(self._panel)
+        self._panel = EditorPage(plugin.getCurrentOptions())
+#        self._panel = OnlyOptions(self, w3af, plugin, save_btn, rvrt_btn, overwriter)
+        self.get_child().pack_start(self._panel)
+        self._panel.show()
+        self.get_child().show_all()
+        self._panel.connect('closed', self._close)
+        self._panel.connect('edited', self._save)
 
-        self.like_initial = True
+#        self.like_initial = True
         self.connect("event", self._evt_close)
         self.run()
         self.destroy()
@@ -309,13 +297,6 @@ class ConfigDialog(gtk.Dialog):
         self.action_area.pack_start(b)
         return b
 
-    def configChanged(self, like_initial):
-        '''Propagates the change from the options.
-
-        @params like_initial: If the config is like the initial one
-        '''
-        self.like_initial = like_initial
-
     def _evt_close(self, widget, event):
         '''Handles the user trying to close the configuration.
 
@@ -323,24 +304,17 @@ class ConfigDialog(gtk.Dialog):
         '''
         if event.type != gtk.gdk.DELETE:
             return False
-        return self._close()
+        
+        self._panel.close()
+        return True
 
-    def _btn_close(self, widget):
-        '''Handles the user trying to close the configuration.'''
-        if not self._close():
-            self.emit("delete_event", gtk.gdk.Event(gtk.gdk.DELETE))
+    def _save(self, widg, opts, *rest):
+        self._plugin.configure(opts)
 
-    def _close(self):
+    def _close(self, *rest):
         '''Generic close.'''
-        if self.like_initial:
-            return False
-
-        msg = "Do you want to quit without saving the changes?"
-        dlg = gtk.MessageDialog(None, gtk.DIALOG_MODAL, gtk.MESSAGE_WARNING, gtk.BUTTONS_YES_NO, msg)
-        stayhere = dlg.run() != gtk.RESPONSE_YES
-        dlg.destroy()
-        return stayhere
-
+        self.emit("delete_event", gtk.gdk.Event(gtk.gdk.DELETE))
+        
 class AdvancedTargetConfigDialog(ConfigDialog):
     '''Inherits from the config dialog and overwrites the close method
     

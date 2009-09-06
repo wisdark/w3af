@@ -306,13 +306,12 @@ class PluginTree(gtk.TreeView):
     def _plugin_status_changed(self, path, reconciled):
         '''shows in the tree when a plugin configuration changed.
 
-        @param like_initial: if some of the configuration changed
+        @param reconciled: if some of the configuration changed
         
         if changed, puts the plugin name in bold. if any of the plugin in a
         type is bold, the type name is also bold.
         '''
         # modify the label of the leaf in the tree
-        path = self.get_cursor()[0]
         row = self.treestore[path]
         if reconciled:
             row[0] = row[3]
@@ -322,6 +321,7 @@ class PluginTree(gtk.TreeView):
 #            self.mainwin.profiles.profilechanged(plugin)
         else:
             row[0] = "<b>%s</b>" % row[3]
+
 
         # update the general config status, and check if the plugin
         # type has any leaf in changed state
@@ -431,9 +431,7 @@ class PluginTree(gtk.TreeView):
         #longdesc = plugin.getLongDesc()
         #longdesc = helpers.cleanDescription(longdesc)
 #        self.mainwin.profiles.pluginConfig(plugin)
-        print plugin
         if plugin:
-            print plugin.getCurrentOptions()
             page = self.editor.open(plugin.getName(), plugin.getCurrentOptions())
             page.connect('edited', self._plugin_edited, path, plugin)
             page.connect('changed', self._plugin_changed, path, plugin)

@@ -61,9 +61,10 @@ class EditorPage(gtk.VBox):
             elif response==gtk.RESPONSE_REJECT:
                 self.__rollback()
             elif response==gtk.RESPONSE_CANCEL:
-                return
+                return False
 
         self.emit('closed')
+        return True
 
     close = __close
 
