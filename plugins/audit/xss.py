@@ -215,6 +215,13 @@ class xss(baseAuditPlugin):
         '''
         xss_tests = []
         
+        #
+        #   TODO: with these xss tests, and the rest of the plugin as it is, w3af has false negatives
+        #    in the case in which we're already controlling something that is written inside <script></script>
+        #    tags.
+        #
+        
+        
         # The number 2 is to inject in stored xss and not "letting the user know we are testing 
         # the site". And also please note that I don't have this: alert2('abc'); this "failure" will
         # let me find XSS in web applications that have magic_quotes enabled and will also 
@@ -247,6 +254,10 @@ class xss(baseAuditPlugin):
                 [browsers.INTERNET_EXPLORER_6, browsers.INTERNET_EXPLORER_7, browsers.NETSCAPE_IE]))
                 
         xss_tests.append(("<IFRAME SRC=\"javascript:alert('RANDOMIZE');\"></IFRAME>", [browsers.ALL, ]))
+        
+        # IE only
+        xss_tests.append(('</A/style="xss:exp/**/ression(alert(\'XSS\'))">',
+                [browsers.INTERNET_EXPLORER_6, browsers.INTERNET_EXPLORER_7]))
 
         # Javascript
         xss_tests.append(('jAvasCript:alert("RANDOMIZE");',
@@ -331,6 +342,7 @@ class xss(baseAuditPlugin):
             msg = 'Cross Site Scripting was found at: ' + mutant.foundAt() 
             msg += ' This vulnerability affects ' + ','.join(mutant.affected_browsers)
             v.setDesc( msg )
+            v.addToHighlight( mutant.getModValue() )
 
             kb.kb.append( self, 'xss', v )
     
@@ -409,6 +421,7 @@ class xss(baseAuditPlugin):
                         msg += ' URL: ' + mutant.getURL()+ '. ' + mutant.printModValue()
                         v.setDesc( msg )
                         v.setId( [response.id, mutant_response_id] )
+                        v.addToHighlight( mutant.getModValue() )
                         kb.kb.append( self, 'xss', v )
                         break
         

@@ -230,7 +230,7 @@ class xUrllib:
         
         return False
     
-    def sendRawRequest( self, head, postdata, fixContentLength=True, get_size=True):
+    def sendRawRequest( self, head, postdata, fixContentLength=True):
         '''
         In some cases the xUrllib user wants to send a request that was typed in a textbox or is stored in a file.
         When something like that happens, this library allows the user to send the request by specifying two parameters
@@ -260,9 +260,9 @@ class xUrllib:
         # Send it
         function_reference = getattr( self , fuzzReq.getMethod() )
         return function_reference( fuzzReq.getURI(), data=fuzzReq.getData(), headers=fuzzReq.getHeaders(),
-                                                useCache=False, grepResult=False, getSize=get_size )
+                                                useCache=False, grepResult=False)
         
-    def GET(self, uri, data='', headers={}, useCache=False, grepResult=True, getSize=False ):
+    def GET(self, uri, data='', headers={}, useCache=False, grepResult=True):
         '''
         Gets a uri using a proxy, user agents, and other settings that where set previously.
         
@@ -286,19 +286,9 @@ class xUrllib:
                 req = urllib2.Request( uri )
             
         req = self._addHeaders( req, headers )
-        
-        if getSize:
-            # Check the file size
-            try:
-                self._checkFileSize( req )
-            except sizeExceeded, se:
-                return httpResponse( NO_CONTENT, '', {}, uri, uri, msg='No Content', id=consecutive_number_generator.inc() )
-            except Exception, e:
-                raise e
-        
         return self._send( req , useCache=useCache, grepResult=grepResult)
     
-    def POST(self, uri, data='', headers={}, grepResult=True, getSize=False, useCache=False ):
+    def POST(self, uri, data='', headers={}, grepResult=True, useCache=False ):
         '''
         POST's data to a uri using a proxy, user agents, and other settings that where set previously.
         
@@ -312,38 +302,34 @@ class xUrllib:
         
         req = urllib2.Request(uri, data )
         req = self._addHeaders( req, headers )
-        
-        if getSize:
-            # Check the file size
-            try:
-                self._checkFileSize( req )
-            except sizeExceeded, se:
-                return httpResponse( NO_CONTENT, '', {}, uri, uri, msg='No Content', id=consecutive_number_generator.inc() )
-            except Exception, e:
-                raise e
-        
         return self._send( req , grepResult=grepResult, useCache=useCache)
     
-    def getRemoteFileSize( self, uri, headers={}, useCache=True ):
+    def getRemoteFileSize( self, req, useCache=True ):
         '''
+        This method was previously used in the framework to perform a HEAD request before each GET/POST (ouch!)
+        and get the size of the response. The bad thing was that I was performing two requests for each resource...
+        I moved the "protection against big files" to the keepalive.py module.
+        
+        I left it here because maybe I want to use it at some point... Mainly to call it directly or something.
+        
         @return: The file size of the remote file.
         '''
-        res = self.HEAD( uri, headers=headers, useCache=useCache )  
+        res = self.HEAD( req.get_full_url(), headers=req.headers, data=req.get_data(), useCache=useCache )  
         
-        fileLen = None
+        resource_length = None
         for i in res.getHeaders():
             if i.lower() == 'content-length':
-                fileLen = res.getHeaders()[ i ]
-                if fileLen.isdigit():
-                    fileLen = int( fileLen )
+                resource_length = res.getHeaders()[ i ]
+                if resource_length.isdigit():
+                    resource_length = int( resource_length )
                 else:
                     msg = 'The content length header value of the response wasn\'t an integer...'
                     msg += ' this is strange... The value is: "' + res.getHeaders()[ i ] + '"'
                     om.out.error( msg )
                     raise w3afException( msg )
         
-        if fileLen != None:
-            return fileLen
+        if resource_length != None:
+            return resource_length
         else:
             msg = 'The response didn\'t contain a content-length header. Unable to return the'
             msg += ' remote file size of request with id: ' + str(res.id)
@@ -367,10 +353,11 @@ class xUrllib:
                 self._xurllib = xu
                 self._method = method
             
-            #(self, uri, data='', headers={}, useCache=False, grepResult=True, getSize=False )
+            #(self, uri, data='', headers={}, useCache=False, grepResult=True )
             def __call__( self, *args, **keywords ):
                 if len( args ) != 1:
-                    msg = 'Invalid number of arguments. This method receives one argument and N keywords and you called it with:'
+                    msg = 'Invalid number of arguments. This method receives one argument and N'
+                    msg += ' keywords and you called it with:'
                     msg += 'args: ' + repr(args) + ' and keywords: ' + repr(keywords)
                     raise w3afException( msg )
                     
@@ -392,11 +379,11 @@ class xUrllib:
                 if 'headers' in keywords:
                     req = self._xurllib._addHeaders( req, keywords['headers'] )
                     keywords.pop('headers')
-                
-                if 'getSize' in keywords:
-                    keywords.pop('getSize')
-                    
-                om.out.debug( req.get_method() + ' ' + uri)
+                else:
+                    # This adds the default headers like the user-agent,
+                    # and any headers configured by the user
+                    # https://sourceforge.net/tracker/?func=detail&aid=2788341&group_id=170274&atid=853652
+                    req = self._xurllib._addHeaders( req, {} )
                 
                 # def _send( self , req , useCache=False, useMultipart=False, grepResult=True )
                 return apply(self._xurllib._send, (req,) , keywords )
@@ -417,8 +404,8 @@ class xUrllib:
     def _checkURI( self, req ):
         #bug bug !
         #
-        #[ Fri Sep 21 23:05:18 2007 - debug ] Reason: "unknown url type: javascript" , Exception: "<urlopen error unknown url type: javascript>"; going to retry.
-        #[ Fri Sep 21 23:05:18 2007 - error ] Too many retries when trying to get: http://localhost/w3af/globalRedirect/2.php?url=javascript%3Aalert
+        # Reason: "unknown url type: javascript" , Exception: "<urlopen error unknown url type: javascript>"; going to retry.
+        # Too many retries when trying to get: http://localhost/w3af/globalRedirect/2.php?url=javascript%3Aalert
         #
         ###TODO: The problem is that the urllib2 library fails even if i do this tests, it fails if it finds javascript: in some part of the URL    
         if req.get_full_url().startswith( 'http' ):
@@ -429,6 +416,15 @@ class xUrllib:
             return False
     
     def _checkFileSize( self, req ):
+        '''
+        **DEPRECATED**
+        
+        This method was previously used in the framework to perform a HEAD request before each GET/POST (ouch!)
+        and get the size of the response. The bad thing was that I was performing two requests for each resource...
+        I moved the "protection against big files" to the keepalive.py module.
+        
+        I left it here because maybe I want to use it at some point... Mainly to call it directly or something.
+        '''
         # No max file size.
         if self.settings.getMaxFileSize() == 0:
             pass
@@ -438,7 +434,7 @@ class xUrllib:
             try:
                 size = self._sizeLRU[ req.get_full_url() ]
             except KeyError:
-                size = self.getRemoteFileSize( req.get_full_url() )
+                size = self.getRemoteFileSize( req )
                 self._sizeLRU[ req.get_full_url() ] = size
                 #om.out.debug('Size of response got from self._sizeLRU.')
             
@@ -513,6 +509,9 @@ class xUrllib:
                 # We usually get here when the response has codes 404, 403, 401, etc...
                 msg = req.get_method() + ' ' + original_url +' returned HTTP code "'
                 msg += str(e.code) + '" - id: ' + str(e.id)
+                
+                if hasattr(e,'from_cache'):
+                    msg += ' - from cache.'
                 om.out.debug( msg )
                 
                 # Return this info to the caller
@@ -530,7 +529,7 @@ class xUrllib:
                 if grepResult:
                     self._grepResult( req, httpResObj )
                 else:
-                    om.out.debug('No grep for : ' + geturl + ' , the plugin sent grepResult=False.')
+                    om.out.debug('No grep for: "' + geturl + '", the plugin sent grepResult=False.')
                 return httpResObj
         except KeyboardInterrupt, k:
             # Correct control+c handling...
@@ -557,11 +556,15 @@ class xUrllib:
             if not req.get_data():
                 msg = req.get_method() + ' ' + urllib.unquote_plus( original_url ) +' returned HTTP code "'
                 msg += str(res.code) + '" - id: ' + str(res.id)
+                if hasattr(res,'from_cache'):
+                    msg += ' - from cache.'
                 om.out.debug( msg )
             else:
                 msg = req.get_method() + ' ' + original_url +' with data: "'
                 msg += urllib.unquote_plus( req.get_data() ) +'" returned HTTP code "'
                 msg += str(res.code) + '" - id: ' + str(res.id)
+                if hasattr(res,'from_cache'):
+                    msg += ' - from cache.'
                 om.out.debug( msg )
             
             code = int(res.code)
@@ -608,12 +611,14 @@ class xUrllib:
             om.out.debug('Re-sending request...')
             return self._send( req, useCache )
         else:
+            error_amt = self._errorCount[ id(req) ]
             # Clear the log of failed requests; this one definetly failed...
             del self._errorCount[ id(req) ]
             # No need to add this:
             #self._incrementGlobalErrorCount()
             # The global error count is already incremented by the _send method.
-            raise w3afException('Too many retries when trying to get: ' + req.get_full_url() )
+            msg = 'Too many retries (' + str(error_amt) +') while requesting: ' + req.get_full_url()
+            raise w3afException( msg )
     
     def _incrementGlobalErrorCount( self ):
         '''

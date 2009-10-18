@@ -69,13 +69,13 @@ class blindSqli(baseAuditPlugin):
             self._blind_sqli_time_delay.setUrlOpener( self._urlOpener )
             time_delay = self._blind_sqli_time_delay.is_injectable( freq, parameter )
             
-            if (response_diff != None and time_delay != None) or response_diff != None:
+            if response_diff != None:
                 om.out.vulnerability( response_diff.getDesc() )
-                kb.kb.append('blindSqli', 'blindSqli', response_diff)
+                kb.kb.append(self, 'blindSqli', response_diff)
             
             elif time_delay != None:
                 om.out.vulnerability( time_delay.getDesc() )
-                kb.kb.append('blindSqli', 'blindSqli', time_delay)
+                kb.kb.append(self, 'blindSqli', time_delay)
         
     def getOptions( self ):
         '''

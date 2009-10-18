@@ -133,7 +133,6 @@ class w3afCore:
 
 #        self._pluginsOptions = {'audit':{}, 'grep':{}, 'bruteforce':{}, 'discovery':{}, \
 #        'evasion':{}, 'mangle':{}, 'output':{}, 'attack':{}}
-
     
     def getHomePath( self ):
         '''
@@ -157,6 +156,7 @@ class w3afCore:
         self.target = targetSettings()
         
         # Init some values
+        # TODO: May be consuming a lot of memory
         kb.kb.save( 'urls', 'urlQueue' ,  Queue.Queue() )
         self._isRunning = False
         self._paused = False
@@ -204,8 +204,9 @@ class w3afCore:
                 try:
                     depType, depPlugin = dep.split('.')
                 except:
-                    raise w3afException('Plugin dependencies must be indicated using pluginType.pluginName notation.\
-                    This is an error in ' + pluginName +'.getPluginDeps() .')
+                    msg = 'Plugin dependencies must be indicated using pluginType.pluginName'
+                    msg += ' notation. This is an error in ' + pluginName +'.getPluginDeps().'
+                    raise w3afException( msg )
                 if depType == pluginType:
                     if depPlugin not in strReqPlugins:
                         if cf.cf.getData('autoDependencies'):
@@ -214,7 +215,9 @@ class w3afCore:
                             # nice recursive call, this solves the "dependency of dependency" problem =)
                             return self._rPlugFactory( strReqPlugins, depType )
                         else:
-                            raise w3afException('Plugin '+ pluginName +' depends on plugin ' + dep + ' and ' + dep + ' is not enabled. ')
+                            msg = 'Plugin "'+ pluginName +'" depends on plugin "' + dep + '" and "'
+                            msg += dep + '" is not enabled.'
+                            raise w3afException( msg )
                 else:
                     if depPlugin not in self._strPlugins[depType]:
                         if cf.cf.getData('autoDependencies'):
@@ -223,7 +226,9 @@ class w3afCore:
                                 self._strPlugins.insert(0, depPlugin)
                             om.out.information('Auto-enabling plugin: ' + depType + '.' + depPlugin)
                         else:
-                            raise w3afException('Plugin '+ pluginName +' depends on plugin ' + dep + ' and ' + dep + ' is not enabled. ')
+                            msg = 'Plugin "'+ pluginName +'" depends on plugin "' + dep + '" and "'
+                            msg += dep + '" is not enabled.'
+                            raise w3afException( msg )
                     else:
                         # if someone in another planet depends on me... run first
                         self._strPlugins[depType].remove( depPlugin )
@@ -258,9 +263,15 @@ class w3afCore:
         
         # This should never happend.
         if len(orderedPluginList) != len(requestedPluginsList):
-            om.out.error('There is an error in the way w3afCore orders plugins. The ordered plugin list length is not equal to the requested plugin list. ', newLine=False)
+            error_msg = 'There is an error in the way w3afCore orders plugins. The ordered plugin'
+            error_msg += ' list length is not equal to the requested plugin list.'
+            om.out.error( error_msg, newLine=False)
+            
             om.out.error('The error was found sorting plugins of type: '+ pluginType +'.')
-            om.out.error('Please report this bug to the developers including a complete list of commands that you run to get to this error.')
+            
+            error_msg = 'Please report this bug to the developers including a complete list of'
+            error_msg += ' commands that you run to get to this error.'
+            om.out.error( error_msg )
 
             om.out.error('Ordered plugins:')
             for plugin in orderedPluginList:
@@ -307,6 +318,9 @@ class w3afCore:
         '''
         Creates an URL list in the kb
         '''
+        # TODO:
+        # kb.kb.getData( 'urls', 'urlList') consumes a lot of memory
+        
         # Create the queue that will be used in gtkUi
         old_list = kb.kb.getData( 'urls', 'urlList')
         new_list = [ fr.getURL() for fr in fuzzableRequestList if fr.getURL() not in old_list ]
@@ -327,39 +341,39 @@ class w3afCore:
         uriList = list( set( uriList ) )
         kb.kb.save( 'urls', 'uriList' ,  uriList )
     
-    def _discoverAndBF( self ):
+    def _discover_and_bruteforce( self ):
         '''
         Discovery and bruteforce phases are related, so I have joined them
         here in this method.
         '''
         go = True
-        tmpList = copy.deepcopy( self._fuzzableRequestList )
+        tmp_list = copy.deepcopy( self._fuzzableRequestList )
         res = []
-        discoveredFrList = []
+        discovered_fr_list = []
         
         # this is an identifier to know what call number of _discoverWorker we are working on
         self._count = 0
         
         while go:
-            discoveredFrList = self._discover( tmpList )
-            successfullyBruteforced = self._bruteforce( discoveredFrList )
-            if not successfullyBruteforced:
+            discovered_fr_list = self._discover( tmp_list )
+            successfully_bruteforced = self._bruteforce( discovered_fr_list )
+            if not successfully_bruteforced:
                 # Haven't found new credentials
                 go = False
-                for fr in discoveredFrList:
+                for fr in discovered_fr_list:
                     if fr not in res:
                         res.append( fr )
             else:
                 tmp = []
-                tmp.extend( discoveredFrList )
-                tmp.extend( successfullyBruteforced )
+                tmp.extend( discovered_fr_list )
+                tmp.extend( successfully_bruteforced )
                 for fr in tmp:
                     if fr not in res:
                         res.append( fr )
                 
                 # So in the next "while go:" loop I can do a discovery
                 # using the new credentials I found
-                tmpList = successfullyBruteforced
+                tmp_list = successfully_bruteforced
                 
                 # Now I reconfigure the urllib to use the newly found credentials
                 self._reconfigureUrllib()
@@ -456,7 +470,7 @@ class w3afCore:
                 # Load the target URLs to the KB
                 self._updateURLsInKb( self._fuzzableRequestList )
                 
-                self._fuzzableRequestList = self._discoverAndBF()
+                self._fuzzableRequestList = self._discover_and_bruteforce()
                 
                 # Export all fuzzableRequests as CSV
                 # if this option is set in the miscSettings

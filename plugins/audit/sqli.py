@@ -79,6 +79,7 @@ class sqli(baseAuditPlugin):
                 v.setId( response.id )
                 v.setName( 'SQL injection vulnerability' )
                 v.setSeverity(severity.HIGH)
+                v.addToHighlight( sql_error[0] )
                 v['error'] = sql_error[0]
                 v['db'] = sql_error[1]
                 v.setDesc( 'SQL injection in a '+ v['db'] +' was found at: ' + mutant.foundAt() )
@@ -141,6 +142,7 @@ class sqli(baseAuditPlugin):
         errors.append( ('Syntax error in string in query expression', dbms.MSSQL ) )
         errors.append( ('ADODB\\.Field \\(0x800A0BCD\\)<br>', dbms.MSSQL ) )
         errors.append( ("Procedure '[^']+' requires parameter '[^']+'", dbms.MSSQL ))
+        errors.append( ("ADODB\\.Recordset'", dbms.MSSQL ))
         
         # DB2
         errors.append( ('SQLCODE', dbms.DB2 ) )

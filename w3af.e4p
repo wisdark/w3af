@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE Project SYSTEM "Project-4.2.dtd">
 <!-- eric4 project file for project w3af -->
-<!-- Saved: 2009-03-16, 00:51:25 -->
+<!-- Saved: 2009-07-28, 18:02:49 -->
 <!-- Copyright (C) 2009 Andres Riancho, andres.riancho@gmail.com -->
 <Project version="4.2">
   <ProgLanguage mixed="0">Python</ProgLanguage>
@@ -588,11 +588,6 @@
       <Dir>plugins</Dir>
       <Dir>output</Dir>
       <Name>__init__.py</Name>
-    </Source>
-    <Source>
-      <Dir>plugins</Dir>
-      <Dir>discovery</Dir>
-      <Name>crossDomain.py</Name>
     </Source>
     <Source>
       <Dir>plugins</Dir>
@@ -1449,10 +1444,6 @@
     <Source>
       <Dir>scripts</Dir>
       <Name>script-halberd.w3af</Name>
-    </Source>
-    <Source>
-      <Dir>scripts</Dir>
-      <Name>script-headers.w3af</Name>
     </Source>
     <Source>
       <Dir>scripts</Dir>
@@ -3485,6 +3476,77 @@
     <Source>
       <Dir>scripts</Dir>
       <Name>script-slash.w3af</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>controllers</Dir>
+      <Dir>misc</Dir>
+      <Name>make_leet.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>data</Dir>
+      <Dir>db</Dir>
+      <Name>temp_persist.py</Name>
+    </Source>
+    <Source>
+      <Dir>plugins</Dir>
+      <Dir>discovery</Dir>
+      <Name>wordpress_fingerprint.py</Name>
+    </Source>
+    <Source>
+      <Dir>plugins</Dir>
+      <Dir>discovery</Dir>
+      <Name>ria_enumerator.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>data</Dir>
+      <Dir>url</Dir>
+      <Dir>handlers</Dir>
+      <Name>HTTPNtlmAuthHandler.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>data</Dir>
+      <Dir>url</Dir>
+      <Dir>handlers</Dir>
+      <Name>urlParameterHandler.py</Name>
+    </Source>
+    <Source>
+      <Dir>plugins</Dir>
+      <Dir>discovery</Dir>
+      <Name>dir_bruter.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>data</Dir>
+      <Dir>export</Dir>
+      <Name>__init__.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>data</Dir>
+      <Dir>export</Dir>
+      <Name>ajax_export.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>data</Dir>
+      <Dir>export</Dir>
+      <Name>python_export.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>data</Dir>
+      <Dir>export</Dir>
+      <Name>ruby_export.py</Name>
+    </Source>
+    <Source>
+      <Dir>core</Dir>
+      <Dir>ui</Dir>
+      <Dir>gtkUi</Dir>
+      <Name>export_request.py</Name>
     </Source>
   </Sources>
   <Forms>

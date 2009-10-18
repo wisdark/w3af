@@ -26,6 +26,8 @@ from . import entries
 from core.data.db.reqResDBHandler import reqResDBHandler
 from core.data.constants import severity
 
+from .export_request import export_request
+
 useMozilla = False
 useGTKHtml2 = False
 
@@ -57,7 +59,10 @@ class reqResViewer(gtk.VBox):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     @author: Facundo Batista ( facundo@taniquetil.com.ar )
     '''
-    def __init__(self, w3af, enableWidget=None, withManual=True, withFuzzy=True, withCompare=True, editableRequest=False, editableResponse=False, widgname="default"):
+    def __init__(self, w3af, enableWidget=None, withManual=True, withFuzzy=True, 
+                        withCompare=True, editableRequest=False, editableResponse=False, 
+                        widgname="default"):
+                            
         super(reqResViewer,self).__init__()
         self.w3af = w3af
         
@@ -76,9 +81,11 @@ class reqResViewer(gtk.VBox):
         pan.pack2(self.response.notebook)
 
         # buttons
+        hbox = gtk.HBox()
+        
         if withManual or withFuzzy or withCompare:
             from .craftedRequests import ManualRequests, FuzzyRequests
-            hbox = gtk.HBox()
+            
             if withManual:
                 b = entries.SemiStockButton("", gtk.STOCK_INDEX, _("Send Request to Manual Editor"))
                 b.connect("clicked", self._sendRequest, ManualRequests)
@@ -97,8 +104,16 @@ class reqResViewer(gtk.VBox):
                 self.response.childButtons.append(b)
                 b.show()
                 hbox.pack_end(b, False, False, padding=2)
-            self.pack_start(hbox, False, False, padding=5)
-            hbox.show()
+
+        # I always can export requests
+        b = entries.SemiStockButton("", gtk.STOCK_COPY, _("Export Request"))
+        b.connect("clicked", self._sendRequest, export_request)
+        self.request.childButtons.append(b)
+        b.show()
+        hbox.pack_start(b, False, False, padding=2)
+            
+        self.pack_start(hbox, False, False, padding=5)
+        hbox.show()
 
         self.show()
 
@@ -203,6 +218,8 @@ class requestResponsePaned(entries.RememberingVPaned):
         
         for special_char in ['\n', '\r', '\t']:
             text = text.replace( repr(special_char)[1:-1], special_char )
+            
+        text = text.replace('\\\'', '\'')
         
         return text
 
@@ -426,6 +443,8 @@ class searchableTextView(gtk.VBox, entries.Searchable):
         
         # Create the textview where the text is going to be shown
         self.textView = gtk.TextView()
+        self.textView.set_wrap_mode(gtk.WRAP_WORD)
+
         for sev in SEVERITY_TO_COLOR:
             self.textView.get_buffer().create_tag(sev, background=SEVERITY_TO_COLOR[sev])
         self.textView.show()
