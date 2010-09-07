@@ -20,15 +20,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-from core.controllers.w3afException import w3afException
 from core.data.dc.queryString import queryString
+import core.data.kb.config as cf
+
+from core.controllers.w3afException import w3afException
 import core.controllers.outputManager as om
+from core.controllers.misc.is_ip_address import is_ip_address
+
 import urlparse as _uparse
 import urllib
 import cgi
 import socket
 import re
-import core.data.kb.config as cf
 import string
 
 '''
@@ -155,14 +158,25 @@ def normalizeURL( url ):
     net_location = getNetLocation( url )
     protocol = getProtocol( url )
     if ':' in net_location:
-        host,  port = net_location.split(':')
-        if protocol.lower() == 'http' and port == '80':
-            net_location = host
-        elif protocol.lower() == 'https' and port == '443':
-            net_location = host
+
+        split_net_location = net_location.split(':')
+        if len(split_net_location) == 2 and split_net_location[1].isdigit():
+            host = split_net_location[0]
+            port = split_net_location[1]
+
+            if protocol.lower() == 'http' and port == '80':
+                net_location = host
+            elif protocol.lower() == 'https' and port == '443':
+                net_location = host
+            else:
+                # The net location has a specific port definition
+                net_location = host + ':' + port
         else:
-            # The net location has a specific port definition
+            # This "URL" is broken, do my best:
+            host = split_net_location[0]
+            port = '80'
             net_location = host + ':' + port
+            
     else:
         # The net location has no port definition
         host = net_location
@@ -206,36 +220,20 @@ def getPort( url ):
             
 def urlJoin( baseurl , relative ):
     '''
-    Construct a full (``absolute'') URL by combining a ``base URL'' (base) with a ``relative URL'' (url). 
-    Informally, this uses components of the base URL, in particular the addressing scheme, the network location and (part of) the path, 
-    to provide missing components in the relative URL.
+    Construct a full (''absolute'') URL by combining a ''base URL'' (base) with a ``relative URL'' (url). 
+    Informally, this uses components of the base URL, in particular the addressing scheme,
+    the network location and (part of) the path, to provide missing components in the relative URL.
 
     Example:
-    urljoin('http://www.cwi.nl/%7Eguido/Python.html', 'FAQ.html')
-    yields the string
-    'http://www.cwi.nl/%7Eguido/FAQ.html'
-    For more information read RFC 1808 espeally section 5
+        >>> urljoin('http://www.cwi.nl/%7Eguido/Python.html', 'FAQ.html')
+        'http://www.cwi.nl/%7Eguido/FAQ.html'
+    For more information read RFC 1808 espeally section 5.
+    
     @param baseurl: The base url to join
     @param relative: The relative url to add to the base url
+    @return: The joined URL.
     '''
-    if relative.find('//') == 0:
-        # This special case had to be generated cause of some pykto tests
-        scheme, domain, path, params, qs, fragment = _uparse.urlparse( baseurl )
-        lastSlash = path.rfind( '/' )
-        if lastSlash != 0:
-            # I have more than one /
-            path = path[: lastSlash]
-
-        relative = relative[1:]
-        # TODO add params?!
-        response =  scheme + '://' + domain + path + relative
-    elif len(relative)>0 and relative[0] == '?':
-        scheme, domain, path, params, qs, fragment = _uparse.urlparse( baseurl )
-        # TODO add params?!
-        response =  scheme + '://' + domain + path + relative
-    else:
-        response = _uparse.urljoin( baseurl, relative )
-
+    response = _uparse.urljoin( baseurl, relative )
     response = normalizeURL(response)
     return response
 
@@ -340,23 +338,8 @@ def getRootDomain( input ):
     
     # def to split URI into its parts, returned as URI object
     def decomposeURI(aURI):
-    
-        # http://www.faqs.org/rfcs/rfc2396.html
-        uriDef = "^(([^:/?#]+):)?(//([^/?#]*))?([^?#]*)(\?([^#]*))?(#(.*))?"
-        #          12            3  4          5       6  7        8 9
-        myRegEp = re.compile(uriDef)
         
-        #m = myRegEp.exec(aURI)
-        m = myRegEp.match(aURI)
-        if (not m):
-            return False
-        
-        scheme = ("",m.group(2))[bool(m.group(2))]
-        authority =  ("",m.group(4))[bool(m.group(4))]
-        path = ("",m.group(5))[bool(m.group(5))]
-        query = ""
-        fragment =  ("",m.group(9))[bool(m.group(9))]
-        
+        authority = getDomain(aURI)
         s = splitAuthority(authority)
         subdomain = s[0]
         baseAuthority = s[1]
@@ -372,7 +355,7 @@ def getRootDomain( input ):
         
     domain = getNetLocation( url )
     
-    if re.match('\d?\d?\d?\.\d?\d?\d?\.\d?\d?\d?\.\d?\d?\d?', domain ):
+    if is_ip_address(domain):
         # An IP address has no "root domain" 
         return domain
     else:

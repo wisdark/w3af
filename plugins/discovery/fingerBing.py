@@ -1,5 +1,5 @@
 '''
-fingerMSN.py
+fingerBing.py
 
 Copyright 2006 Andres Riancho
 
@@ -33,134 +33,129 @@ from core.controllers.w3afException import w3afRunOnce
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
 
-from core.data.searchEngines.msn import msn as msn
+from core.data.searchEngines.bing import bing as bing
 import core.data.parsers.urlParser as urlParser
 import core.data.parsers.dpCache as dpCache
 
 
-class fingerMSN(baseDiscoveryPlugin):
+class fingerBing(baseDiscoveryPlugin):
     '''
-    Search MSN to get a list of users for a domain.
+    Search Bing to get a list of users for a domain.
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    
+
     def __init__(self):
         baseDiscoveryPlugin.__init__(self)
-        
         # Internal variables
         self._run = True
         self._accounts = []
-        
         # User configured 
-        self._result_limit = 300
-        
-    def discover(self, fuzzableRequest ):
+        self._resultLimit = 300
+
+    def discover(self, fuzzableRequest):
         '''
         @parameter fuzzableRequest: A fuzzableRequest instance that contains (among other things) the URL to test.
         '''
+        result = []
+        # This will remove the plugin from the discovery plugins to be runned.
         if not self._run:
-            # This will remove the plugin from the discovery plugins to be runned.
             raise w3afRunOnce()
-        else:
-            # This plugin will only run one time. 
-            self._run = False
-            
-            msn_se = msn( self._urlOpener )
-            
-            self._domain = domain = urlParser.getDomain( fuzzableRequest.getURL() )
-            self._domain_root = urlParser.getRootDomain( domain )
-            
-            results = msn_se.getNResults('@'+ self._domain_root, self._result_limit)
-                
-            for result in results:
-                targs = (result,)
-                self._tm.startFunction( target=self._find_accounts, args=targs , ownerObj=self )
 
-            self._tm.join( self )
-            self.printUniq( kb.kb.getData( 'fingerMSN', 'mails' ), None )
-                
-        return []
-    
-    def _find_accounts(self, msn_page ):
+        # This plugin will only run one time. 
+        self._run = False
+        bingSE = bing(self._urlOpener)
+        self._domain = domain = urlParser.getDomain(fuzzableRequest.getURL())
+        self._domainRoot = urlParser.getRootDomain(domain)
+
+        results = bingSE.getNResults('@'+self._domainRoot, self._resultLimit)
+
+        for result in results:
+            targs = (result,)
+            self._tm.startFunction(target=self._findAccounts, args=targs, ownerObj=self)
+
+        self._tm.join(self)
+        self.printUniq(kb.kb.getData('fingerBing', 'mails'), None)
+        return result
+
+    def _findAccounts(self, page):
         '''
-        Finds mails in msn result.
-        
+        Finds mails in bing result.
+
         @return: A list of valid accounts
         '''
         try:
-            om.out.debug('Searching for mails in: ' + msn_page.URL )
-            if self._domain == urlParser.getDomain( msn_page.URL ):
-                response = self._urlOpener.GET( msn_page.URL, useCache=True, grepResult=True )
+            om.out.debug('Searching for mails in: ' + page.URL)
+            if self._domain == urlParser.getDomain(page.URL):
+                response = self._urlOpener.GET(page.URL, useCache=True, grepResult=True)
             else:
-                response = self._urlOpener.GET( msn_page.URL, useCache=True, grepResult=False )
+                response = self._urlOpener.GET(page.URL, useCache=True, grepResult=False)
         except KeyboardInterrupt, e:
             raise e
         except w3afException, w3:
-            msg = 'xUrllib exception raised while fetching page in fingerMSN,'
+            msg = 'xUrllib exception raised while fetching page in fingerBing,'
             msg += ' error description: ' + str(w3)
-            om.out.debug( msg )
+            om.out.debug(msg)
         else:
-            
             # I have the response object!
             try:
-                document_parser = dpCache.dpc.getDocumentParserFor( response )
+                document_parser = dpCache.dpc.getDocumentParserFor(response)
             except w3afException:
                 # Failed to find a suitable parser for the document
                 pass
             else:
                 # Search for email addresses
-                for mail in document_parser.getEmails( self._domain_root ):
+                for mail in document_parser.getEmails(self._domainRoot):
                     if mail not in self._accounts:
                         self._accounts.append( mail )
 
                         i = info.info()
-                        i.setURL( msn_page.URL )
-                        i.setName( mail )
-                        msg = 'The mail account: "'+ mail + '" was found in: "' + msn_page.URL + '"'
+                        i.setURL(page.URL)
+                        i.setName(mail)
+                        msg = 'The mail account: "'+ mail + '" was found in: "' + page.URL + '"'
                         i.setDesc( msg )
                         i['mail'] = mail
                         i['user'] = mail.split('@')[0]
+                        i['url_list'] = [page.URL, ]
                         kb.kb.append( 'mails', 'mails', i )
-                        kb.kb.append( 'fingerMSN', 'mails', i )
-    
+                        kb.kb.append( 'fingerBing', 'mails', i )
+
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
         '''
-        d1 = 'Fetch the first "resultLimit" results from the MSN search'
-        o1 = option('resultLimit', self._result_limit, d1, 'integer')
-        
+        d1 = 'Fetch the first "resultLimit" results from the Bing search'
+        o1 = option('resultLimit', self._resultLimit, d1, 'integer')
         ol = optionList()
         ol.add(o1)
         return ol
 
     def setOptions( self, optionsMap ):
         '''
-        This method sets all the options that are configured using the user interface 
+        This method sets all the options that are configured using the user interface
         generated by the framework using the result of getOptions().
-        
+
         @parameter OptionList: A dictionary with the options for the plugin.
         @return: No value is returned.
-        ''' 
-        self._result_limit = optionsMap['resultLimit'].getValue()
-            
+        '''
+        self._resultLimit = optionsMap['resultLimit'].getValue()
+
     def getPluginDeps( self ):
         '''
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
         return []
-    
+
     def getLongDesc( self ):
         '''
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin finds mail addresses in MSN search engine.
-        
+        This plugin finds mail addresses in Bing search engine.
+
         One configurable parameter exist:
             - resultLimit
-        
-        This plugin searches MSN for : "@domain.com", requests all search results and parses them in order
+
+        This plugin searches Bing for : "@domain.com", requests all search results and parses them in order
         to find new mail addresses.
         '''

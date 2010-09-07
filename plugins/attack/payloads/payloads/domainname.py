@@ -11,7 +11,7 @@ class domainname(base_payload):
         values.append(self.shell.read('/proc/sys/kernel/domainname')[:-1])
 
         for v in values:
-            result.update({'Domainname':v})
+            result.update({'Domain name':v})
 
         return result
 
@@ -22,5 +22,5 @@ class domainname(base_payload):
             result.append(k+': '+v)
         
         if result == [ ]:
-            result.append('Domainname not found.')
+            result.append('Domain name not found.')
         return result

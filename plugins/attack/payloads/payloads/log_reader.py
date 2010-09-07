@@ -57,7 +57,7 @@ class log_reader(base_payload):
         logs.append('/var/log/apache2/access_log')
         logs.append('/var/log/apache2/modsec_audit.log')
         logs.append('/var/log/tomcat6/catalina.out')
-#TODO: APPEND DATE! 
+        #TODO: Append date!
         logs.append('/var/log/tomcat6/localhost.')
         logs.append('/var/log/tomcat6/catalina.')
 

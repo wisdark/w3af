@@ -63,6 +63,15 @@ class redos(baseAuditPlugin):
         
         @param freq: A fuzzableRequest
         '''
+        #
+        #   We know for a fact that PHP is not vulnerable to this attack
+        #
+        #   TODO: Add other frameworks that are not vulnerable!
+        #
+        for powered_by in kb.kb.getData('serverHeader','poweredByString'):
+            if 'php' in powered_by.lower():
+                return
+        
         om.out.debug( 'redos plugin is testing: ' + freq.getURL() )
     
         # Send the fuzzableRequest without any fuzzing, so we can measure the response 
@@ -84,6 +93,8 @@ class redos(baseAuditPlugin):
                 kwds = {'analyze_callback':self._analyze_wait}
                 self._tm.startFunction( target=self._sendMutant, args=targs , \
                                                     kwds=kwds, ownerObj=self )
+                                                    
+        self._tm.join( self )
 
     def _analyze_wait( self, mutant, response ):
         '''
@@ -184,7 +195,7 @@ class redos(baseAuditPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return []
+        return ['discovery.serverHeader']
     
     def getLongDesc( self ):
         '''

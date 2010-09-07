@@ -12,8 +12,10 @@ class hostname(base_payload):
         values = []
         values.append(self.shell.read('/etc/hostname')[:-1])
         values.append(self.shell.read('/proc/sys/kernel/hostname')[:-1])
+        
         values = list(set(values))
         values= [p for p in values if p != '']
+        
         result['Hostname'] = values
         
         return result
@@ -39,8 +41,8 @@ class hostname(base_payload):
                 return ''
              
             
-        hostnames = parse_iis6_log(self.shell_read('/windows/iis6.log'))
-        hostnames+=parse_certocm_log(self.shell_read('/windows/certocm.log'))
+        hostnames = parse_iis6_log(self.shell.read('/windows/iis6.log'))
+        hostnames+=parse_certocm_log(self.shell.read('/windows/certocm.log'))
         hostnames = list(set(hostnames))
         hostnames= [p for p in hostnames if p != '']
         result['Hostname'] = hostnames
@@ -49,10 +51,10 @@ class hostname(base_payload):
     def run_read(self):
         hashmap = self.api_read()
         result = []
-        for hostname in hashmap['Hostnames']:
+        for hostname in hashmap['Hostname']:
             result.append(hostname)
         
-        if result == [ ]:
+        if result == []:
             result.append('Hostname not found.')
         return result
         

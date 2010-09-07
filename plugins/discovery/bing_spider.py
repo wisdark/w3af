@@ -1,5 +1,5 @@
 '''
-MSNSpider.py
+bing_spider.py
 
 Copyright 2006 Andres Riancho
 
@@ -19,6 +19,7 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
+from urllib2 import URLError
 
 import core.controllers.outputManager as om
 
@@ -31,29 +32,24 @@ from core.controllers.w3afException import w3afException
 from core.controllers.w3afException import w3afRunOnce
 from core.controllers.misc.is_private_site import is_private_site
 
-from core.data.searchEngines.msn import msn as msn
+from core.data.searchEngines.bing import bing as bing
 import core.data.parsers.urlParser as urlParser
 
-from urllib2 import URLError
-
-
-class MSNSpider(baseDiscoveryPlugin):
+class bing_spider(baseDiscoveryPlugin):
     '''
-    Search MSN to get a list of new URLs
+    Search Bing to get a list of new URLs
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
     def __init__(self):
         baseDiscoveryPlugin.__init__(self)
         self._run = True
-        
         # User variables
         self._resultLimit = 300
-
         # Internal variables
-        self._fuzzable_requests = []
-        
-    def discover(self, fuzzableRequest ):
+        self._fuzzableRequests = []
+
+    def discover(self, fuzzableRequest):
         '''
         @parameter fuzzableRequest: A fuzzableRequest instance that contains
                                     (among other things) the URL to test.
@@ -61,53 +57,51 @@ class MSNSpider(baseDiscoveryPlugin):
         if not self._run:
             # This will remove the plugin from the discovery plugins to be runned.
             raise w3afRunOnce()
-        else:
-            # I will only run this one time. All calls to MSNSpider return the same url's
-            self._run = False
-            
-            msn_obj = msn( self._urlOpener )
-            
-            domain = urlParser.getDomain( fuzzableRequest.getURL() )
-            if is_private_site( domain ):
-                msg = 'There is no point in searching MSN for "site:'+ domain + '".'
-                msg += ' MSN doesnt index private pages.'
-                raise w3afException( msg )
 
-            results = msn_obj.getNResults('site:'+ domain, self._resultLimit )
-        
-            for res in results:
-                targs = (res.URL,)
-                self._tm.startFunction( target=self._gen_fuzzable_requests, 
-                                        args=targs, ownerObj=self )          
-            self._tm.join( self )
+        # I will only run this one time. All calls to bing_spider return the same url's
+        self._run = False
+        bingSE = bing(self._urlOpener)
+        domain = urlParser.getDomain(fuzzableRequest.getURL())
 
-        return self._fuzzable_requests
-    
-    def _gen_fuzzable_requests( self, url ):
+        if is_private_site(domain):
+            msg = 'There is no point in searching Bing for "site:'+ domain + '".'
+            msg += ' Bing doesnt index private pages.'
+            raise w3afException( msg )
+
+        results = bingSE.getNResults('site:'+ domain, self._resultLimit)
+
+        for res in results:
+            targs = (res.URL,)
+            self._tm.startFunction(target=self._genFuzzableRequests,
+                                    args=targs, ownerObj=self)
+        self._tm.join( self )
+
+        return self._fuzzableRequests
+
+    def _genFuzzableRequests(self, url):
         '''
         GET the URL and then call createFuzzableRequests with the response.
 
         @parameter url: The URL to GET.
         '''
         try:
-            response = self._urlOpener.GET( url, useCache=True)
+            response = self._urlOpener.GET(url, useCache=True)
         except KeyboardInterrupt, k:
             raise k
         except w3afException, w3:
-            om.out.error('Exception while requesting ' + url + ' ' + str(w3) )
+            om.out.error('Exception while requesting ' + url + ' ' + str(w3))
         except URLError, url_err:
-            om.out.debug('URL Error while fetching page in MSNSpider, error: ' + str(url_err) )
+            om.out.debug('URL Error while fetching page in bing_spider, error: ' + str(url_err))
         else:
-            fuzzReqs = self._createFuzzableRequests( response )
-            self._fuzzable_requests.extend( fuzzReqs )
-    
+            fuzzReqs = self._createFuzzableRequests(response)
+            self._fuzzableRequests.extend(fuzzReqs)
+
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
         '''
         d2 = 'Fetch the first "resultLimit" results from the Google search'
         o2 = option('resultLimit', self._resultLimit, d2, 'integer')
-
         ol = optionList()
         ol.add(o2)
         return ol
@@ -116,10 +110,10 @@ class MSNSpider(baseDiscoveryPlugin):
         '''
         This method sets all the options that are configured using the user interface 
         generated by the framework using the result of getOptions().
-        
+
         @parameter OptionList: A dictionary with the options for the plugin.
         @return: No value is returned.
-        ''' 
+        '''
         self._resultLimit = optionsMap['resultLimit'].getValue()
 
     def getPluginDeps( self ):
@@ -134,11 +128,11 @@ class MSNSpider(baseDiscoveryPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin finds new URL's in MSN search engine.
-        
+        This plugin finds new URL's in Bing search engine.
+
         One configurable parameters exist:
             - resultLimit
-        
-        This plugin searches MSN for : "@domain.com", requests all search results and parses them in order
+
+        This plugin searches Bing for : "site:domain.com", requests all search results and parses them in order
         to find new mail addresses.
         '''

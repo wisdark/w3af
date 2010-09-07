@@ -1,4 +1,3 @@
-#TODO: SELF ENVIRON NOT READABLE
 import re
 from plugins.attack.payloads.base_payload import base_payload
 
@@ -24,9 +23,11 @@ class current_user(base_payload):
             else:
                 return ''
         
+        #TODO: What if this file is not readable?
         self_environ = self.shell.read('/proc/self/environ')
-        
+
         result['current'] = ({'user':default_user(self_environ), 'home':default_home(self_environ)})
+        
         return result
     
     def run_read(self):

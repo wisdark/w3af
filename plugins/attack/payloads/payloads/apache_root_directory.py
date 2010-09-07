@@ -1,7 +1,8 @@
 import re
 from plugins.attack.payloads.base_payload import base_payload
 import core.data.kb.knowledgeBase as kb
-#TODO: TEST
+
+#TODO: Perform more testing
 class apache_root_directory(base_payload):
     '''
     This payload finds Apache Root Directories where websites are hosted.

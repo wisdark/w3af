@@ -57,16 +57,14 @@ class threadManager:
         #       self._tm.startFunction( target=self._do_request, args=(url,) )
         #
         if self._maxThreads:
-            self._threadPool = ThreadPool( self._maxThreads, q_size = self._maxThreads * 3)
+            self._threadPool = ThreadPool( self._maxThreads, q_size = 200)
         else:
             # if I want to use the restrict argument of startFunction, the thread pool 
             # MUST have some threads
             self._threadPool = ThreadPool( 5, 15 )
     
     def setMaxThreads( self, threads ):
-        if self._maxThreads == threads:
-            self._maxThreads = threads
-        elif self._maxThreads > threads:
+        if self._maxThreads > threads:
             self._threadPool.dismissWorkers( self._maxThreads - threads )
             self._maxThreads = threads
         elif self._maxThreads < threads:
@@ -111,9 +109,11 @@ class threadManager:
             apply( target, args, kwds )
         else:
             # Assign a job to a thread in the thread pool
-            om.out.debug('Assigning function object with id: "' + str(id(target)) + '" to a thread in the thread pool.' )
             wr = WorkRequest( target, args=args, kwds=kwds, ownerObj=ownerObj )
             self._threadPool.putRequest( wr )
+            msg = '[thread manager] Successfully added function to threadpool. Work queue size: '
+            msg += str(self._threadPool.requestsQueue.qsize())
+            om.out.debug( msg )
             
     def join( self, ownerObj=None, joinAll=False ):
         self._threadPool.wait( ownerObj, joinAll )

@@ -19,11 +19,13 @@ class dhcp_config_files(base_payload):
             content = self.shell.read(file)
             if content:
                 result.update({file:content})
+                
         return result
     
     def run_read(self):
         hashmap = self.api_read()
         result = []
+        
         if hashmap:
             result.append('DHCP Config Files')
             for file, content in hashmap.iteritems():
@@ -32,7 +34,8 @@ class dhcp_config_files(base_payload):
                 result.append('-------------------------')
                 result.append(content)
         
-        if result == [ ]:
+        if result == []:
             result.append('DHCP configuration files not found.')
+            
         return result
         

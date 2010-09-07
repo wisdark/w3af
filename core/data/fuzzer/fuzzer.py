@@ -58,6 +58,16 @@ import core.controllers.outputManager as om
 from core.data.dc.form import form
 
 
+#
+#   The following is a list of parameter names that will be ignored during the fuzzing process
+#
+IGNORED_PARAMETERS = ['__EVENTTARGET', '__EVENTARGUMENT', '__VIEWSTATE', '__VIEWSTATEENCRYPTED', 
+                                          '__EVENTVALIDATION', '__dnnVariable', 'javax.faces.ViewState',
+                                          'jsf_state_64', 'jsf_sequence', 'jsf_tree', 'jsf_tree_64', 
+                                          'jsf_viewid', 'jsf_state', 'cfid', 'cftoken','ASP.NET_sessionid',
+                                          'ASPSESSIONID', 'PHPSESSID', 'JSESSIONID']
+                                          
+
 def createMutants( freq, mutant_str_list, append=False, fuzzableParamList = [] , oResponse = None ):
     '''
     @parameter freq: A fuzzable request with a dataContainer inside.
@@ -300,6 +310,12 @@ def _createMutantsWorker( freq, mutantClass, mutant_str_list, fuzzableParamList,
         dataContainer = freq.getDc()
 
     for parameter_name in dataContainer:
+        
+        #
+        #   Ignore the banned parameter names
+        #
+        if parameter_name in IGNORED_PARAMETERS:
+            continue
         
         # This for is to support repeated parameter names
         for element_index, element_value in enumerate(dataContainer[parameter_name]):

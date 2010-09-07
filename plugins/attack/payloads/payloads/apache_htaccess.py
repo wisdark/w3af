@@ -1,6 +1,8 @@
 import re
 from plugins.attack.payloads.base_payload import base_payload
-#TODO: TEST
+
+#TODO: Perform more testing
+
 class apache_htaccess(base_payload):
     '''
     This payload shows Apache distributed configuration files (.htaccess & .htpasswd)

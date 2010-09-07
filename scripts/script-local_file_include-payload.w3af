@@ -11,7 +11,7 @@ back
 back
 
 target
-set target http://localhost/w3af/audit/local_file_read/local_file_read.php?file=section.txt
+set target http://moth/w3af/audit/local_file_read/local_file_read.php?file=section.txt
 back
 
 start
@@ -22,6 +22,6 @@ exploit
 exploit localFileReader
 interact 0
 
-payload list_processes
+payload cpu_info
 
 

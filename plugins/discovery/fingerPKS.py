@@ -69,14 +69,17 @@ class fingerPKS(baseDiscoveryPlugin):
             for result in results:
                 i = info.info()
                 i.setURL( 'http://pgp.mit.edu:11371/' )
+                i.setId( [] )
                 mail = result.username +'@' + domain_root
                 i.setName( mail )
                 i.setDesc( 'The mail account: "'+ mail + '" was found in the MIT PKS server. ' )
                 i['mail'] = mail
                 i['user'] = result.username
                 i['name'] = result.name
+                i['url_list'] = ['http://pgp.mit.edu:11371/', ]
                 kb.kb.append( 'mails', 'mails', i )
-                kb.kb.append( self, 'mails', i )
+                #   Don't save duplicated information in the KB. It's useless.
+                #kb.kb.append( self, 'mails', i )
                 om.out.information( i.getDesc() )
 
         return []

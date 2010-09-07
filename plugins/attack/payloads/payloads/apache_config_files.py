@@ -29,14 +29,14 @@ class apache_config_files(base_payload):
                 for file in files:
                     content = self.shell.read(dir+file)
                     if content:
-                         result['apache_config'].update({dir+file:content})
-                         
-                        #result.append(file_crawler.get_files(self, self.shell.read(dir+file)))
+                        result['apache_config'].update({dir+file:content})
+                
+                #TODO: Add target domain name being scanned by w3af.
                 if kb.kb.getData('passwordProfiling', 'passwordProfiling'):
                     for profile in kb.kb.getData('passwordProfiling', 'passwordProfiling'):
                         profile_content = self.shell.read(dir+'sites-available/'+profile.lower())
                         if profile_content:
-                             result['apache_config'].update({dir+'sites-available/'+profile.lower():profile_content})
+                            result['apache_config'].update({dir+'sites-available/'+profile.lower():profile_content})
 
         return result
         

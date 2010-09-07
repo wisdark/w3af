@@ -19,6 +19,7 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
+from __future__ import with_statement
 
 import core.controllers.outputManager as om
 import core.data.kb.knowledgeBase as kb
@@ -89,6 +90,10 @@ class fingerprint_404:
         
         @parameter http_response: The HTTP response which we want to know if it is a 404 or not.
         '''
+
+        #   This is here for testing.
+        #return False
+        
         #
         #   First we handle the user configured exceptions:
         #
@@ -121,14 +126,14 @@ class fingerprint_404:
         if http_response.id in self._is_404_LRU:
             return self._is_404_LRU[ http_response.id ]
             
-        self._lock.acquire()
-        if not self._already_analyzed:
-            # Generate a 404 and save it
-            self._404_bodies = self._generate_404_knowledge( http_response.getURL() )
-            self._already_analyzed = True
-        self._lock.release()
+        with self._lock:
+            if not self._already_analyzed:
+                # Generate a 404 and save it
+                self._404_bodies = self._generate_404_knowledge( http_response.getURL() )
+                self._already_analyzed = True
+
         
-        # self._404_body was already cleaned inside self._generate404
+        # self._404_body was already cleaned inside self._generate_404_knowledge
         # so we need to clean this one.
         html_body = self._get_clean_body( http_response )
         
@@ -233,7 +238,7 @@ class fingerprint_404:
         except w3afMustStopException, mse:
             # Someone else will raise this exception and handle it as expected
             # whenever the next call to GET is done
-            raise w3afException('w3afMustStopException found by _generate404, someone else will handle it.')
+            raise w3afException('w3afMustStopException found by _send_404, someone else will handle it.')
         except Exception, e:
             raise w3afException('Unhandled exception while fetching a 404 page, error: ' + str(e) )
         

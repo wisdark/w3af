@@ -46,6 +46,7 @@ import traceback
 import copy
 import Queue
 import re
+import time
 
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.config as cf
@@ -353,8 +354,9 @@ class w3afCore:
         res = []
         discovered_fr_list = []
         
-        # this is an identifier to know what call number of _discoverWorker we are working on
-        self._count = 0
+        # this will help identify the total discovery time
+        self._discovery_start_time_epoch = time.time()
+        self._time_limit_reported = False
         
         while go:
             discovered_fr_list = self._discover( tmp_list )
@@ -462,12 +464,20 @@ class w3afCore:
                         self._end()
                         raise
                     except w3afException, w3:
-                        om.out.information( 'The target URL: ' + url + ' is unreachable.' )
-                        om.out.information( 'Error description: ' + str(w3) )
+                        om.out.error( 'The target URL: ' + url + ' is unreachable.' )
+                        om.out.error( 'Error description: ' + str(w3) )
                     except Exception, e:
-                        om.out.information( 'The target URL: ' + url + ' is unreachable because of an unhandled exception.' )
-                        om.out.information( 'Error description: "' + str(e) + '". See debug output for more information.')
-                        om.out.debug( 'Traceback for this error: ' + str( traceback.format_exc() ) )
+                        om.out.error( 'The target URL: ' + url + ' is unreachable because of an unhandled exception.' )
+                        om.out.error( 'Error description: "' + str(e) + '". See debug output for more information.')
+                        om.out.error( 'Traceback for this error: ' + str( traceback.format_exc() ) )
+                    else:
+                        #
+                        #   NOTE: I need to perform this test here in order to avoid some wierd
+                        #   thread locking that happens when the webspider calls is_404, and 
+                        #   the function locks in order to calculate the 
+                        #
+                        from core.controllers.coreHelpers.fingerprint_404 import is_404
+                        is_404(response)
                 
                 # Load the target URLs to the KB
                 self._updateURLsInKb( self._fuzzableRequestList )
@@ -511,7 +521,66 @@ class w3afCore:
                     for i in tmp_url_list:
                         om.out.information( '- ' + i )
                     
-                    # Sort fuzzable requests and print them
+                    #
+                    #   What I want to do here, is filter the repeated fuzzable requests.
+                    #   For example, if the spidering process found:
+                    #       - http://host.tld/?id=3739286
+                    #       - http://host.tld/?id=3739285
+                    #       - http://host.tld/?id=3739282
+                    #       - http://host.tld/?id=3739212
+                    #
+                    #   I don't want to have all these different fuzzable requests. The reason is that
+                    #   audit plugins will try to send the payload to each parameter, thus generating
+                    #   the following requests:
+                    #       - http://host.tld/?id=payload1
+                    #       - http://host.tld/?id=payload1
+                    #       - http://host.tld/?id=payload1
+                    #       - http://host.tld/?id=payload1
+                    #
+                    #   w3af has a cache, but its still a waste of time to send those requests.
+                    #
+                    #   Now lets analyze this with more than one parameter. Spidered URIs:
+                    #       - http://host.tld/?id=3739286&action=create
+                    #       - http://host.tld/?id=3739285&action=create
+                    #       - http://host.tld/?id=3739282&action=remove
+                    #       - http://host.tld/?id=3739212&action=remove
+                    #
+                    #   Generated requests:
+                    #       - http://host.tld/?id=payload1&action=create
+                    #       - http://host.tld/?id=3739286&action=payload1
+                    #       - http://host.tld/?id=payload1&action=create
+                    #       - http://host.tld/?id=3739285&action=payload1
+                    #       - http://host.tld/?id=payload1&action=remove
+                    #       - http://host.tld/?id=3739282&action=payload1
+                    #       - http://host.tld/?id=payload1&action=remove
+                    #       - http://host.tld/?id=3739212&action=payload1
+                    #
+                    #   In cases like this one, I'm sending these repeated requests:
+                    #       - http://host.tld/?id=payload1&action=create
+                    #       - http://host.tld/?id=payload1&action=create
+                    #       - http://host.tld/?id=payload1&action=remove
+                    #       - http://host.tld/?id=payload1&action=remove
+                    #   But there is not much I can do about it... (except from having a nice cache)
+                    #
+                    #   TODO: Is the previous statement completely true?
+                    #
+                    '''filtered_fuzzable_requests = []
+                    for fr_original in self._fuzzableRequestList:
+                        
+                        different_from_all = True
+                        
+                        for fr_filtered in filtered_fuzzable_requests:
+                            if fr_filtered.is_variant_of( fr_original ):
+                                different_from_all = False
+                                break
+                        
+                        if different_from_all:
+                            filtered_fuzzable_requests.append( fr_original )
+                    
+                    self._fuzzableRequestList = filtered_fuzzable_requests
+                    '''
+                    
+                    #   Now I simply print the list that I have after the filter.
                     tmp_fr_list = []
                     for fuzzRequest in self._fuzzableRequestList:
                         tmp_fr_list.append( '- ' + str(fuzzRequest) )
@@ -632,9 +701,6 @@ class w3afCore:
         self._urls = []
         self._set_phase('discovery')
         
-        for fr in toWalk:
-            fr.iterationNumber = 0
-        
         result = []
         try:
             result = self._discoverWorker( toWalk )
@@ -657,27 +723,50 @@ class w3afCore:
             except Exception, e:
                 om.out.error('The plugin "'+ p.getName() + '" raised an exception in the end() method: ' + str(e) )
     
+    def get_discovery_time(self):
+        '''
+        @return: The time between now and the start of the discovery phase. In minutes.
+        '''
+        now = time.time()
+        diff = now - self._discovery_start_time_epoch
+        return diff / 60
+    
     def _discoverWorker(self, toWalk):
         om.out.debug('Called _discoverWorker()' )
         
-        while len( toWalk ) and self._count < cf.cf.getData('maxDiscoveryLoops'):
+        while len( toWalk ):
             
             # Progress stuff, do this inside the while loop, because the toWalk variable changes
             # in each loop
             amount_of_tests = len(self._plugins['discovery']) * len(toWalk)
             self.progress.set_total_amount( amount_of_tests )
-        
-            # This variable is for LOOP evasion
-            self._count += 1
             
             plugins_to_remove_list = []
             fuzzableRequestList = []
             
             for plugin in self._plugins['discovery']:
+                
+                #
+                #   I use the self._time_limit_reported variable to break out of two loops
+                #
+                if self._time_limit_reported:
+                    break
+                    
                 for fr in toWalk:
 
-                    if fr.iterationNumber > cf.cf.getData('maxDepth'):
-                        om.out.debug('Avoiding discovery loop in fuzzableRequest: ' + str(fr) )
+                    #
+                    #   Time exceeded?
+                    #
+                    if self.get_discovery_time() > cf.cf.getData('maxDiscoveryTime'):
+                        if not self._time_limit_reported:
+                            #   I use the self._time_limit_reported variable to break out of two loops
+                            self._time_limit_reported = True
+                            om.out.information('Maximum discovery time limit hit.')
+                        
+                        #   Replaced the return [] with this break, so I don't loose all the
+                        #   gathered knowledge.
+                        break
+                        
                     else:
                         self._setRunningPlugin( plugin.getName() )
                         self._setCurrentFuzzableRequest( fr )
@@ -702,7 +791,6 @@ class w3afCore:
                                     fuzzableRequestList.append( (i, plugin.getName()) )
                                     
                         om.out.debug('Ending plugin: ' + plugin.getName() )
-                    #end-if fr.iterationNumber > cf.cf.getData('maxDepth'):
                     
                     # We finished one loop, inc!
                     self.progress.inc()
@@ -711,7 +799,7 @@ class w3afCore:
             #end-for
             
             ##
-            ##  The search has finished, now i'll some mangling with the requests
+            ##  The search has finished, now i'll perform some mangling with the requests
             ##
             newFR = []
             tmp_sort = []
@@ -719,9 +807,6 @@ class w3afCore:
                 # I dont care about fragments ( http://a.com/foo.php#frag ) and I dont really trust plugins
                 # so i'll remove fragments here
                 iFr.setURL( urlParser.removeFragment( iFr.getURL() ) )
-                
-                # Increment the iterationNumber !
-                iFr.iterationNumber = fr.iterationNumber + 1
                 
                 if iFr not in self._alreadyWalked and urlParser.baseUrl( iFr.getURL() ) in cf.cf.getData('baseURLs'):
                     # Found a new fuzzable request
@@ -841,9 +926,6 @@ class w3afCore:
         # This two for loops do all the audit magic [KISS]
         for plugin in self._plugins['audit']:
             
-            # FIXME: I should remove this information lines, they duplicate functionality with the setRunningPlugin
-            om.out.information('Starting ' + plugin.getName() + ' plugin execution.')
-            
             # For status
             self._setRunningPlugin( plugin.getName() )
 
@@ -962,8 +1044,12 @@ class w3afCore:
         
         @parameter pluginNames: A list with the names of the Plugins that will be runned.
         @parameter pluginType: The type of the plugin.
-        @return: None
+        
+        @return: A list of plugins that are unknown to the framework. This is mainly used to have
+        some error handling related to old profiles, that might reference deprecated plugins.
         '''
+        unknown_plugins = []
+        
         # Validate the input...
         pluginNames = list( set( pluginNames ) )    # bleh !
         pList = self.getPluginList(  pluginType  )
@@ -971,7 +1057,7 @@ class w3afCore:
             if p not in pList \
             and p.replace('!','') not in pList\
             and p != 'all':
-                raise w3afException('Unknown plugin selected ("'+ p +'")')
+                unknown_plugins.append( p )
         
         setMap = {'discovery':self._setDiscoveryPlugins, 'audit':self._setAuditPlugins, \
         'grep':self._setGrepPlugins, 'evasion':self._setEvasionPlugins, 'output':self._setOutputPlugins,  \
@@ -979,6 +1065,8 @@ class w3afCore:
         
         func = setMap[ pluginType ]
         func( pluginNames )
+        
+        return unknown_plugins
     
     def reloadModifiedPlugin(self,  pluginType,  pluginName):
         '''
@@ -1234,12 +1322,16 @@ class w3afCore:
             # It exists, work with it!
             for pluginType in self._plugins.keys():
                 pluginNames = profileInstance.getEnabledPlugins( pluginType )
-                self.setPlugins( pluginNames, pluginType )
-                '''
-                def setPluginOptions(self, pluginType, pluginName, PluginsOptions ):
-                    @parameter PluginsOptions: An option list with the options for a plugin. For example:\
-                    { 'script':'AAAA', 'timeout': 10 }
-                '''
+                
+                # Handle errors that might have been triggered from a possibly invalid profile
+                unknown_plugins = self.setPlugins( pluginNames, pluginType )
+                if unknown_plugins:
+                    om.out.error('The profile references the following missing plugins:')
+                    for unknown_plugin_name in unknown_plugins:
+                        om.out.error('- ' + unknown_plugin_name)
+                    
+                # Now we set the plugin options, which can also trigger errors with "outdated"
+                # profiles that users could have in their ~/.w3af/ directory.
                 for pluginName in profileInstance.getEnabledPlugins( pluginType ):
                     pluginOptions = profileInstance.getPluginOptions( pluginType, pluginName )
                     try:
@@ -1248,11 +1340,12 @@ class w3afCore:
                     except Exception, e:
                         # This is because of an invalid plugin, or something like that...
                         # Added as a part of the fix of bug #1937272
-                        msg = 'The profile you are trying to load seems to be corrupt, or one of'
-                        msg += ' the enabled plugins has a bug. If your profile is ok, please report'
-                        msg += ' this as a bug to the w3af sourceforge page: Exception while setting '
-                        msg += pluginName +' plugin options: "' + str(e) + '"'
-                        raise w3afException( msg )
+                        msg = 'The profile you are trying to load seems to be outdated, one of'
+                        msg += ' the enabled plugins has a bug or an plugin option that was valid'
+                        msg += ' when you created the profile was now removed from the framework.'
+                        msg += ' The plugin that triggered this exception is "' + pluginName + '",'
+                        msg += ' and the original exception is: "' + str(e) +'".'
+                        om.out.error( msg )
                     
             # Set the target settings of the profile to the core
             self.target.setOptions( profileInstance.getTarget() )

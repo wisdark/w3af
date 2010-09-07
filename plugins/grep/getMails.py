@@ -77,7 +77,7 @@ class getMails(baseGrepPlugin):
             dp = dpCache.dpc.getDocumentParserFor( response )
         except w3afException:
             msg = 'If I can\'t parse the document, I won\'t be able to find any emails.'
-            msg += ' Ignoring the desponse for "' + response.getURL() + '".'
+            msg += ' Ignoring the response for "' + response.getURL() + '".'
             om.out.debug( msg )
             return
 
@@ -92,7 +92,7 @@ class getMails(baseGrepPlugin):
             mail_address = mail_address.lower()
 
             email_map = {}
-            for info_obj in kb.kb.getData( 'getMails', 'mails'):
+            for info_obj in kb.kb.getData( 'mails', 'mails'):
                 mail_string = info_obj['mail']
                 email_map[ mail_string ] = info_obj
 
@@ -112,25 +112,25 @@ class getMails(baseGrepPlugin):
                 i.addToHighlight( mail_address )
                 
                 kb.kb.append( 'mails', kb_key, i )
-                kb.kb.append( self, 'mails', i )
-                continue
             
-            # Get the corresponding info object.
-            i = email_map[ mail_address ]
-            # And work
-            if response.getURL() not in i['url_list']:
-                # This email was already found in some other URL
-                # I'm just going to modify the url_list and the description message
-                # of the information object.
-                id_list_of_info = i.getId()
-                id_list_of_info.append( response.id )
-                i.setId( id_list_of_info )
-                i.setURL('')
-                desc = i.getDesc()
-                desc += '\n- ' + response.getURL() 
-                desc += ' - In request with id: '+ str(response.id)
-                i.setDesc( desc )
-                i['url_list'].append( response.getURL() )
+            else:
+            
+                # Get the corresponding info object.
+                i = email_map[ mail_address ]
+                # And work
+                if response.getURL() not in i['url_list']:
+                    # This email was already found in some other URL
+                    # I'm just going to modify the url_list and the description message
+                    # of the information object.
+                    id_list_of_info = i.getId()
+                    id_list_of_info.append( response.id )
+                    i.setId( id_list_of_info )
+                    i.setURL('')
+                    desc = i.getDesc()
+                    desc += '\n- ' + response.getURL() 
+                    desc += ' - In request with id: '+ str(response.id)
+                    i.setDesc( desc )
+                    i['url_list'].append( response.getURL() )
         
     def setOptions( self, optionsMap ):
         self._only_target_domain = optionsMap['onlyTargetDomain'].getValue()

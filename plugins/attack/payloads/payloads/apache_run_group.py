@@ -1,8 +1,10 @@
 import re
 from plugins.attack.payloads.base_payload import base_payload
-#TODO: TEST
+
+#TODO: Perform more testing
 class apache_run_group(base_payload):
     '''
+    Get apache process group.
     '''
     def api_read(self):
         result = {}

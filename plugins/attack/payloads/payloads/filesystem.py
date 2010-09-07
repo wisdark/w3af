@@ -30,7 +30,7 @@ class filesystem(base_payload):
             else:
                 return []
         
-        iis6log = self.shell_read('/windows/iis6.log')
+        iis6log = self.shell.read('/windows/iis6.log')
         if iis6log:
             result.update({'SysDrive':parse_win_sysdrive(iis6log)})
         

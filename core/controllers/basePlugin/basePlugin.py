@@ -26,7 +26,7 @@ from core.controllers.threads.threadManager import threadManagerObj as tm
 from core.controllers.configurable import configurable
 import core.data.kb.vuln as vuln
 
-import thread
+import threading
 
 
 class basePlugin(configurable):
@@ -48,7 +48,7 @@ class basePlugin(configurable):
         '''
         self._urlOpener = None
         self._tm = tm
-        self._plugin_lock = thread.allocate_lock()
+        self._plugin_lock = threading.RLock()
 
     def setUrlOpener( self, urlOpener):
         '''
@@ -191,7 +191,9 @@ class basePlugin(configurable):
         @parameter mutant: The mutated request.
         @parameter res: The HTTP response.
         '''
-        raise w3afException('You must override the _analyzeResult method of basePlugin if you want to use _sendMutant().')
+        msg = 'You must override the "_analyzeResult" method of basePlugin if'
+        msg += ' you want to use "_sendMutant" with the default callback.'
+        raise w3afException( msg )
     
     def __eq__( self, other ):
         '''

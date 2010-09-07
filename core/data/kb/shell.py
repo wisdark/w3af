@@ -166,7 +166,7 @@ class shell(vuln, exploitResult, commonAttackMethods):
             result = payload_handler.exec_payload( self,  payload_name)
             result_str = '\n'.join(result)
         else:
-            result_str = 'The payload could not be run'
+            result_str = 'The payload could not be run.'
             
         return result_str
     
@@ -176,7 +176,9 @@ class shell(vuln, exploitResult, commonAttackMethods):
         
         @return: A list with all runnable payloads.
         '''
-        return '\n'.join( payload_handler.runnable_payloads( self ) )
+        payloads = payload_handler.runnable_payloads( self )
+        payloads.sort()
+        return '\n'.join( payloads )
         
     def end( self ):
         '''

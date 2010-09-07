@@ -379,6 +379,10 @@ class SemiStockButton(gtk.Button):
     '''
     def __init__(self, text, image, tooltip=None):
         super(SemiStockButton,self).__init__(stock=image)
+        # Icons in menus and buttons are not shown by default in GNOME 2.28
+        settings = self.get_settings()
+        settings.set_property('gtk-button-images', True)
+
         align = self.get_children()[0]
         box = align.get_children()[0]
         (self.image, self.label) = box.get_children()
@@ -667,6 +671,7 @@ class Searchable(object):
         self.key_g = gtk.gdk.keyval_from_name("g")
         self.key_G = gtk.gdk.keyval_from_name("G")
         self.key_F3 = gtk.gdk.keyval_from_name("F3")
+        self.key_Esc = gtk.gdk.keyval_from_name("Escape")
 
         # signals
         self.connect("key-press-event", self._key)
@@ -700,6 +705,9 @@ class Searchable(object):
                 self._find(None, "previous")
             else:
                 self._find(None, "next")
+        # Esc
+        if event.keyval == self.key_Esc:
+            self._close(None, None)
         return False
 
     def _populate_popup(self, textview, menu):
@@ -797,7 +805,7 @@ class Searchable(object):
         if not tosearch:
             return
         (ini, fin) = self.textbuf.get_bounds()
-        alltext = self.textbuf.get_text(ini, fin)
+        alltext = self.textbuf.get_slice(ini, fin, True)
 
         if not self._matchCaseValue:
             alltext = alltext.lower()

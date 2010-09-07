@@ -64,7 +64,7 @@ def dependencyCheck():
         try:
             import google as pygoogle
         except Exception, e:
-            print 'You have to install pygoogle lib. Please read the users guide.'
+            print 'You have to install pygoogle and fpconst libs. Please read the users guide.'
             print 'Error: ' + str(e)
             sys.exit( 1 )
 
@@ -109,7 +109,7 @@ def dependencyCheck():
         from OpenSSL import SSL
     except:
         msg = 'You have to install pyOpenSSL library. \n'
-        msg += '    - On Debian based distributions: apt-get install python-pyopenssl\n'
+        msg += '    - On Debian based distributions: sudo apt-get install python-pyopenssl\n'
         msg += '    - On Mac: sudo port install py25-socket-ssl , or py25-openssl'
         print msg
         sys.exit( 1 )

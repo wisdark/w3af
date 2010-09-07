@@ -22,9 +22,32 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 # Common imports
 from core.data.parsers.urlParser import *
+
+try:
+    from lxml import etree
+except ImportError:
+    try:
+        # Python 2.5
+        import xml.etree.cElementTree as etree
+    except ImportError:
+        try:
+            # Python 2.5
+            import xml.etree.ElementTree as etree
+        except ImportError:
+            try:
+                # normal cElementTree install
+                import cElementTree as etree
+            except ImportError:
+                try:
+                    # normal ElementTree install
+                    import elementtree.ElementTree as etree
+                except ImportError:
+                    print("Failed to import ElementTree from any known place")
+
 import copy
 import re
 import string
+
 
 # Handle codecs
 import codecs
@@ -43,6 +66,7 @@ class httpResponse:
         # A nice and comfortable default
         self._charset = 'utf-8'
         self._content_type = ''
+        self._dom = None
         
         # Set the URL variables
         # The URL that we really GET'ed
@@ -54,7 +78,15 @@ class httpResponse:
         
         # Set the rest
         self.setCode(code)
+
+        # Save the type for fast access, so I don't need to calculate the type each time
+        # someone calls the "is_text_or_html" method. This attributes are set in the
+        # setHeaders() method.
+        self._is_text_or_html_response = False
+        self._is_swf_response = False
+        self._is_pdf_response = False
         self.setHeaders(info)
+        
         self.setBody(read)
         self._msg = msg
         self._time = time
@@ -63,13 +95,38 @@ class httpResponse:
         self.id = id
 
         self._fromCache = False
+        
     
     def getId( self ): return self.id
     def getRedirURL( self ): return self._redirectedURL
     def getRedirURI( self ): return self._redirectedURI
     def getCode( self ): return self._code
-    def getBody( self ):
-        return self._body
+    def getBody( self ): return self._body
+    
+    def getDOM( self ):
+        '''
+        I don't want to calculate the soup for all responses, only for those which are needed.
+        This method will first calculate the soup, and then save it for other calls to this method.
+        
+        @return: The soup, or None if the HTML normalization failed.
+        '''
+        if self._dom == None:
+            try:
+                parser = etree.XMLParser(recover=True)
+                self._dom = etree.fromstring( self._body, parser )
+            except Exception, e:
+                print e
+                msg = 'The HTTP body for "' + self.getURL() + '" could NOT be'
+                msg += ' parsed by libxml2.'
+                om.out.debug( msg )
+        return self._dom
+    
+    def getNormalizedBody(self):
+        '''
+        @return: A normalized body
+        '''
+        return etree.tostring( self._dom )
+    
     def getHeaders( self ): return self._headers
     def getLowerCaseHeaders( self ):
         '''
@@ -103,8 +160,9 @@ class httpResponse:
         @body: A string that represents the body of the HTTP response
         @return: None
         '''
+        #   Sets the self._body attribute
         self._charset_handling(body)
-
+        
     def __contains__(self, string_to_test):
         '''
         Determine if any of the strings inside the string_list match the HTTP response body.
@@ -200,11 +258,27 @@ class httpResponse:
         '''
         self._headers = headers
 
-        # Analyze
+        #   Set the type, for easy access.
         for key in headers.keys():
             if 'Content-Type'.lower() == key.lower():
                 self._content_type = headers[ key ]
-                break
+                
+                #   Text or HTML?
+                magic_words = [ 'text', 'html', 'xml', 'txt']
+                for mw in magic_words:
+                   if self._content_type.lower().count(mw):
+                       self._is_text_or_html_response = True
+                       return
+                
+                #   PDF?
+                if self._content_type.lower().count('pdf'):
+                    self._is_pdf_response = True
+                
+                #   SWF?
+                if self._content_type.lower().count('x-shockwave-flash'):
+                    self._is_swf_response = True
+                
+                return
 
     def getContentType( self ):
         '''
@@ -216,28 +290,19 @@ class httpResponse:
         '''
         @return: True if this response is text or html
         '''
-        if self._content_type.lower().count('txt') or self._content_type.lower().count('html'):
-            return True
-        else:
-            return False
-
+        return self._is_text_or_html_response
+    
     def is_pdf( self ):
         '''
         @return: True if this response is a PDF file
         '''
-        if self._content_type.lower().count('pdf'):
-            return True
-        else:
-            return False
+        return self._is_pdf_response
     
     def is_swf( self ):
         '''
         @return: True if this response is a SWF file
         '''
-        if self._content_type.lower().count('x-shockwave-flash'):
-            return True
-        else:
-            return False
+        return self._is_swf_response
             
     def setURL( self, url ): self._realurl = url
     def setURI( self, uri ): self._uri = uri

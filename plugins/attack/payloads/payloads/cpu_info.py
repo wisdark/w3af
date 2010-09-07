@@ -11,7 +11,11 @@ class cpu_info(base_payload):
         def parse_cpu_info( cpu_info ):
             processor = re.search('(?<=model name\t: )(.*)', cpu_info)
             if processor:
-                return processor.group(1)
+                processor_string = processor.group(1)
+                splitted = processor_string.split(' ')
+                splitted = [ i for i in splitted if i != '']
+                processor_string = ' '.join(splitted)
+                return processor_string
             else:
                 return ''
 
@@ -20,7 +24,7 @@ class cpu_info(base_payload):
             if cores:
                 return cores.group(1)
             else:
-                return ''
+                return '1'
 
         content = self.shell.read('/proc/cpuinfo')
         if content:

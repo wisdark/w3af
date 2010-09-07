@@ -9,7 +9,6 @@ class apache_ssl(base_payload):
         result = {}
         result['apache_ssl_certificate'] = {}
         result['apache_ssl_key'] = {}
-        
 
         def parse_ssl_cert (apache_config):
             cert = re.search('(?<=SSLCertificateFile)(?! directive)    (.*)', apache_config)

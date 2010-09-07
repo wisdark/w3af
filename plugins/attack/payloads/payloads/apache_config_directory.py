@@ -55,20 +55,20 @@ class apache_config_directory(base_payload):
 
         for path in paths:
             if check_apache_config_dir(path):
-                result['apache_directory'] .append(path)
+                result['apache_directory'].append(path)
 
         return result
     
     def run_read(self):
-        hashmap = self.api_read()
+        api_result = self.api_read()
         result = []
         
-        for k, v in hashmap.iteritems():
+        for k, v in api_result.iteritems():
             k = k.replace('_', ' ')
             result.append(k.title())
             for directory in v:
                 result.append(directory)
         
-        if result == [ ]:
+        if result == []:
             result.append('Apache configuration directory not found.')
         return result

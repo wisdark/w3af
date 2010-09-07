@@ -16,7 +16,7 @@ class arp_cache(base_payload):
         for file in files:
             content = self.shell.read(file)
             if content != '':
-                result .update({file:content})
+                result[file] = content
         return result
     
     def run_read(self):

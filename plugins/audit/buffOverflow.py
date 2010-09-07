@@ -81,12 +81,20 @@ class buffOverflow(baseAuditPlugin):
         om.out.debug( 'bufferOverflow plugin is testing: ' + freq.getURL() )
         
         str_list = self._get_string_list()
-        oResponse = self._sendMutant( freq , analyze=False ).getBody()
-        mutants = createMutants( freq , str_list, oResponse=oResponse )
-            
-        for mutant in mutants:
-            targs = (mutant,)
-            self._tm.startFunction( target=self._sendMutant, args=targs, ownerObj=self )
+        try:
+            oResponse = self._sendMutant( freq , analyze=False ).getBody()
+        except:
+            msg = 'Failed to perform the initial request during buffer'
+            msg += ' overflow testing'
+            om.out.debug( msg )
+        else:
+            mutants = createMutants( freq , str_list, oResponse=oResponse )
+                
+            for mutant in mutants:
+                targs = (mutant,)
+                self._tm.startFunction( target=self._sendMutant, args=targs, ownerObj=self )
+                
+            self._tm.join( self )
             
     def _sendMutant( self, mutant, analyze=True, grepResult=True ):
         '''
@@ -114,7 +122,7 @@ class buffOverflow(baseAuditPlugin):
             if data:
                 msg = 'A possible (most probably a false positive than a bug) buffer overflow was'
                 msg += ' found when requesting: "' + url + '", using HTTP method ' + method
-                msg += '. The data sent was: "' + data + '".'
+                msg += '. The data sent was: "' + str(data) + '".'
                 i.setDesc( msg )
             else:
                 msg = 'A possible (most probably a false positive than a bug) buffer overflow was'

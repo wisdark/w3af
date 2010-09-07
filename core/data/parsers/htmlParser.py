@@ -23,15 +23,27 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import core.controllers.outputManager as om
 from core.controllers.w3afException import w3afException
 import core.data.kb.config as cf
+
 try:
-    import extlib.BeautifulSoup as BeautifulSoup
-    om.out.debug('htmlParser is using the bundled BeautifulSoup library')
-except:
+    from lxml import etree
+except ImportError:
     try:
-        import BeautifulSoup
-        om.out.debug('htmlParser is using the systems BeautifulSoup library')
-    except:
-        raise w3afException('You have to install BeautifulSoup lib.')
+        # Python 2.5
+        import xml.etree.cElementTree as etree
+    except ImportError:
+        try:
+            # Python 2.5
+            import xml.etree.ElementTree as etree
+        except ImportError:
+            try:
+                # normal cElementTree install
+                import cElementTree as etree
+            except ImportError:
+                try:
+                    # normal ElementTree install
+                    import elementtree.ElementTree as etree
+                except ImportError:
+                    print("Failed to import ElementTree from any known place")
 
 from core.data.parsers.sgmlParser import sgmlParser
 import core.data.parsers.urlParser as urlParser
@@ -62,14 +74,19 @@ class htmlParser(sgmlParser):
         
         sgmlParser.__init__(self, httpResponse, normalizeMarkup, verbose)
         
-    def _preParse( self, HTMLDocument ):
+    def _preParse( self, httpResponse ):
+        '''
+        @parameter httpResponse: The HTTP response document that contains the HTML
+        document inside its body.
+        '''
         assert self._baseUrl != '', 'The base URL must be setted.'
+        
+        HTMLDocument = httpResponse.getBody()
+        
         if self._normalizeMarkup:
-            try:
-                HTMLDocument = str( BeautifulSoup.BeautifulSoup(HTMLDocument) )
-            except Exception,e:
-                om.out.debug('BeautifulSoup raised the exception:' + str(e))
-                om.out.debug('Parsing HTML document without BeautifulSoup normalization.')
+            # In some cases, the parsing library could fail.
+            if httpResponse.getDOM() != None:
+                HTMLDocument = etree.tostring( httpResponse.getDOM() )
 
         # Now we are ready to work
         self._parse ( HTMLDocument )
