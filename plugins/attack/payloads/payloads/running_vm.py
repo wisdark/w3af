@@ -1,11 +1,13 @@
 import re
 from plugins.attack.payloads.base_payload import base_payload
+from core.ui.consoleUi.tables import table
+
 
 class running_vm(base_payload):
     '''
     This payload check if the Server is running through a VM
     '''
-    def api_read(self):
+    def api_read(self, parameters):
         result = {}
         result['running_vm'] = False
         files = []
@@ -51,7 +53,7 @@ class running_vm(base_payload):
 
 
         for candidate in candidates:
-            file = self.shell.read('/sys/bus/pci/devices/'+candidate)
+            file = self.shell.read('/sys/bus/pci/devices/'+candidate+'/uevent')
             pci_id = parse_pci_id(file)
             pci_subsys_id = parse_subsys_id(file)
             for pci_item in pci_list:
@@ -81,14 +83,18 @@ class running_vm(base_payload):
         iis6log_content = self.shell.read('/windows/iis6.log')
         #if 'VMWare'
     
-    def run_read(self):
-        hashmap = self.api_read()
-        result = []
-        
-        if hashmap:
-                if hashmap['running_vm']:
-                   result.append('Is running through a VM !!')
-                else:
-                    result.append('Is NOT running through a VM')
+    def run_read(self, parameters):
+        api_result = self.api_read( parameters )
 
-        return result
+        rows = []
+        rows.append( ['Running inside Virtual Machine',] ) 
+        rows.append( [] )
+        
+        if api_result['running_vm']:
+            rows.append(['The remote host is a virtual machine.',])
+        else:
+            rows.append(['The remote host is NOT a virtual machine.',])
+            
+        result_table = table( rows )
+        result_table.draw( 80 )                    
+        return

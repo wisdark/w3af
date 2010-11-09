@@ -27,6 +27,7 @@ from core.controllers.intrusionTools.delayedExecution import delayedExecution
 from core.controllers.intrusionTools.execMethodHelpers import *
 import time
 
+
 class crontabHandler( delayedExecution ):
     '''
     This class defines a crontab handler, that will:
@@ -56,8 +57,14 @@ class crontabHandler( delayedExecution ):
         Adds a command to the cron.
         '''
         actualCron = self._exec( 'crontab -l 2>&1' )
+        actualCron = actualCron.strip()
+        
         remoteDate = self._exec( 'date +%d-%m-%H:%M:%S-%u' )
+        remoteDate = remoteDate.strip()
+        
         user = self._exec( 'whoami')
+        user = user.strip()
+        
         newCronLine, waitTime = self._createCronLine( remoteDate, commandToExec )
         
         if 'no crontab for ' + user == actualCron:

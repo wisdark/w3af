@@ -1,12 +1,14 @@
 import re
 import core.data.kb.knowledgeBase as kb
 from plugins.attack.payloads.base_payload import base_payload
+from core.ui.consoleUi.tables import table
+
 
 class root_login_allowed(base_payload):
     '''
     This payload checks if root user is allowed to login on console.
     '''
-    def api_read(self):
+    def api_read(self, parameters):
         result = {}
 
         def parse_securetty( securetty ):
@@ -42,20 +44,26 @@ class root_login_allowed(base_payload):
 
         return result
     
-    def run_read(self):
-        hashmap = self.api_read()
-        result = []
+    def run_read(self, parameters):
+        api_result = self.api_read( parameters )
         
-        if hashmap:
-            if hashmap['ssh_attack']:
-                result.append('A SSH Bruteforce attack is possible.')
-            else:
-                result.append('A SSH Bruteforce attack is not possible.')
-            if hashmap['root_login']:
-                result.append('Root user is allowed to login on CONSOLE.')
-            else:
-                result.append('Root user is NOT allowed to login on CONSOLE.')
+        if not api_result:
+            msg = 'Failed to verify if root login is allowed, '
+            msg += ' a SSH bruteforce attack might still be possible.'
+            return msg
+        else:
+            
+            rows = []
+            rows.append( ['Root login allowed',] ) 
+            rows.append( [] )
+            if api_result['ssh_attack']:
+                rows.append( ['A SSH Bruteforce attack is possible.',] )
+            if api_result['root_login']:
+                rows.append( ['Root user is allowed to login on CONSOLE.',] )
+            if not api_result['root_login'] and not api_result['ssh_attack']:
+                rows.append( ['Root user is not allowed to login through SSH nor console.',] )
+                
+            result_table = table( rows )
+            result_table.draw( 80 )                    
+            return
         
-        if result == [ ]:
-            result.append('Cant check if root login is allowed. A SSH Bruteforce attack might be possible')
-        return result

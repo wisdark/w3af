@@ -20,33 +20,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-# Common imports
-from core.data.parsers.urlParser import *
-
-try:
-    from lxml import etree
-except ImportError:
-    try:
-        # Python 2.5
-        import xml.etree.cElementTree as etree
-    except ImportError:
-        try:
-            # Python 2.5
-            import xml.etree.ElementTree as etree
-        except ImportError:
-            try:
-                # normal cElementTree install
-                import cElementTree as etree
-            except ImportError:
-                try:
-                    # normal ElementTree install
-                    import elementtree.ElementTree as etree
-                except ImportError:
-                    print("Failed to import ElementTree from any known place")
 
 import copy
 import re
-import string
+
+from lxml import etree
+
+import core.controllers.outputManager as om
+from core.data.parsers.urlParser import uri2url
+
 
 
 # Handle codecs
@@ -57,7 +39,10 @@ def _returnEscapedChar(exc):
 codecs.register_error("returnEscapedChar", _returnEscapedChar)
 
 
-class httpResponse:
+DEFAULT_CHARSET = 'utf-8'
+
+
+class httpResponse(object):
     
     def __init__( self, code, read , info, geturl, originalUrl, msg='OK', id=None, time=0.2):
         '''
@@ -67,6 +52,7 @@ class httpResponse:
         self._charset = 'utf-8'
         self._content_type = ''
         self._dom = None
+        self._clear_text_body = None
         
         # Set the URL variables
         # The URL that we really GET'ed
@@ -102,6 +88,42 @@ class httpResponse:
     def getRedirURI( self ): return self._redirectedURI
     def getCode( self ): return self._code
     def getBody( self ): return self._body
+
+    def getClearTextBody(self):
+        '''
+        @return: A clear text representation of the HTTP response body. 
+        '''
+        
+        if self._clear_text_body is not None:
+            #
+            #    We already calculated this, we can return it now.
+            #
+            return self._clear_text_body
+        else:
+            #
+            #    Calculate the clear text body
+            #
+            dom = self.getDOM()
+            
+            if dom is None:
+                # return None if we don't have a DOM
+                return None
+                
+            else:
+                self._clear_text_body = ''
+                
+                for elem in dom.getiterator():
+                    
+                    if elem.tag == 'br':
+                        self._clear_text_body += '\n'
+                    else:
+                        # get the text
+                        text = elem.text
+                        if text is not None:
+                            self._clear_text_body += text
+                
+                return self._clear_text_body
+
     
     def getDOM( self ):
         '''
@@ -110,22 +132,24 @@ class httpResponse:
         
         @return: The soup, or None if the HTML normalization failed.
         '''
-        if self._dom == None:
+        if self._dom is None:
             try:
-                parser = etree.XMLParser(recover=True)
-                self._dom = etree.fromstring( self._body, parser )
-            except Exception, e:
-                print e
-                msg = 'The HTTP body for "' + self.getURL() + '" could NOT be'
-                msg += ' parsed by libxml2.'
-                om.out.debug( msg )
+                parser = etree.HTMLParser(recover=True)
+                self._dom = etree.fromstring(self._body, parser)
+            except Exception:
+                msg = 'The HTTP body for "%s" could NOT be ' \
+                'parsed by libxml2.' % self.getURL()
+                om.out.debug(msg)
         return self._dom
     
     def getNormalizedBody(self):
         '''
         @return: A normalized body
         '''
-        return etree.tostring( self._dom )
+        if self._dom is not None:
+            return etree.tostring( self._dom )
+        
+        return None
     
     def getHeaders( self ): return self._headers
     def getLowerCaseHeaders( self ):
@@ -190,11 +214,11 @@ class httpResponse:
             om.out.debug('hmmm... wtf?! The remote web server failed to send the content-type header.')
             self._body = body
         else:
-            if not re.findall('text/(\w+)', lowerCaseHeaders['content-type'] ):
+            if not self.is_text_or_html():
                 # Not text, save as it is.
                 self._body = body
             else:
-                # According to the web server, the body content is a text/html content
+                # According to the web server, the body content is text, html, xml or something similar
                 
                 # I'll get the charset from the response headers, and the charset from the HTML content meta tag
                 # if the charsets differ, then I'll decode the text with one encoder, and then with the other; comparing
@@ -203,26 +227,26 @@ class httpResponse:
                 
                 # Go for the headers
                 headers_charset = ''
-                reCharset = re.findall('charset=([\w-]+)', lowerCaseHeaders['content-type'] )
-                if reCharset:
+                re_charset = re.findall('charset=([\w-]+)', lowerCaseHeaders['content-type'] )
+                if re_charset:
                     # well... it seems that they are defining a charset in the response headers..
-                    headers_charset = reCharset[0].lower().strip()
+                    headers_charset = re_charset[0].lower().strip()
                     
                 # Now go for the meta tag
                 # I parse <meta http-equiv="Content-Type" content="text/html; charset=utf-8"> ?
                 meta_charset = ''
-                reCharset = re.findall('<meta.*?content=".*?charset=([\w-]+)".*?>', body, re.IGNORECASE )
-                if reCharset:
+                re_charset = re.findall('<meta.*?content=".*?charset=([\w-]+)".*?>', body, re.IGNORECASE )
+                if re_charset:
                     # well... it seems that they are defining a charset in meta tag...
-                    meta_charset = reCharset[0].lower().strip()
+                    meta_charset = re_charset[0].lower().strip()
                 
                 # by default we asume:
-                charset = 'utf-8'
+                charset = DEFAULT_CHARSET
                 if meta_charset == '' and headers_charset != '':
                     charset = headers_charset
                 elif headers_charset == '' and meta_charset != '':
                     charset = meta_charset
-                elif headers_charset == meta_charset and headers_charset != '' and meta_charset != '':
+                elif headers_charset == meta_charset and headers_charset != '':
                     charset = headers_charset
                 elif meta_charset != headers_charset:
                     om.out.debug('The remote web application sent charset="'+ headers_charset + '" in the header, but charset="' +\
@@ -242,7 +266,8 @@ class httpResponse:
                     om.out.debug( msg )
                     
                     # Use the default
-                    unicode_str = body.decode(self._charset, 'returnEscapedChar')
+                    charset = DEFAULT_CHARSET
+                    unicode_str = body.decode(charset, 'returnEscapedChar')
                
                 # Now we use the unicode_str to create a utf-8 string that will be used in all w3af
                 self._body = unicode_str.encode('utf-8')
@@ -260,16 +285,16 @@ class httpResponse:
 
         #   Set the type, for easy access.
         for key in headers.keys():
-            if 'Content-Type'.lower() == key.lower():
-                self._content_type = headers[ key ]
+            if 'content-type' == key.lower():
+                self._content_type = headers[key]
                 
                 #   Text or HTML?
-                magic_words = [ 'text', 'html', 'xml', 'txt']
+                magic_words = ['text', 'html', 'xml', 'txt', 'javascript']
                 for mw in magic_words:
-                   if self._content_type.lower().count(mw):
-                       self._is_text_or_html_response = True
-                       return
-                
+                    if self._content_type.lower().count(mw):
+                        self._is_text_or_html_response = True
+                        return
+
                 #   PDF?
                 if self._content_type.lower().count('pdf'):
                     self._is_pdf_response = True
@@ -277,6 +302,10 @@ class httpResponse:
                 #   SWF?
                 if self._content_type.lower().count('x-shockwave-flash'):
                     self._is_swf_response = True
+
+                #   Image?
+                if self._content_type.lower().count('image'):
+                    self._is_image_response = True
                 
                 return
 
@@ -303,6 +332,12 @@ class httpResponse:
         @return: True if this response is a SWF file
         '''
         return self._is_swf_response
+
+    def is_image( self ):
+        '''
+        @return: True if this response is an image file
+        '''
+        return self._is_image_response
             
     def setURL( self, url ): self._realurl = url
     def setURI( self, uri ): self._uri = uri
@@ -324,7 +359,7 @@ class httpResponse:
         res = '< httpResponse | ' + str(self.getCode()) + ' | ' + self.getURL()
 
         # extra info
-        if self.id != None:
+        if self.id is not None:
             res += ' | id:'+str(self.id)
 
         if self._fromCache != False:

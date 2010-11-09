@@ -26,10 +26,12 @@ exploit localFileReader
 
 interact 0
 
-cat /etc/passwd
+read /etc/passwd
+payload tcp
+
 list
 
-endInteraction
+exit
 back
 
 assert len(kb.kb.getData('localFileInclude','localFileInclude')) == 3

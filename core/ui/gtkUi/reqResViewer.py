@@ -69,15 +69,10 @@ try:
 except Exception, e:
     withGtkHtml2 = False
 
-try:
-    import extlib.BeautifulSoup as BeautifulSoup
-except:
-    import BeautifulSoup
-
 def sigsegv_handler(signum, frame):
     print _('This is a catched segmentation fault!')
     print _('I think you hitted bug #1933524 , this is mainly a gtkhtml2 problem. Please report this error here:')
-    print _('https://sourceforge.net/tracker/index.php?func=detail&aid=1933524&group_id=170274&atid=853652')
+    print 'https://sourceforge.net/apps/trac/w3af/newticket'
 signal.signal(signal.SIGSEGV, sigsegv_handler)
 # End signal handler
 
@@ -90,7 +85,7 @@ class reqResViewer(gtk.VBox):
 
     '''
     def __init__(self, w3af, enableWidget=None, withManual=True, withFuzzy=True, 
-                        withCompare=True, editableRequest=False, editableResponse=False, 
+                        withCompare=True, withAudit=True, editableRequest=False, editableResponse=False, 
                         widgname="default"):
                             
         super(reqResViewer,self).__init__()
@@ -121,8 +116,6 @@ class reqResViewer(gtk.VBox):
         # Buttons
         hbox = gtk.HBox()
         
-        hbox = gtk.HBox()
-        
         if withManual or withFuzzy or withCompare:
             from .craftedRequests import ManualRequests, FuzzyRequests
             
@@ -145,6 +138,15 @@ class reqResViewer(gtk.VBox):
                 b.show()
                 hbox.pack_end(b, False, False, padding=2)
 
+        if withAudit:
+            # Add everything I need for the audit request thing:
+            # The button that shows the menu
+            b = entries.SemiStockButton("", gtk.STOCK_EXECUTE, _("Audit Request with..."))
+            b.connect("button-release-event", self._popupMenu)
+            self.request.childButtons.append(b)
+            b.show()
+            hbox.pack_start(b, False, False, padding=2)
+
 
         # I always can export requests
         b = entries.SemiStockButton("", gtk.STOCK_COPY, _("Export Request"))
@@ -155,14 +157,6 @@ class reqResViewer(gtk.VBox):
             
         self.pack_start(hbox, False, False, padding=5)
         hbox.show()
-
-        # Add everything I need for the audit request thing:
-        # The button that shows the menu
-        b = entries.SemiStockButton("", gtk.STOCK_EXECUTE, _("Audit Request with..."))
-        b.connect("button-release-event", self._popupMenu)
-        self.request.childButtons.append(b)
-        b.show()
-        hbox.pack_start(b, False, False, padding=2)
         
         # The throbber (hidden!)
         self.throbber = helpers.Throbber()
@@ -172,6 +166,12 @@ class reqResViewer(gtk.VBox):
         hbox.show()
 
         self.show()
+
+    def focusResponse(self):
+        self.nb.set_current_page(1)
+
+    def focusRequest(self):
+        self.nb.set_current_page(0)
 
     def _popupMenu(self, widget, event):
         '''Show a Audit popup menu.'''
@@ -759,7 +759,7 @@ class responsePart(requestResponsePart):
             print _('This is a catched exception!')
             print _('Exception:'), type(e), str(e)
             print _('I think you hitted bug #1933524 , this is mainly a gtkhtml2 problem. Please report this error here:')
-            print _('https://sourceforge.net/tracker/index.php?func=detail&aid=1933524&group_id=170274&atid=853652')
+            print 'https://sourceforge.net/apps/trac/w3af/newticket'
 
     def _renderMozilla(self, body, mimeType, baseURI):
         self._renderingWidget.render_data(body, long(len(body)), baseURI , mimeType)
@@ -793,11 +793,6 @@ class responsePart(requestResponsePart):
             mimeType = 'text/html'
             body = _('The response type is: <i>') + mimeType + _('</i>. w3af is still under development, in the future images will be displayed.')
 
-        # Show it rendered, but before rendering, use BeautifulSoup to normalize the HTML
-        # this should avoid some bugs in the HTML renderers!
-        soup = BeautifulSoup.BeautifulSoup(body)
-        body = soup.prettify()
-       
         self._renderFunction(body, mimeType, baseURI)
 
 
@@ -869,14 +864,18 @@ class reqResWindow(entries.RememberingWindow):
     A window to show a request/response pair.
     """
     def __init__(self, w3af, request_id, enableWidget=None, withManual=True,
-                 withFuzzy=True, withCompare=True, editableRequest=False,
-                 editableResponse=False, widgname="default"):
+                 withFuzzy=True, withCompare=True, withAudit=True,
+                 editableRequest=False, editableResponse=False,
+                 widgname="default"):
         # Create the window
         entries.RememberingWindow.__init__(
-            self, w3af, "reqResWin", _("w3af - HTTP Request/Response"), "Browsing_the_Knowledge_Base")
+            self, w3af, "reqResWin", _("w3af - HTTP Request/Response"), 
+            "Browsing_the_Knowledge_Base")
 
         # Create the request response viewer
-        rrViewer = reqResViewer(w3af, enableWidget, withManual, withFuzzy, withCompare, editableRequest, editableResponse, widgname)
+        rrViewer = reqResViewer(w3af, enableWidget, withManual, withFuzzy, 
+                                withCompare, withAudit, editableRequest, 
+                                editableResponse, widgname)
 
         # Search the id in the DB
         historyItem = HistoryItem()

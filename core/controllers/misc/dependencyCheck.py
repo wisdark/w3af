@@ -24,10 +24,14 @@ import core.controllers.outputManager as om
 import sys
 import subprocess
 
+# Use w3af's 'extlib' modules first. By doing this we ensure that modules
+# in 'w3af/extlib/' are first imported over python installation 'site-packages/'
+sys.path.insert(0, "./extlib")
 
 def dependencyCheck():
     '''
-    This function verifies that the dependencies that are needed by the framework core are met.
+    This function verifies that the dependencies that are needed by the
+    framework core are met.
     '''
 
     om.out.debug('Checking core dependencies')
@@ -51,32 +55,11 @@ def dependencyCheck():
     warnings.filterwarnings('ignore', '.*',)
 
     try:
-        sys.path.append("./extlib")
         import nltk
     except Exception, e:
         print 'You have to install the nltk lib. Please read the users guide.'
         print 'Error: ' + str(e)
         sys.exit( 1 )
-            
-    try:
-        import extlib.pygoogle.google as pygoogle
-    except:
-        try:
-            import google as pygoogle
-        except Exception, e:
-            print 'You have to install pygoogle and fpconst libs. Please read the users guide.'
-            print 'Error: ' + str(e)
-            sys.exit( 1 )
-
-    try:
-        import extlib.BeautifulSoup as BeautifulSoup
-    except:
-        try:
-            import BeautifulSoup
-        except:
-            print 'You have to install BeautifulSoup lib. Please read the users guide.'
-            sys.exit( 1 )
-        
 
     try:
         import extlib.SOAPpy.SOAPpy as SOAPpy
@@ -95,15 +78,6 @@ def dependencyCheck():
         except:
             print 'You have to install pyPdf lib. Debian based distributions: apt-get install python-pypdf'
             sys.exit( 1 )
-    
-    try:
-        from extlib.jsonpy import json as json
-    except:
-        try:
-            import json
-        except:
-            print 'You have to install python-json lib. Debian based distributions: apt-get install python-json'
-            sys.exit( 1 )
             
     try:
         from OpenSSL import SSL
@@ -113,4 +87,12 @@ def dependencyCheck():
         msg += '    - On Mac: sudo port install py25-socket-ssl , or py25-openssl'
         print msg
         sys.exit( 1 )
+
+    try:
+        from lxml import etree
+    except:
+        msg = 'You have to install python libxml2 wrapper. Debian based distributions: apt-get install python-lxml'
+        print msg
+        sys.exit( 1 )     
+
 

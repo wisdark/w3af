@@ -5,7 +5,7 @@ class ftp_config_files(base_payload):
     '''
     This payload shows FTP Server configuration files
     '''
-    def api_read(self):
+    def api_read(self, parameters):
         result = {}
         files = []
 
@@ -38,7 +38,8 @@ class ftp_config_files(base_payload):
             if content:
                 result.update({file:content})
 
-        users_name = self.exec_payload('users_name').values()
+        # TODO: Should I move this to users_config_files ?
+        users_name = self.exec_payload('users')
         for user_home in users_name:
             filezilla_content = self.shell.read(user_home+'.filezilla/filezilla.xml')
             recent_content = self.shell.read(user_home+'.filezilla/recentservers.xml')
@@ -51,7 +52,7 @@ class ftp_config_files(base_payload):
                 result.update({user_home+'.filezilla/recentservers.xml':sitemanager_content})
         return result
     
-    def run_read(self):
+    def run_read(self, parameters):
         hashmap = self.api_read()
         result = []
         if hashmap:

@@ -1,13 +1,14 @@
-import re
 import core.data.kb.knowledgeBase as kb
 import plugins.attack.payloads.misc.file_crawler as file_crawler
 from plugins.attack.payloads.base_payload import base_payload
+from core.ui.consoleUi.tables import table
+
 
 class apache_config_files(base_payload):
     '''
     This payload finds readable Apache configuration files
     '''
-    def api_read(self):
+    def api_read(self, parameters):
         result = {}
         result['apache_config'] = {}
         files = []
@@ -29,31 +30,43 @@ class apache_config_files(base_payload):
                 for file in files:
                     content = self.shell.read(dir+file)
                     if content:
-                        result['apache_config'].update({dir+file:content})
+                        result['apache_config'][ dir+file ] = content
                 
                 #TODO: Add target domain name being scanned by w3af.
-                if kb.kb.getData('passwordProfiling', 'passwordProfiling'):
-                    for profile in kb.kb.getData('passwordProfiling', 'passwordProfiling'):
-                        profile_content = self.shell.read(dir+'sites-available/'+profile.lower())
-                        if profile_content:
-                            result['apache_config'].update({dir+'sites-available/'+profile.lower():profile_content})
+                profiled_words_list = kb.kb.getData('passwordProfiling', 'passwordProfiling')
+                domain_name = self.exec_payload('domainname')['domain_name']
+                hostname = self.exec_payload('hostname')['hostname']
+                
+                extras = []
+                extras.append(domain_name)
+                extras.extend(hostname)
+                if profiled_words_list is not None:
+                    extras.extend(profiled_words_list)
+                extras = list(set(extras))
+                extras = [i for i in extras if i != '']
+                
+                for possible_domain in extras:
+                    site_configuration = dir + 'sites-enabled/' + possible_domain.lower()
+                    
+                    site_configuration_content = self.shell.read(site_configuration)
+                    if site_configuration_content:
+                        result['apache_config'][ site_configuration ] = site_configuration_content
 
         return result
         
-    def run_read(self):
-        hashmap = self.api_read()
-        result = []
+    def run_read(self, parameters):
+        api_result = self.api_read( parameters )
         
-        for k, v in hashmap.iteritems():
-            k = k.replace('_', ' ')
-            result.append(k.title())
-            for file, content in v.iteritems():
-                result.append('-------------------------')
-                result.append(file)
-                result.append('-------------------------')
-                result.append(content)
-        
-        if result == []:
-            result.append('Apache configuration files not found.')
-        return result
+        if not api_result['apache_config']:
+            return 'Apache configuration files not found.'
+        else:
+            rows = []
+            rows.append( ['Apache configuration files'] ) 
+            rows.append( [] )
+            for key_name in api_result:
+                for filename, file_content in api_result[key_name].items():
+                    rows.append( [filename,] )
+            result_table = table( rows )
+            result_table.draw( 80 )                    
+            return
 

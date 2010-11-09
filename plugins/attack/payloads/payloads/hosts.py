@@ -1,11 +1,12 @@
-import re
 from plugins.attack.payloads.base_payload import base_payload
+from core.ui.consoleUi.tables import table
+
 
 class hosts(base_payload):
     '''
     This payload shows the hosts allow and deny files.
     '''
-    def api_read(self):
+    def api_read(self, parameters):
         result = {}
         hosts = []
 
@@ -16,22 +17,23 @@ class hosts(base_payload):
         for file in hosts:
             content = self.shell.read(file)
             if content:
-                result.update({file:content})
+                result[file] = content
         return result
         
-    def run_read(self):
-        hashmap = self.api_read()
-        result = []
-        if hashmap:
-            result.append('Hosts Config Files')
-            for file, content in hashmap.iteritems():
-                result.append('-------------------------')
-                result.append(file)
-                result.append('-------------------------')
-                result.append(content)
+    def run_read(self, parameters):
+        api_result = self.api_read( parameters )
         
-        if result == [ ]:
-            result.append('Hosts files not found.')
-        return result
-
-
+        if not api_result:
+            return 'Hosts files not found.'
+        else:
+            rows = []
+            rows.append( ['Host file', 'Content'] )
+            rows.append( [] )
+            for file in api_result:
+                rows.append( [file, api_result[file]] )
+                rows.append( [] )
+                    
+            result_table = table( rows[:-1] )
+            result_table.draw( 160 )
+            return
+        

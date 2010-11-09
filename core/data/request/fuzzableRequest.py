@@ -53,6 +53,9 @@ class fuzzableRequest:
         self._headers = {}
         self._cookie = None
         self._dc = dc()
+
+        # Set the internal variables
+        self._sent_information = None
     
     def dump( self ):
         '''
@@ -84,31 +87,67 @@ class fuzzableRequest:
         return result_string
 
     def export( self ):
-      '''
-      @return: a csv str representation of the request
-      '''
-      strRes = ''
-      strRes += self._method + ',' 
-      strRes += self._url
- 
-      if self._method == 'GET': 
-        if self._dc:
-          strRes += '?'
-          for i in self._dc:
-            #
-            #   FIXME: What about repeated parameter names?!
-            #
-            strRes += i + '=' + urllib.quote(str(self._dc[i])) + '&'          
-          strRes = strRes[: -1]
-        strRes += ','
-      else:
-        strRes += ','
-        if self._dc:
-          for i in self._dc:
-            strRes += i + '=' + urllib.quote(str(self._dc[i])) + '&'          
-          strRes = strRes[: -1]
-      return strRes
+        '''
+        METHOD,URL,DC
+        Examples:
+        GET,http://localhost/index.php?abc=123&def=789,
+        POST,http://localhost/index.php,abc=123&def=789
+        
+        @return: a csv str representation of the request
+        '''
+        #
+        #   FIXME: What if a comma is inside the URL or DC?
+        #   TODO: Why don't we export headers and cookies?
+        #
+        str_res = ''
+        str_res += self._method + ',' 
+        str_res += self._url
+
+        if self._method == 'GET': 
+            if self._dc:
+                str_res += '?'
+                str_res += str(self._dc)         
+            str_res += ','
+        else:
+            str_res += ','
+            if self._dc:
+                str_res += str(self._dc)
+        return str_res
+                    
+    def sent(self, something_interesting):
+        '''
+        Checks if the something_interesting was sent in the request.
+
+        @parameter something_interesting: The string
+        @return: True if it was sent
+        '''
+        if self._sent_information is None:
+            self._sent_information = ''
+    
+            if self.getMethod().upper() == 'POST':
+                sent_data = self.getData()
                 
+                if sent_data is not None:
+                    
+                    # Save the information as-is, encoded.
+                    self._sent_information += ' ' + str(sent_data)
+                    
+                    # Save the decoded information
+                    sent_data = urllib.unquote( str(sent_data) )
+                    self._sent_information += ' ' + sent_data
+                    
+            
+            # Save the url as-is, encoded.
+            self._sent_information += ' ' + self.getURI()
+            # Save the decoded URL
+            self._sent_information += ' ' + urllib.unquote_plus( self.getURI() )
+    
+        if something_interesting in self._sent_information:
+            return True
+        else:
+            # I didn't sent the something_interesting in any way
+            return False
+
     def __str__( self ):
         '''
         Return a str representation of this fuzzable request.
@@ -235,7 +274,7 @@ class fuzzableRequest:
             self._cookie = c
         elif isinstance( c, basestring ):
             self._cookie = cookie( c )
-        elif c == None:
+        elif c is None:
             self._cookie = None
         else:
             om.out.error('[fuzzableRequest error] setCookie received: "' + str(type(c)) + '" , "' + repr(c) + '"'  )

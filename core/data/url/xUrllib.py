@@ -46,6 +46,7 @@ from core.data.parsers.httpRequestParser import httpRequestParser
 from core.data.request.frFactory import createFuzzableRequestRaw
 
 from core.data.url.httpResponse import httpResponse as httpResponse
+from core.data.url.HTTPRequest import HTTPRequest as HTTPRequest
 from core.data.url.handlers.localCache import CachedResponse
 import core.data.kb.config as cf
 import core.data.kb.knowledgeBase as kb
@@ -200,7 +201,7 @@ class xUrllib:
     
     def _init( self ):
         if self.settings.needUpdate or \
-        self._opener == None or self._cacheOpener == None:
+        self._opener is None or self._cacheOpener is None:
         
             self.settings.needUpdate = False
             self.settings.buildOpeners()
@@ -212,7 +213,7 @@ class xUrllib:
         Returns a dict with the headers that would be used when sending a request
         to the remote server.
         '''
-        req = urllib2.Request( uri )
+        req = HTTPRequest( uri )
         req = self._addHeaders( req )
         return req.headers
     
@@ -278,13 +279,13 @@ class xUrllib:
         
         qs = urlParser.getQueryString( uri )
         if qs:
-            req = urllib2.Request( uri )
+            req = HTTPRequest( uri )
         else:
             if data:
-                req = urllib2.Request( uri + '?' + data )
+                req = HTTPRequest( uri + '?' + data )
             else:
                 # It's really an url...
-                req = urllib2.Request( uri )
+                req = HTTPRequest( uri )
             
         req = self._addHeaders( req, headers )
         return self._send( req , useCache=useCache, grepResult=grepResult)
@@ -301,7 +302,7 @@ class xUrllib:
         if self._isBlacklisted( uri ):
             return httpResponse( http_constants.NO_CONTENT, '', {}, uri, uri, msg='No Content', id=consecutive_number_generator.inc() )
         
-        req = urllib2.Request(uri, data )
+        req = HTTPRequest(uri, data )
         req = self._addHeaders( req, headers )
         return self._send( req , grepResult=grepResult, useCache=useCache)
     
@@ -329,7 +330,7 @@ class xUrllib:
                     om.out.error( msg )
                     raise w3afException( msg )
         
-        if resource_length != None:
+        if resource_length is not None:
             return resource_length
         else:
             msg = 'The response didn\'t contain a content-length header. Unable to return the'
@@ -347,7 +348,7 @@ class xUrllib:
         '''
         class anyMethod:
             
-            class methodRequest(urllib2.Request):
+            class methodRequest(HTTPRequest):
                 def get_method(self):
                     return self._method
                 def set_method( self, method ):
@@ -633,7 +634,7 @@ class xUrllib:
         
     def _evasion( self, request ):
         '''
-        @parameter request: urllib2.Request instance that is going to be modified by the evasion plugins
+        @parameter request: HTTPRequest instance that is going to be modified by the evasion plugins
         '''
         for eplugin in self._evasionPlugins:
             try:
@@ -684,25 +685,28 @@ class xUrllib:
         timeout_seconds = 5
         timedout_grep_wrapper = TimeLimited( grep_plugin.grep_wrapper, timeout_seconds)
         try:
-            timedout_grep_wrapper( request, response)
+            timedout_grep_wrapper(request, response)
         except KeyboardInterrupt:
             # Correct control+c handling...
             raise
         except TimeLimitExpired:
-            msg = 'The "' + grep_plugin.getName() + '" plugin took more than ' + str(timeout_seconds)
-            msg += ' seconds to run.'
-            msg += ' For a plugin that should only perform pattern matching, this is too much,'
-            msg += ' please review its source code.'
-            om.out.error( msg )
+            msg = 'The "%s" plugin took more than %s seconds to run. ' \
+            'For a plugin that should only perform pattern matching, ' \
+            'this is too much, please review its source code.' % \
+            (grep_plugin.getName(), timeout_seconds)
+            om.out.error(msg)
         except Exception, e:
-            msg = 'Error in grep plugin, "' + grep_plugin.getName() + '" raised the exception: '
-            msg += str(e) + '. Please report this bug to the w3af sourceforge project page '
-            msg += '[ https://sourceforge.net/apps/trac/w3af/newticket ] '
-            msg += '\nException: ' + str(traceback.format_exc(1))
-            om.out.error( msg )
-            om.out.error( str(traceback.format_exc()) )
+            msg = 'Error in grep plugin, "%s" raised the exception: %s. ' \
+            'Please report this bug to the w3af sourceforge project page ' \
+            '[ https://sourceforge.net/apps/trac/w3af/newticket ] ' \
+            '\nException: %s' % (grep_plugin.getName(), str(e), 
+                                 traceback.format_exc(1))
+            om.out.error(msg)
+            om.out.error(getattr(e, 'orig_traceback_str', '') or \
+                            traceback.format_exc())
+
         
-        om.out.debug('Finished grep_worker for response: ' + repr(response) )
+        om.out.debug('Finished grep_worker for response: ' + repr(response))
 
 _abbrevs = [
     (1<<50L, 'P'),

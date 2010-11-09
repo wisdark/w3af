@@ -1,11 +1,12 @@
-import re
 from plugins.attack.payloads.base_payload import base_payload
+from core.ui.consoleUi.tables import table
+
 
 class dns_config_files(base_payload):
     '''
     This payload shows DNS Server configuration files
     '''
-    def api_read(self):
+    def api_read(self, parameters):
         result = {}
         files = []
 
@@ -25,17 +26,19 @@ class dns_config_files(base_payload):
                 result.update({file:content})
         return result
         
-    def run_read(self):
-        hashmap = self.api_read()
-        result = []
-        if hashmap:
-            result.append('DNS Config Files')
-            for file, content in hashmap.iteritems():
-                result.append('-------------------------')
-                result.append(file)
-                result.append('-------------------------')
-                result.append(content)
+    def run_read(self, parameters):
+        api_result = self.api_read( parameters )
+                
+        if not api_result:
+            return 'DNS configuration files not found.'
+        else:
+            rows = []
+            rows.append( ['DNS configuration files',] )
+            rows.append( [] )
+            for filename in api_result:
+                rows.append( [filename,] )
+                    
+            result_table = table( rows )
+            result_table.draw( 80 )
+            return
         
-        if result == [ ]:
-            result.append('DNS configuration files not found.')
-        return result

@@ -1,21 +1,24 @@
 import re
 from plugins.attack.payloads.base_payload import base_payload
+from core.ui.consoleUi.tables import table
+
 
 class kernel_version(base_payload):
     '''
     This payload shows Kernel version
     '''
-    def api_read(self):
+    def api_read(self, parameters):
         result = {}
+        result['kernel_version'] = ''
+        
         paths = []
 
         def parse_proc_version ( proc_version ):
-               version = re.search('(?<=Linux version ).*?\)', proc_version)
-               if version:
-                   return version.group(0)
-               else:
-                   return ''
-
+            version = re.search('(?<=Linux version ).*?\)', proc_version)
+            if version:
+                return version.group(0)
+            else:
+                return ''
 
         def parse_sched_debug ( sched_debug ):
             version = re.search('(?<=Sched Debug Version: )(v\d\.\d\d, )(.*)', sched_debug)
@@ -34,16 +37,21 @@ class kernel_version(base_payload):
                 longest = version
         if longest:
             result['kernel_version'] = longest
-        return result
-        
-    def run_read(self):
-        hashmap = self.api_read()
-        result = []
-        
-        for k, v in hashmap.iteritems():
-            k = k.replace('_', ' ')
-            result.append(k.title()+': '+v)
 
-        if result == [ ]:
-            result.append('Cant identify Kernel Version.')
         return result
+        
+    def run_read(self, parameters):
+        api_result = self.api_read( parameters )
+        
+        if not api_result['kernel_version']:
+            return 'Failed to identify kernel version.'
+        else:
+            rows = []
+            rows.append( ['Kernel version',] ) 
+            rows.append( [] )
+            rows.append( [api_result['kernel_version'], ] )
+                              
+            result_table = table( rows )
+            result_table.draw( 80 )                    
+            return
+

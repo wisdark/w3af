@@ -94,7 +94,7 @@ class basePlugin(configurable):
         '''
         @return: A description of the plugin.
         '''
-        if self.__doc__ != None:
+        if self.__doc__ is not None:
             res2 = self.__doc__.replace( '\t' , '' )
             res2 = self.__doc__.replace( '    ' , '' )
             res = ''.join ( [ i for i in res2.split('\n') if i != '' and '@author' not in i ] )
@@ -135,7 +135,7 @@ class basePlugin(configurable):
                     reportedVARs.append( (i.getURL(), i.getVar()) )
                     inform.append( i )
         
-        elif unique == None:
+        elif unique is None:
             inform = infoObjList
             
         else:
@@ -199,10 +199,7 @@ class basePlugin(configurable):
         '''
         This function is called when extending a list of plugin instances.
         '''
-        if self.__class__.__name__ == other.__class__.__name__:
-            return True
-        else:
-            return False
+        return self.__class__.__name__ == other.__class__.__name__
     
     def end( self ):
         '''

@@ -19,10 +19,6 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
-
-if __name__ == '__main__':
-    import sys
-    sys.path.insert(0, '/home/dz0/w3af/w3af/trunk')
     
 from core.controllers.daemons.proxy import proxy
 from core.controllers.daemons.proxy import w3afProxyHandler
@@ -74,7 +70,7 @@ class w3afLocalProxyHandler(w3afProxyHandler):
                 head,  body = self.server.w3afLayer._editedRequests[ id(fuzzReq) ]
                 del self.server.w3afLayer._editedRequests[ id(fuzzReq) ]
                 
-                if head == body == None:
+                if head == body is None:
                     # The request was dropped!
                     # We close the connection to the browser and exit
                     self.rfile.close()

@@ -78,7 +78,6 @@ from . import scanrun, exploittab, helpers, profiles, craftedRequests, compare, 
 from . import export_request
 from . import entries, encdec, messages, logtab, pluginconfig, confpanel
 from . import wizard, guardian, proxywin
-from . import exception_handler
 
 from core.controllers.misc.homeDir import get_home_dir
 from core.controllers.misc.get_w3af_version import get_w3af_version
@@ -492,7 +491,7 @@ class MainApp(object):
         
         # We know that we have focus.... but... is the selection a plugin ?
         (path, column) = treeToUse.get_cursor()
-        if path != None and len(path) > 1:
+        if path is not None and len(path) > 1:
             # Excellent! it is over a plugin!
             # enable the menu option
             ag = self._actiongroup.get_action("EditPlugin")

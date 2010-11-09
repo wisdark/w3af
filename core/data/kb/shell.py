@@ -24,13 +24,12 @@ from core.data.kb.vuln import vuln as vuln
 from core.controllers.misc.commonAttackMethods import commonAttackMethods
 from core.data.kb.exploitResult import exploitResult
 from core.controllers.w3afException import w3afException
-from core.controllers.intrusionTools.execMethodHelpers import *
+from core.controllers.intrusionTools.readMethodHelpers import read_os_detection
+import core.data.parsers.urlParser as urlParser
 
 import plugins.attack.payloads.payload_handler as payload_handler
+import core.controllers.outputManager as om
 
-# python stuff
-import time
-import os
 
 
 class shell(vuln, exploitResult, commonAttackMethods):
@@ -82,57 +81,48 @@ class shell(vuln, exploitResult, commonAttackMethods):
         '''
         om.out.console('Available commands:')
         om.out.console('    help                            Display this information')
-        om.out.console('    start vdaemon                   Start the virtual daemon')
-        om.out.console('    start w3afAgent                 Start the w3afAgent service')
-        om.out.console('    endInteraction                  Exit the shell session')
+        om.out.console('    lsp                             List the available payloads')        
+        om.out.console('    exit                            Exit the shell session')
         om.out.console('')
         om.out.console('All the other commands are executed on the remote server.')
         return True
+
+    def generic_user_input( self, command ):
+        '''
+        This is the method that is called when a user wants to execute something in the shell.
         
-    def rexec( self, command ):
+        First, I trap the requests for starting the virtual daemon and the w3afAgent, and if this is not the
+        case, I forward the request to the specific_user_input method which should be implemented by all shellAttackPlugins.
         '''
-        This is the method that is called when a user wants to execute something in the remote operating system.
-        First, I trap the requests for starting the virtual daemon and the w3afAgent, and if this isn not the
-        case, I forward the request to the _rexec method which should be implemented by all shellAttackPlugins.
-        '''
+        # Get the command and the parameters
+        original_command = command
+        parameters = command.split(' ')[1:]
+        command = command.split(' ')[0]
+        
+        #
+        #    Commands that are common to all shells:
+        #
         if command.strip() == 'help':
-            self.help( command )
-        if command == 'start vdaemon':
-            # start a vdaemon!
-            # (advanced exploitation)
-            from core.controllers.vdaemon.vdFactory import getVirtualDaemon
-            try:
-                vd = getVirtualDaemon(self._rexec)
-            except w3afException, w3:
-                return 'Error' + str(w3)
-            else:
-                vd.setRemoteIP( urlParser.getDomain( self.getURL() )  )
-                vd.start2()
-                # Let the server start
-                time.sleep(0.1)
-                return 'Successfully started the virtual daemon.'
-        elif command == 'start w3afAgent':
-            # start a w3afAgent, to do this, I must transfer the agent client to the
-            # remote end and start the w3afServer in this local machine
-            # all this work is done by the w3afAgentManager, I just need to called
-            # start and thats it.
-            from core.controllers.w3afAgent.w3afAgentManager import w3afAgentManager
-            try:
-                agentManager = w3afAgentManager(self._rexec)
-            except w3afException, w3:
-                return 'Error' + str(w3)
-            else:
-                agentManager.run()
-                return 'Successfully started the w3afAgent.'
-        elif hasattr( self, '_rexec'):
-            # forward to the plugin
-            return self._rexec( command )
-        else:
-            raise w3afException('Plugins inhereting from baseShellAttackPlugin should implement the _rexec method.')
+            return self.help( command )
+            
+        elif command == 'payload':
+            #
+            #    Run the payload
+            #
+            payload_name = parameters[0]
+            return self._payload( payload_name, parameters[1:] )
+        
+        elif command == 'lsp':
+            #
+            #    Based on the syscalls that we have available, list the payloads
+            #    that can be run
+            #
+            return self._print_runnable_payloads()
+
 
     def end_interaction(self):
         '''
-        When the user executes endInteraction in the console, this method is called.
+        When the user executes "exit" in the console, this method is called.
         Basically, here we handle WHAT TO DO in that case. In most cases (and this is
         why we implemented it this way here) the response is "yes, do it end me" that
         equals to "return True".
@@ -142,29 +132,36 @@ class shell(vuln, exploitResult, commonAttackMethods):
         '''
         return True
 
-    def _rexec( self, command ):
+    def specific_user_input( self, command ):
         '''
-        This method should be implemented by all of the classes that inherit from this one.
-        rexec is called when a command is being sent to the remote server.
-        This is a NON-interactive shell.
+        This method is called when a user writes a command in the shell and hits enter.
+        
+        Recommendation: Overwrite this in your customized shells
+        
+        Before calling this method, the framework calls the generic_user_input method
+        from the shell class.
 
-        @parameter command: The command to send ( ie. "ls", "whoami", etc ).
+        @parameter command: The command to handle ( ie. "read", "exec", etc ).
         @return: The result of the command.
         '''
-        raise w3afException('You should implement the _rexec method of classes that inherit from "shell"')
+        pass
     
-    def _payload(self, payload_name):
+    def _payload(self, payload_name, parameters):
         '''
         Run a payload by name.
         
-        @parameter payload_name: The name of the payload I want to run.
+        @param payload_name: The name of the payload I want to run.
+        @param parameters: The parameters as sent by the user.
         '''
         result_str = ''
         
         if payload_name in payload_handler.runnable_payloads(self):
             om.out.debug( 'The payload can be run. Starting execution.' )
-            result = payload_handler.exec_payload( self,  payload_name)
-            result_str = '\n'.join(result)
+            # TODO: The payloads are actually writing to om.out.console
+            # by themselves, so this is useless. In order for the
+            # result_str = ... to work, we would need a refactoring
+            # what usually gets here, are errors.
+            result_str = payload_handler.exec_payload( self, payload_name, parameters)
         else:
             result_str = 'The payload could not be run.'
             
@@ -201,16 +198,11 @@ class shell(vuln, exploitResult, commonAttackMethods):
         '''
         Identify the remote operating system and get some remote variables to show to the user.
         '''
-        self._rOS = osDetectionExec( self.rexec )
-        if self._rOS == 'linux':
-            self._rUser = self.rexec('whoami').strip()
-            self._rSystem = self.rexec('uname -o -r -n -m -s').strip()
-            self._rSystemName = self.rexec('uname -n').strip()
-        elif self._rOS == 'windows':
-            self._rUser = self.rexec('echo %USERDOMAIN%\%USERNAME%').strip()
-            self._rSystem = self.rexec('echo %COMPUTERNAME% - %OS% - %PROCESSOR_IDENTIFIER%').strip()
-            self._rSystemName = self.rexec('echo %COMPUTERNAME%').strip()
-        
+        self._rUser = 'generic'
+        self._rSystem = 'generic'
+        self._rSystemName = 'generic'
+        self._rOS = 'generic'
+            
     def __repr__( self ):
         if not self._rOS:
             self._identifyOs()

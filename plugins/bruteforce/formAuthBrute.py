@@ -25,7 +25,7 @@ import core.controllers.outputManager as om
 from core.controllers.basePlugin.baseBruteforcePlugin import baseBruteforcePlugin
 from core.controllers.w3afException import w3afException
 from core.data.dc.form import form as form
-from core.controllers.misc.levenshtein import relative_distance
+from core.controllers.misc.levenshtein import relative_distance_ge
 from core.data.fuzzer.fuzzer import createRandAlNum
 
 import core.data.kb.knowledgeBase as kb
@@ -71,7 +71,7 @@ class formAuthBrute(baseBruteforcePlugin):
                 
                     # Let the user know what we are doing
                     om.out.information('Found a form login. The action of the form is: "' + freq.getURL() +'".')
-                    if self._user_field_name != None:
+                    if self._user_field_name is not None:
                         om.out.information('The username field to be used is: "' + self._user_field_name + '".')
                     om.out.information('The password field to be used is: "' + self._passwd_field_name + '".')
                     om.out.information('Starting form authentication bruteforce on URL: "' + freq.getURL() + '".')
@@ -88,7 +88,7 @@ class formAuthBrute(baseBruteforcePlugin):
                             #   Two different cases, one for user/password forms, the other for
                             #   password only forms.
                             #
-                            if self._user_field_name != None:
+                            if self._user_field_name is not None:
                                 #   user/pass form:
                                 try:
                                     combinations.append( self._bruteforcer.getNext() )
@@ -135,7 +135,7 @@ class formAuthBrute(baseBruteforcePlugin):
         for user, passwd in tests:
             #   Setup the data_container
             #   Remember that we can have password only forms!
-            if self._user_field_name != None:
+            if self._user_field_name is not None:
                 data_container[ self._user_field_name ][0] = user
             data_container[ self._passwd_field_name ][0] = passwd
             freq.setDc( data_container )
@@ -157,7 +157,7 @@ class formAuthBrute(baseBruteforcePlugin):
         for user, passwd in tests:
             # Now I do a self test of the result I just created.
             #   Remember that we can have password only forms!
-            if self._user_field_name != None:
+            if self._user_field_name is not None:
                 data_container[ self._user_field_name ][0] = user
             data_container[ self._passwd_field_name ][0] = passwd
             freq.setDc( data_container )
@@ -171,16 +171,14 @@ class formAuthBrute(baseBruteforcePlugin):
                 raise w3afException('Failed to generate a response that matches the failed login page.')
     
     
-    def _matchesFailedLogin(self, response_body):
+    def _matchesFailedLogin(self, resp_body):
         '''
-        @return: True if the response_body matches the previously created responses that
+        @return: True if the resp_body matches the previously created responses that
         are stored in self._login_failed_result_list.
-        '''
-        # In the ratio, 1 is completely equal.
-        ratio0 = relative_distance( response_body, self._login_failed_result_list[0])
-        ratio1 = relative_distance( response_body, self._login_failed_result_list[1])
-        
-        if ratio0 > 0.65 or ratio1 > 0.65:
+        '''        
+        # 0.65 gives a good measure of similarity
+        if relative_distance_ge(resp_body, self._login_failed_result_list[0], 0.65) or \
+            relative_distance_ge(resp_body, self._login_failed_result_list[1], 0.65):
             return True
         else:
             # I'm happy! The response_body IS NOT a failed login page.
@@ -275,7 +273,7 @@ class formAuthBrute(baseBruteforcePlugin):
         #   Ok, now we start with the real bruteforcing!
         for combination in combinations:
             #   Remember that we can have password only forms!
-            if self._user_field_name != None:
+            if self._user_field_name is not None:
                 data_container[ self._user_field_name ][0] = combination[0]
             data_container[ self._passwd_field_name ][0] = combination[1]
             freq.setDc( data_container )
@@ -293,7 +291,7 @@ class formAuthBrute(baseBruteforcePlugin):
                     v = vuln.vuln()
                     v.setURL( freq.getURL() )
                     v.setId(response.id)
-                    if self._user_field_name != None:
+                    if self._user_field_name is not None:
                         msg = 'Found authentication credentials to: "'+ freq.getURL()
                         msg += '". A correct user and password combination is: ' + combination[0]
                         msg += '/' + combination[1]

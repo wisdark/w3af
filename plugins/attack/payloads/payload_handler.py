@@ -22,9 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import os
 import sys
-#import core.controllers.outputManager as om
 
 PAYLOAD_PATH= os.path.join('plugins','attack','payloads','payloads')
+
 
 def payload_to_file( payload_name ):
     '''
@@ -39,21 +39,44 @@ def is_payload( function_name ):
     '''
     return function_name in get_payload_list()
     
-def exec_payload(shell_obj, payload_name, use_api=False):
+def exec_payload(shell_obj, payload_name, parameters=[], use_api=False):
     '''
     Now I execute the payload, by providing the shell_obj.
     
-    @parameter shell_obj: The shell object instance.
-    @parameter payload_name: The name of the payload I want to run.
+    @param shell_obj: The shell object instance where I get the syscalls from.
+                      If this is set to None, the handler will choose a shell from
+                      the KB that provide the necessary syscalls. 
+    @param payload_name: The name of the payload I want to run.
+    @param parameters: A list with the parameters (strings) the user typed. 
     @use_api: Indicates if I need to use the API or not in this run. This is True when
                     exec_payload is called from base_payload.exec_payload()
+                    
     @return: The payload result.
     '''
+    if shell_obj is None:
+        #
+        #    I have to go to the KB, and filter the shell objects that are available there
+        #    using the syscalls they provide and the syscalls I need.
+        #
+        
+        #    The import needs to be here, don't ask why :P
+        import core.data.kb.knowledgeBase as kb
+        
+        available_shells = kb.kb.getAllShells()
+        for shell in available_shells:
+            print shell
+            if payload_name in runnable_payloads( shell ):
+                shell_obj = shell
+                break
+    
+    #
+    #    Now that I have everything ready, lets run the payload
+    #
     payload_inst = get_payload_instance(payload_name, shell_obj)
     if use_api:
-        result = payload_inst.run_api()
+        result = payload_inst.run_api(parameters)
     else:
-        result = payload_inst.run()
+        result = payload_inst.run(parameters)
     return result
     
 def runnable_payloads(shell_obj):

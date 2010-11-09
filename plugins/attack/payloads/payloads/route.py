@@ -1,11 +1,13 @@
 import re
 from plugins.attack.payloads.base_payload import base_payload
+from core.ui.consoleUi.tables import table
+
 
 class route(base_payload):
     '''
     This payload shows the IP Routing Table.
     '''
-    def api_read(self):
+    def api_read(self, parameters):
         result = {}
         result['route'] = []
         list = []
@@ -42,17 +44,20 @@ class route(base_payload):
  
         return result
     
-    def run_read(self):
-        hashmap = self.api_read()
-        result = []
-        if hashmap:
-            result.append('Iface'.ljust(20)+'Destination'.ljust(20)+'Gateway'.ljust(20)+'Mask'.ljust(20))
-            for hashmaps in hashmap['route']:
-                    new = hashmaps['Iface'].ljust(20)+\
-                    hashmaps['Destination'].ljust(20)+\
-                    hashmaps['Gateway'].ljust(20)+\
-                    hashmaps['Mask'].ljust(20)
-                    result.append(new)
-        if result == [ ]:
-            result.append('Route information not found.')
-        return result
+    def run_read(self, parameters):
+        api_result = self.api_read( parameters )
+        
+        if not api_result['route']:
+            return 'Remote host routes could not be retrieved.'
+        else:
+            rows = []
+            rows.append( ['Interface', 'Destination', 'Gateway', 'Mask'] ) 
+            rows.append( [] )
+            for a_route in api_result['route']:
+                rows.append( [ a_route['Iface'],a_route['Destination'],a_route['Gateway'],a_route['Mask']] )
+
+            result_table = table( rows )
+            result_table.draw( 80 )                    
+
+            return
+        

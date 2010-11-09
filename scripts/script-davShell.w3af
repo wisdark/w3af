@@ -25,10 +25,13 @@ exploit davShell
 
 interact
 interact 0
-ls
-w
 
-endInteraction
+execute ls
+execute w
+read /etc/passwd
+payload tcp
+
+exit
 back
 assert len(kb.kb.getData('davShell','shell')) == 1
 

