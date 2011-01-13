@@ -20,14 +20,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-import traceback
+import os
 
-import core.data.kb.knowledgeBase as kb        
+from core.controllers.auto_update import VersionMgr
+from core.controllers.w3afException import w3afException
 from core.ui.consoleUi.util import *
 from core.ui.consoleUi.history import *
 from core.ui.consoleUi.help import *
 import core.controllers.outputManager as om
-from core.controllers.w3afException import w3afException
+import core.data.kb.knowledgeBase as kb
 
 
 class menu:
@@ -218,6 +219,19 @@ class menu:
             om.out.console('Unknown variable.')
         else:
             om.out.console( repr(res) )
+    
+    def _cmd_update(self, params):
+        # TODO: pass 'console' output as param
+        vmgr = VersionMgr(os.getcwd())
+        om.out.console('Checking if a new version is available in our code ' \
+                       'repo. Please wait...')
+        is_avail = vmgr.is_update_avail()
+        if is_avail:
+            om.out.console('w3af is updating from repo')
+#           files = vmgr.update()
+            
+        else:
+            om.out.console('Nothing to update. Your w3af version is up-to-date!')
 
 
     def _cmd_assert(self, params):

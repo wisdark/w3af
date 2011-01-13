@@ -39,6 +39,52 @@ try:
 except KeyboardInterrupt:
     sys.exit(0)
 
+
+### TODO: Move it away from here #############################################
+FREQ_DAILY = 'D'
+FREQ_WEEKLY = 'W'
+FREQ_MONTHLY = 'M'
+
+
+def load_start_config():
+    '''
+    Loads w3af startup configuration from startup.conf file
+    
+    @return: Return tuple with format (auto_upd, freq) where 'auto_upd' is a
+    boolean value and 'freq' in ('D', 'W' ,'M') meaning 'Daily', 'Weekly' and
+    'Monthly'.
+    '''
+    import ConfigParser
+    defaults = {'auto-update': 'false', 'frequency': 'D'}
+    config = ConfigParser.ConfigParser(defaults)
+    sectionname = 'StartConfig'
+    try:
+        config.read('startup.conf')
+    except:
+        om.out.error('Error while reading start config file: startup.conf')
+    else:
+        auto_upd = config.get(sectionname, 'auto-update', raw=True)
+        boolvals = {'false': 0, 'off': 0, 'no': 0,
+                    'true': 1, 'on': 1, 'yes': 1}
+        auto_upd = bool(boolvals.get(auto_upd.lower(), False))
+        freq = config.get(sectionname, 'frequency', raw=True).upper()
+        if freq not in (FREQ_DAILY, FREQ_WEEKLY, FREQ_MONTHLY):
+            freq = FREQ_DAILY
+        return (auto_upd, freq)
+
+def check_update():
+    '''
+    Analyzes input paramaters and determines if a code update should be
+    performed.
+    '''
+    auto_upd, freq = load_start_config()
+    return auto_upd
+
+##############################################################################
+
+
+# check_update()
+
 class consoleUi:
     '''
     This class represents the console. 
@@ -47,33 +93,40 @@ class consoleUi:
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
 
-    def __init__(self, commands=[], parent=None):
+    def __init__(self, commands=[], parent=None, checkupd=None):
         self._commands = commands 
         self._line = [] # the line which is being typed
         self._position = 0 # cursor position
         self._history = historyTable() # each menu has array of (array, positionInArray)
         self._trace = []
+        self._upd_avail = False
+        
+        if checkupd is None:
+            checkupd = check_update()
+        if checkupd:
+            self._commands.append('update')
 
-        self._handlers = { '\t' : self._onTab, \
-            '\r' : self._onEnter, \
-            term.KEY_BACKSPACE : self._onBackspace, \
-            term.KEY_LEFT : self._onLeft, \
-            term.KEY_RIGHT : self._onRight, \
-            term.KEY_UP : self._onUp, \
-            term.KEY_DOWN : self._onDown, \
-            '^C' : self._backOrExit, \
+        self._handlers = {
+            '\t' : self._onTab,
+            '\r' : self._onEnter,
+            term.KEY_BACKSPACE : self._onBackspace,
+            term.KEY_LEFT : self._onLeft,
+            term.KEY_RIGHT : self._onRight,
+            term.KEY_UP : self._onUp,
+            term.KEY_DOWN : self._onDown,
+            '^C' : self._backOrExit,
             '^D' : self._backOrExit,
             '^L' : self._clearScreen,
             '^W' : self._delWord,
             '^H' : self._onBackspace,
             '^A' : self._toLineStart,
-            '^E' : self._toLineEnd } 
+            '^E' : self._toLineEnd
+        }
 
         if parent:
             self.__initFromParent(parent)
         else:
             self.__initRoot()
-
 
     def __initRoot(self):
         self._w3af = core.controllers.w3afCore.w3afCore()
