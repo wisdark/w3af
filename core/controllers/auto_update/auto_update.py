@@ -8,6 +8,8 @@ from __future__ import with_statement
 import os
 import threading
 
+DEBUG = True
+
 
 class SVNError(Exception):
     pass
@@ -56,9 +58,9 @@ except:
     raise
 
 # Actions on files
-FILE_UPD = 1 # Updated
-FILE_NEW = 2 # New
-FILE_DEL = 3 # Removed
+FILE_UPD = 'UPD' # Updated
+FILE_NEW = 'NEW' # New
+FILE_DEL = 'DEL' # Removed
 
 wcna = pysvn.wc_notify_action
 pysvn_action_translator = {
@@ -111,7 +113,10 @@ class W3afSVNClient(SVNClient):
         
         
     def _get_svn_info(self, path_or_url):
-        return self._svnclient.info2(path_or_url, recurse=False)[0][1]
+        try:
+            return self._svnclient.info2(path_or_url, recurse=False)[0][1]
+        except pysvn.ClientError, ce:
+            raise SVNUpdateError(*ce.args)
     
     def need_to_update(self):
         '''
@@ -135,10 +140,9 @@ class W3afSVNClient(SVNClient):
             except pysvn.ClientError, ce:
                 raise SVNUpdateError(*ce.args)
             else:
-                # Use our Revision class
-                rev = Revision(pysvn_rev.number, pysvn_rev.date)
                 updfiles = self._filter_files(self.UPD_ACTIONS)
-                return (rev, updfiles)
+                updfiles.rev = Revision(pysvn_rev.number, pysvn_rev.date)
+                return updfiles
     
     def commit(self):
         '''
@@ -160,22 +164,22 @@ class W3afSVNClient(SVNClient):
             except Exception:
                 raise
             else:
-                return \
-                    [(ent.path, pysvn_status_translator.get(ent.text_status,
+                res = [(ent.path, pysvn_status_translator.get(ent.text_status,
                                               ST_UNKNOWN)) for ent in entries]
+                return SVNFilesList(res)
 
     def _filter_files(self, filterbyactions=()):
         '''
         Filter... Return files-actions
         @param filterby: 
         '''
-        files = []
+        files = SVNFilesList()
         for ev in self._events:
             action = ev['action']
             if action in filterbyactions:
                 path = ev['path']
                 if os.path.isfile(path):
-                    files.append((path, pysvn_action_translator[action]))
+                    files.append(path, pysvn_action_translator[action])
         return files
     
     def _register(self, event):
@@ -203,6 +207,47 @@ class Revision(object):
     def number(self):
         return self._number
 
+
+class SVNFilesList(list):
+    '''
+    Wrapper for python list type. It may contain the number of the current
+    revision and perform a 'smart' data (file paths along with their statuses)
+    printing.
+    '''
+    def __init__(self, seq=(), rev=None):
+        '''
+        @param rev: Revision object
+        '''
+        list.__init__(self, seq)
+        self._rev = rev
+        self._sorted = True
+
+    def _getrev(self):
+        return self._rev
+
+    def _setrev(self, rev):
+        self._rev = rev
+
+    # TODO: Cannot use *full* decorators as we're still on py2.5
+    rev = property(_getrev, _setrev)
+
+    def append(self, path, status):
+        list.append(self, (path, status))
+        self._sorted = False
+
+    def __str__(self):
+        # First sort by status
+        sortfunc = lambda x, y: cmp(x[1], y[1])
+        self.sort(cmp=sortfunc)
+        print_list = ['%s    %s' % (f, s) for s, f in self]
+        if self._rev:
+            print_list.append('At revision %s.' % self._rev.number)
+        return os.linesep.join(print_list)
+    
+    def __eq__(self, olist):
+        return list.__eq__(self, olist) and self._rev == olist.rev
+        
+
 # Use this class to perform svn actions on code
 SVNClientClass = W3afSVNClient
 
@@ -210,19 +255,43 @@ SVNClientClass = W3afSVNClient
 # Facade class. Intended to be used to to interact with the module
 class VersionMgr(object): #TODO: Make it singleton?
     
+    ON_UPDATE = 1
+    ON_UPDATE_CHECK = 2
+    ON_COMMIT = 3
+    
     def __init__(self, localpath):
         # TODO: see exceptions here
         self._client = SVNClientClass(localpath)
+        self._reg_funcs = {}
     
     def is_update_avail(self):
+        self._notify(VersionMgr.ON_UPDATE_CHECK)
         return self._client.need_to_update()
     
     def update(self):
+        self._notify(VersionMgr.ON_UPDATE)
+        if DEBUG:
+            files = [('/some/path/foo', 'M'), ('/some/path/foo2', 'C'),
+                        ('/some/path/foo3', 'N')]
+            files = SVNFilesList(files, Revision(12, None))
+            return files
         return self._client.update()
     
     def status(self, path=None):
         return self._client.status(path)
     
     def commit(self):
-        pass
+        self._notify(VersionMgr.ON_COMMIT)
+        # TODO: Add implementation
+    
+    def register(self, eventname, func, *args):
+        funcs = self._reg_funcs.setdefault(eventname, [])
+        funcs.append((func, args))
+    
+    def _notify(self, event):
+        '''
+        Call registered functions for event.
+        '''
+        for f, args in self._reg_funcs.get(event, []):
+            f(*args)
 
