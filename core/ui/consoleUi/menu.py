@@ -236,7 +236,8 @@ class menu:
             is_avail = vmgr.is_update_avail()
             if is_avail:
                 files = vmgr.update()
-                log(str(files))
+                if files:
+                    log(str(files))
             else:
                 log('Nothing to update. Your w3af version is up-to-date!')
         except SVNError, svnerr:

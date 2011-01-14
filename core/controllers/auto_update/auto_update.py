@@ -8,7 +8,8 @@ from __future__ import with_statement
 import os
 import threading
 
-DEBUG = True
+
+DEBUG = 0
 
 
 class SVNError(Exception):
@@ -49,6 +50,10 @@ class SVNClient(object):
     
     def status(self, path=None):
         pass
+    
+    def list(self, path_or_url=None):
+        pass
+    
 
 
 # See what TODO: here
@@ -110,7 +115,10 @@ class W3afSVNClient(SVNClient):
         '''
         svninfo = self._get_svn_info(self._localpath)
         return svninfo.URL
-        
+    
+    @property
+    def URL(self):
+        return self._repourl        
         
     def _get_svn_info(self, path_or_url):
         try:
@@ -161,12 +169,29 @@ class W3afSVNClient(SVNClient):
             path = localpath or self._localpath
             try:
                 entries = self._svnclient.status(path, recurse=False)
-            except Exception:
-                raise
+            except pysvn.ClientError, ce:
+                raise SVNError(*ce)
             else:
                 res = [(ent.path, pysvn_status_translator.get(ent.text_status,
                                               ST_UNKNOWN)) for ent in entries]
                 return SVNFilesList(res)
+    
+    def list(self, path_or_url=None):
+        '''
+        TODO: Add docstring.
+        '''
+        with self._actionlock:
+            if not path_or_url:
+                path_or_url = self._localpath
+            try:
+                entries = self._svnclient.list(path_or_url, recurse=False)
+            except pysvn.ClientError, ce:
+                raise SVNError(*ce)
+            else:
+                res = [(ent.path, None) for ent, _ in entries]
+                return SVNFilesList(res)
+                
+        
 
     def _filter_files(self, filterbyactions=()):
         '''
@@ -255,14 +280,15 @@ SVNClientClass = W3afSVNClient
 # Facade class. Intended to be used to to interact with the module
 class VersionMgr(object): #TODO: Make it singleton?
     
+    # Events
     ON_UPDATE = 1
     ON_UPDATE_CHECK = 2
     ON_COMMIT = 3
     
     def __init__(self, localpath):
-        # TODO: see exceptions here
+        self._localpath = localpath
         self._client = SVNClientClass(localpath)
-        self._reg_funcs = {}
+        self._reg_funcs = {} # Registered functions
     
     def is_update_avail(self):
         self._notify(VersionMgr.ON_UPDATE_CHECK)
@@ -270,12 +296,38 @@ class VersionMgr(object): #TODO: Make it singleton?
     
     def update(self):
         self._notify(VersionMgr.ON_UPDATE)
+        
         if DEBUG:
             files = [('/some/path/foo', 'M'), ('/some/path/foo2', 'C'),
                         ('/some/path/foo3', 'N')]
             files = SVNFilesList(files, Revision(12, None))
             return files
-        return self._client.update()
+        
+        client = self._client
+        #
+        # Check if a new directory was added to extlib
+        #
+        ospath = os.path
+        join = ospath.join
+        # Find dirs in repo
+        repourl = self._client.URL + '/' + 'extlib'
+        # In repo we distinguish dirs from files by the dot (.) presence
+        repodirs = (ospath.basename(d) for d, _ in client.list(repourl)[1:] \
+                                        if ospath.basename(d).find('.') == -1)
+        # Get local dirs
+        extliblocaldir = join(self._localpath, 'extlib')
+        extlibcontent = (join(extliblocaldir, f) for f in \
+                                                os.listdir(extliblocaldir))
+        localdirs = (ospath.basename(d) for d in extlibcontent \
+                                                        if ospath.isdir(d))
+        # At least one dir was added to the repo. We're not interested on
+        # performing the update
+        if set(repodirs).difference(set(localdirs)):
+            msg = 'A new dependency was included in w3af. Please update ' \
+            'manually.'
+            self._notify(VersionMgr.ON_UPDATE, msg)
+            return []
+        return client.update()
     
     def status(self, path=None):
         return self._client.status(path)
@@ -284,14 +336,15 @@ class VersionMgr(object): #TODO: Make it singleton?
         self._notify(VersionMgr.ON_COMMIT)
         # TODO: Add implementation
     
-    def register(self, eventname, func, *args):
+    def register(self, eventname, func, msg):
         funcs = self._reg_funcs.setdefault(eventname, [])
-        funcs.append((func, args))
+        funcs.append((func, msg))
     
-    def _notify(self, event):
+    def _notify(self, event, msg=''):
         '''
-        Call registered functions for event.
+        Call registered functions for event. If `msg` is not empty then force
+        to call the registered functions with `msg`.
         '''
-        for f, args in self._reg_funcs.get(event, []):
-            f(*args)
+        for f, _msg in self._reg_funcs.get(event, []):
+            f(msg or _msg)
 
