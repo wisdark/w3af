@@ -322,11 +322,12 @@ class VersionMgr(object): #TODO: Make it singleton?
                                                         if ospath.isdir(d))
         # At least one dir was added to the repo. We're not interested on
         # performing the update
-        if set(repodirs).difference(set(localdirs)):
-            msg = 'A new dependency was included in w3af. Please update ' \
-            'manually.'
+        deps = set(repodirs).difference(localdirs)
+        if deps:
+            msg = 'At least one new dependency (%s) was included in w3af. ' \
+            'Please update manually.' % str(', '.join(deps))
             self._notify(VersionMgr.ON_UPDATE, msg)
-            return []
+            return ()
         return client.update()
     
     def status(self, path=None):
