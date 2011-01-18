@@ -36,6 +36,7 @@ from core.data.fuzzer.fuzzer import createRandAlNum
 from core.controllers.misc.levenshtein import relative_distance_lt
 
 import urllib
+import os
 
 
 class afd(baseDiscoveryPlugin):
