@@ -37,6 +37,33 @@ from core.controllers.misc.levenshtein import relative_distance_lt
 
 import urllib
 
+'''
+wsdasda
+sdasdasdasd
+asdasdasdasdasdasd
+asdasdasdasdasdasdasdasdasdasdasd
+asdasdasdasd
+asdasdasdasd
+a
+
+
+asd
+asd
+asd
+a
+sd
+asd
+asd
+asd
+asdasdasdasdasdasdasdasdasdsadasdASDFASDASDASDVASDFASDASDSDFER
+GVDWIUDVSUIDFEDSds;uyfdeiusdasdudsflsdfl;IHFCYPL;YDFHLPOA L;OIUF;PSDYHYHFcpcv
+'''
+
+
+import os.path
+
+from os import path
+
 
 class afd(baseDiscoveryPlugin):
     '''
