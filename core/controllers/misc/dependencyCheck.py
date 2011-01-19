@@ -22,7 +22,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import core.controllers.outputManager as om
 import sys
-import subprocess
 
 # Use w3af's 'extlib' modules first. By doing this we ensure that modules
 # in 'w3af/extlib/' are first imported over python installation 'site-packages/'
@@ -93,6 +92,14 @@ def dependencyCheck():
     except:
         msg = 'You have to install python libxml2 wrapper. \n'
         msg += '    - On Debian based distributions: apt-get install python-lxml'
+        print msg
+        sys.exit( 1 )
+    
+    try:
+        import pysvn
+    except:
+        msg = 'You have to install python pysvn lib. \n'
+        msg += '    - On Debian based distributions:  apt-get install python-svn'
         print msg
         sys.exit( 1 )
 

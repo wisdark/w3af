@@ -23,8 +23,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import sys
 try:
     from shlex import *
-    import os.path
+    import os
+    import random
     import traceback
+
+    from core.controllers.auto_update import VersionMgr, SVNError
     from core.ui.consoleUi.rootMenu import *
     from core.ui.consoleUi.callbackMenu import *
     from core.ui.consoleUi.util import *
@@ -35,55 +38,9 @@ try:
     import core.controllers.outputManager as om
     import core.controllers.miscSettings as miscSettings
     from core.controllers.w3afException import w3afException
-    import random
 except KeyboardInterrupt:
     sys.exit(0)
 
-
-### TODO: Move it away from here #############################################
-FREQ_DAILY = 'D'
-FREQ_WEEKLY = 'W'
-FREQ_MONTHLY = 'M'
-
-
-def load_start_config():
-    '''
-    Loads w3af startup configuration from startup.conf file
-    
-    @return: Return tuple with format (auto_upd, freq) where 'auto_upd' is a
-    boolean value and 'freq' in ('D', 'W' ,'M') meaning 'Daily', 'Weekly' and
-    'Monthly'.
-    '''
-    import ConfigParser
-    defaults = {'auto-update': 'false', 'frequency': 'D'}
-    config = ConfigParser.ConfigParser(defaults)
-    sectionname = 'StartConfig'
-    try:
-        config.read('startup.conf')
-    except:
-        om.out.error('Error while reading start config file: startup.conf')
-    else:
-        auto_upd = config.get(sectionname, 'auto-update', raw=True)
-        boolvals = {'false': 0, 'off': 0, 'no': 0,
-                    'true': 1, 'on': 1, 'yes': 1}
-        auto_upd = bool(boolvals.get(auto_upd.lower(), False))
-        freq = config.get(sectionname, 'frequency', raw=True).upper()
-        if freq not in (FREQ_DAILY, FREQ_WEEKLY, FREQ_MONTHLY):
-            freq = FREQ_DAILY
-        return (auto_upd, freq)
-
-def check_update():
-    '''
-    Analyzes input paramaters and determines if a code update should be
-    performed.
-    '''
-    auto_upd, freq = load_start_config()
-    return auto_upd
-
-##############################################################################
-
-
-# check_update()
 
 class consoleUi:
     '''
@@ -100,11 +57,6 @@ class consoleUi:
         self._history = historyTable() # each menu has array of (array, positionInArray)
         self._trace = []
         self._upd_avail = False
-        
-        if checkupd is None:
-            checkupd = check_update()
-        if checkupd:
-            self._commands.append('update')
 
         self._handlers = {
             '\t' : self._onTab,
@@ -126,11 +78,22 @@ class consoleUi:
         if parent:
             self.__initFromParent(parent)
         else:
-            self.__initRoot()
+            self.__initRoot(checkupd)
 
-    def __initRoot(self):
+    def __initRoot(self, checkupd):
+        '''
+        Root menu init routine.
+        '''
         self._w3af = core.controllers.w3afCore.w3afCore()
         self._w3af.setPlugins(['console'], 'output')
+        
+        if checkupd:
+            log = om.out.console
+            vmgr = VersionMgr(localpath=os.getcwd(), log=log)
+            msg = 'Checking if a new version is available in our code repo. ' \
+            'Please wait...'
+            vmgr.register(vmgr.ON_UPDATE, log, msg)
+            vmgr.update(askvalue=raw_input, print_result=True, show_log=True)
        
     def __initFromParent(self, parent):
         self._context = parent._context
@@ -177,7 +140,6 @@ class consoleUi:
     def _executePending(self):
         while (self._commands):
             curCmd, self._commands = self._commands[0], self._commands[1:]
-
             self._paste(curCmd)
             self._onEnter()
 

@@ -20,9 +20,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-import os
-
-from core.controllers.auto_update import VersionMgr, SVNError
 from core.controllers.w3afException import w3afException
 from core.ui.consoleUi.util import *
 from core.ui.consoleUi.history import *
@@ -87,7 +84,7 @@ class menu:
         
         self._paramHandlers = {}
         for cmd in [c for c in dir(self) if c.startswith('_cmd_')]:
-            self._handlers[cmd[5:]] =  getattr(self, cmd)
+            self._handlers[cmd[5:]] = getattr(self, cmd)
 
         for cmd in self._handlers.keys():
             try:
@@ -219,31 +216,6 @@ class menu:
             om.out.console('Unknown variable.')
         else:
             om.out.console( repr(res) )
-    
-    def _cmd_update(self, params):
-        '''
-        Update command. Check against repo if a new version is available.
-        '''
-        vmgr = VersionMgr(os.getcwd())
-        log = om.out.console
-        msg = 'Checking if a new version is available in our code repo. ' \
-        'Please wait...'
-        vmgr.register(VersionMgr.ON_UPDATE_CHECK, log, msg)
-        msg = 'w3af is updating from repo...'
-        
-        try:
-            vmgr.register(VersionMgr.ON_UPDATE, log, msg)
-            is_avail = vmgr.is_update_avail()
-            if is_avail:
-                files = vmgr.update()
-                if files:
-                    log(str(files))
-            else:
-                log('Nothing to update. Your w3af version is up-to-date!')
-        except SVNError, svnerr:
-            om.out.error('An error occurred while updating from repo: %s' % \
-                         svnerr)
-
 
     def _cmd_assert(self, params):
         if not len(params):
