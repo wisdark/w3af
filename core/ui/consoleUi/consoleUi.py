@@ -93,7 +93,13 @@ class consoleUi:
             msg = 'Checking if a new version is available in our code repo. ' \
             'Please wait...'
             vmgr.register(vmgr.ON_UPDATE, log, msg)
-            vmgr.update(askvalue=raw_input, print_result=True, show_log=True)
+            try:
+                vmgr.update(askvalue=raw_input, print_result=True, show_log=True)
+            except SVNError, e:
+                om.out.error('An error occured while updating:\n%s' % e.args)
+            except KeyboardInterrupt:
+                pass
+                
        
     def __initFromParent(self, parent):
         self._context = parent._context

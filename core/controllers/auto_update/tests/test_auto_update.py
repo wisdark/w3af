@@ -11,7 +11,7 @@ sys.path.append('/home/jandalia/workspace2/w3af')
 
 from pymock import PyMockTestCase, method, override, dontcare, set_count
 
-from ..auto_update import W3afSVNClient, Revision, SVNFilesList, FILE_UPD, \
+from core.controllers.auto_update.auto_update import W3afSVNClient, Revision, SVNFilesList, FILE_UPD, \
     FILE_NEW, FILE_DEL, ST_CONFLICT, ST_MODIFIED, ST_UNKNOWN
 
 REPO_URL = 'http://localhost/svn/w3af'
@@ -87,7 +87,7 @@ class TestW3afSVNClient(PyMockTestCase):
         import pysvn
         from pysvn import wc_notify_action as wcna
         from pysvn import Revision
-        from ..auto_update import os
+        from core.controllers.auto_update.auto_update import os
         client = self.client
         override(os.path, 'isfile').expects(dontcare()).returns(True)
         set_count(exactly=2)

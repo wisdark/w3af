@@ -22,25 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from __future__ import with_statement
 from datetime import datetime, date, timedelta
 import os
+import time
 import ConfigParser
 import threading
-
-
-def exit_on_keyboard_interrupt(func):
-    '''
-    This decorator can be used to catch Keyboard interruption signals
-    and terminate the program successfuly.
-    '''
-    def new_func(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except KeyboardInterrupt:
-            import sys
-            sys.exit(0)
-    new_func.__name__ = func.__name__
-    new_func.__doc__ = func.__doc__
-    new_func.__dict__.update(func.__dict__)
-    return new_func
 
 
 class SVNError(Exception):
@@ -59,6 +43,9 @@ class SVNClient(object):
     '''
     Typically an abstract class. Intended to define behaviour. Not to be
     instantiated.
+    SVN implementations should extend from this class.
+    Implemented methods in child classes should potentially raise SVNError
+    exception (or descendant) when a condition error is found.
     '''
 
     def __init__(self, localpath):
@@ -75,31 +62,36 @@ class SVNClient(object):
 
     def update(self):
         '''
-        TODO: Add docstring.
+        Update local repo to last revision.
         '''
         raise NotImplementedError
 
     def commit(self):
         '''
-        TODO: Add docstring.
+        Commit to remote repo changes in local repo.
         '''
         raise NotImplementedError
 
     def status(self, path=None):
         '''
-        TODO: Add docstring.
+        Return a SVNFilesList object.
+        
+        @param localpath: Path to get the status from. If None use project's
+            root.
         '''
         raise NotImplementedError
 
     def list(self, path_or_url=None):
         '''
-        TODO: Add docstring.
+        Return a SVNFilesList. Elements are tuples containing the path and
+        the status for all files in `path_or_url` at the provided revision.
         '''
         raise NotImplementedError
 
     def diff(self, localpath, rev=None):
         '''
-        TODO: Add docstring.
+        Return string with the differences between `rev` and HEAD revision for
+        `localpath`
         '''
         raise NotImplementedError
 
@@ -137,15 +129,12 @@ pysvn_status_translator = {
 
 class W3afSVNClient(SVNClient):
     '''
-    TODO: Add docstring
+    Our wrapper for pysvn.Client class.
     '''
 
     UPD_ACTIONS = (wcna.update_add, wcna.update_delete, wcna.update_update)
 
     def __init__(self, localpath):
-        '''
-        TODO: Add docstring
-        '''
         self._svnclient = pysvn.Client()
         # Call parent's __init__
         super(W3afSVNClient, self).__init__(localpath)
@@ -153,15 +142,49 @@ class W3afSVNClient(SVNClient):
         self._svnclient.callback_notify = self._register
         # Events occurred in current action
         self._events = []
+    
+    def __getattribute__(self, name):
+        '''
+        Wrap all methods on order to be able to respond to Ctrl+C signals.
+        This implementation was added due to limitations in pysvn.
+        '''
+        def new_meth(*args, **kwargs):
+            def wrapped_meth(*args, **kwargs):
+                try:
+                    self._result = meth(*args, **kwargs)
+                    self._exc = None
+                except Exception, exc:
+                    if isinstance(exc, pysvn.ClientError):
+                        exc = SVNError(*exc.args)
+                    self._exc = exc
+            # Run wrapped_meth in new thread.
+            th = threading.Thread(target=wrapped_meth, args=args,
+                                  kwargs=kwargs)
+            th.setDaemon(True)
+            try:
+                th.start()
+                while th.isAlive():
+                    time.sleep(0.2)
+                try:
+                    if self._exc:
+                        raise self._exc
+                    return self._result
+                finally:
+                    self._exc = self._result = None
+            except KeyboardInterrupt:
+                raise
+        
+        attr = SVNClient.__getattribute__(self, name)
+        if callable(attr):
+            meth = attr
+            return new_meth
+        return attr
 
     @property
     def URL(self):
         return self._repourl
 
     def update(self):
-        '''
-        TODO: Add docstring
-        '''
         with self._actionlock:
             self._events = []
             try:
@@ -173,45 +196,23 @@ class W3afSVNClient(SVNClient):
                 updfiles.rev = Revision(pysvn_rev.number, pysvn_rev.date)
                 return updfiles
 
-    def commit(self):
-        '''
-        TODO: Add docstring
-        '''
-        pass
-
     def status(self, localpath=None):
-        '''
-        TODO: Add docstring
-        
-        @param localpath: Path to get the status from. If is None use project
-            root.
-        '''
         with self._actionlock:
             path = localpath or self._localpath
-            try:
-                entries = self._svnclient.status(path, recurse=False)
-            except pysvn.ClientError, ce:
-                raise SVNError(*ce)
-            else:
-                res = [(ent.path, pysvn_status_translator.get(ent.text_status,
-                                              ST_UNKNOWN)) for ent in entries]
-                return SVNFilesList(res)
+            entries = self._svnclient.status(path, recurse=False)            
+            res = [(ent.path, pysvn_status_translator.get(ent.text_status,
+                                          ST_UNKNOWN)) for ent in entries]
+            return SVNFilesList(res)
 
     def list(self, path_or_url=None):
-
         with self._actionlock:
             if not path_or_url:
                 path_or_url = self._localpath
-            try:
-                entries = self._svnclient.list(path_or_url, recurse=False)
-            except pysvn.ClientError, ce:
-                raise SVNError(*ce)
-            else:
-                res = [(ent.path, None) for ent, _ in entries]
-                return SVNFilesList(res)
+            entries = self._svnclient.list(path_or_url, recurse=False)
+            res = [(ent.path, None) for ent, _ in entries]
+            return SVNFilesList(res)
 
     def diff(self, localpath, rev=None):
-
         with self._actionlock:
             path = os.path.join(self._localpath, localpath)
             # If no rev is passed the compare to HEAD
@@ -418,11 +419,7 @@ class VersionMgr(object): #TODO: Make it singleton?
         # Startup configuration
         self._start_cfg = StartUpConfig()
 
-    def is_update_avail(self):
-        self._notify(VersionMgr.ON_UPDATE_CHECK)
-        return self._client.need_to_update()
 
-    @exit_on_keyboard_interrupt
     def update(self, askvalue=None, print_result=False, show_log=False):
         '''
         Perform code update if necessary.
@@ -484,10 +481,6 @@ class VersionMgr(object): #TODO: Make it singleton?
 
     def status(self, path=None):
         return self._client.status(path)
-
-    def commit(self):
-        #self._notify(VersionMgr.ON_COMMIT)
-        pass
 
     def register(self, eventname, func, msg):
         funcs = self._reg_funcs.setdefault(eventname, [])
