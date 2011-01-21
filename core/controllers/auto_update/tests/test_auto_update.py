@@ -11,8 +11,11 @@ sys.path.append('/home/jandalia/workspace2/w3af')
 
 from pymock import PyMockTestCase, method, override, dontcare, set_count
 
-from core.controllers.auto_update.auto_update import W3afSVNClient, Revision, SVNFilesList, FILE_UPD, \
-    FILE_NEW, FILE_DEL, ST_CONFLICT, ST_MODIFIED, ST_UNKNOWN
+from core.controllers.auto_update.auto_update import W3afSVNClient, Revision, \
+    VersionMgr, SVNFilesList, StartUpConfig, FILE_UPD, FILE_NEW, FILE_DEL, \
+    ST_CONFLICT, ST_MODIFIED, ST_UNKNOWN
+
+del W3afSVNClient.__getattribute__
 
 REPO_URL = 'http://localhost/svn/w3af'
 LOCAL_PATH = '/home/user/w3af'
@@ -62,7 +65,7 @@ class TestW3afSVNClient(PyMockTestCase):
 
     def test_upd_fail(self):
         from pysvn import ClientError
-        from ..auto_update import SVNUpdateError
+        from core.controllers.auto_update.auto_update import SVNUpdateError
         client = self.client
         method(client._svnclient, 'update').expects(LOCAL_PATH)
         self.raises(ClientError('file locked'))
@@ -89,7 +92,7 @@ class TestW3afSVNClient(PyMockTestCase):
         from pysvn import Revision
         from core.controllers.auto_update.auto_update import os
         client = self.client
-        override(os.path, 'isfile').expects(dontcare()).returns(True)
+        override(os.path, 'isdir').expects(dontcare()).returns(False)
         set_count(exactly=2)
         ## Stop recording. Play!
         self.replay()
@@ -149,22 +152,42 @@ class TestW3afSVNClient(PyMockTestCase):
         ## Verify ##
         self.verify()
 
-    def test_need_to_update(self):
-        client = self.client
-        svninfomock = self.mock()
-        svninfomock.rev.number
-        self.setReturn(50)
-        override(client, '_get_svn_info').expects(LOCAL_PATH).returns(svninfomock)
-        
-        svninfomock2 = self.mock()
-        svninfomock2.rev.number
-        self.setReturn(55)
-        override(client, '_get_svn_info').expects(REPO_URL).returns(svninfomock2)
-        ## Stop recording - Replay ##
-        self.replay()
-        self.assertTrue(client.need_to_update())
-        ## Verify ##
-        self.verify()
-
     def test_commit(self):
         pass
+
+
+class TestVersionMgr(PyMockTestCase):
+    
+    def setUp(self):
+        PyMockTestCase.setUp(self)
+        # Override auto_update module variable
+        import core.controllers.auto_update.auto_update as autoupdmod
+        autoupdmod.SVNClientClass = self.mock()
+        self.vmgr = VersionMgr(LOCAL_PATH, dummy)
+    
+    def test_has_to_update(self):
+        
+        vmgr = self.vmgr
+        start_cfg_mock = self.mock()
+        vmgr._start_cfg = start_cfg_mock
+        
+        # Test no auto-update
+        start_cfg_mock.auto_upd
+        self.setReturn(False)
+        self.replay()
+        self.assertFalse(vmgr._has_to_update())
+
+        # Test [D]aily, [W]eekly and [M]onthly auto-update
+        import datetime
+        SC = StartUpConfig        
+        for freq, diffdays in ((SC.FREQ_DAILY, 1), (SC.FREQ_WEEKLY, 8), \
+                               (SC.FREQ_MONTHLY, 34)):
+            self.reset()
+            start_cfg_mock.auto_upd
+            self.setReturn(True)
+            start_cfg_mock.freq
+            self.setReturn(freq)
+            start_cfg_mock.last_upd
+            self.setReturn(datetime.date.today() - datetime.timedelta(days=diffdays))
+            self.replay()
+            self.assertTrue(vmgr._has_to_update())

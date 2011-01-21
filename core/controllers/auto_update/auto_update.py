@@ -420,7 +420,8 @@ class VersionMgr(object): #TODO: Make it singleton?
         self._start_cfg = StartUpConfig()
 
 
-    def update(self, askvalue=None, print_result=False, show_log=False):
+    def update(self, force=False, askvalue=None, print_result=False,
+               show_log=False):
         '''
         Perform code update if necessary.
         
@@ -435,7 +436,7 @@ class VersionMgr(object): #TODO: Make it singleton?
         lrev = client.get_revision(local=True)
         files = SVNFilesList(rev=lrev)
 
-        if self._has_to_update():
+        if force or self._has_to_update():
             self._notify(VersionMgr.ON_UPDATE)
             rrev = client.get_revision(local=False)
 
@@ -600,7 +601,8 @@ class StartUpConfig(object):
         @param datevalue: datetime.date value
         '''
         self._lastupd = datevalue
-        self._config.set(self._start_section, 'last-update', datevalue.isoformat())
+        self._config.set(self._start_section, 'last-update',
+                         datevalue.isoformat())
 
     # TODO: Cannot use *full* decorators as we're still on py2.5
     # Read/Write property

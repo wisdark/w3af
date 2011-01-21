@@ -73,7 +73,7 @@ def main():
         return -3
     scriptFile = None
     profile = None
-    checkupdate = None
+    doupdate = None
     
     for o, a in opts:
         if o == "-e":
@@ -94,9 +94,9 @@ def main():
             usage()
             return 0
         if o in ('-f', '--force-update'):
-            checkupdate = True
+            doupdate = True
         elif o in ('-n', '--no-update'):
-            checkupdate = False
+            doupdate = False
     
     # console
     from core.ui.consoleUi.consoleUi import consoleUi
@@ -118,7 +118,7 @@ def main():
     elif profile is not None:
         commandsToRun = ["profiles use %s" % profile]
 
-    console = consoleUi(commands=commandsToRun, checkupd=checkupdate)
+    console = consoleUi(commands=commandsToRun, do_upd=doupdate)
     console.sh()
 
 

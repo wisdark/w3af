@@ -50,7 +50,7 @@ class consoleUi:
     @author Alexander Berezhnoy (alexander.berezhnoy |at| gmail.com)
     '''
 
-    def __init__(self, commands=[], parent=None, checkupd=None):
+    def __init__(self, commands=[], parent=None, do_upd=None):
         self._commands = commands 
         self._line = [] # the line which is being typed
         self._position = 0 # cursor position
@@ -78,29 +78,29 @@ class consoleUi:
         if parent:
             self.__initFromParent(parent)
         else:
-            self.__initRoot(checkupd)
+            self.__initRoot(do_upd)
 
-    def __initRoot(self, checkupd):
+    def __initRoot(self, do_upd):
         '''
         Root menu init routine.
         '''
         self._w3af = core.controllers.w3afCore.w3afCore()
         self._w3af.setPlugins(['console'], 'output')
         
-        if checkupd:
+        if do_upd is not False:
             log = om.out.console
             vmgr = VersionMgr(localpath=os.getcwd(), log=log)
             msg = 'Checking if a new version is available in our code repo. ' \
             'Please wait...'
             vmgr.register(vmgr.ON_UPDATE, log, msg)
             try:
-                vmgr.update(askvalue=raw_input, print_result=True, show_log=True)
+                vmgr.update(force=do_upd is True, askvalue=raw_input,
+                            print_result=True, show_log=True)
             except SVNError, e:
                 om.out.error('An error occured while updating:\n%s' % e.args)
             except KeyboardInterrupt:
                 pass
-                
-       
+
     def __initFromParent(self, parent):
         self._context = parent._context
         self._w3af = parent._w3af
