@@ -583,14 +583,14 @@ class StartUpConfig(object):
     FREQ_DAILY = 'D' # [D]aily
     FREQ_WEEKLY = 'W' # [W]eekly
     FREQ_MONTHLY = 'M' # [M]onthly
+    # DEFAULT VALUES
+    DEFAULTS = {'auto-update': 'true', 'frequency': 'D', 'last-update': 'None'}
 
     def __init__(self):
         
         self._start_cfg_file = os.path.join(get_home_dir(), 'startup.conf')
         self._start_section = 'STARTUP_CONFIG'
-        defaults = {'auto-update': 'true', 'frequency': 'D', 
-                    'last-update': 'None'}
-        self._config = ConfigParser.ConfigParser(defaults)
+        self._config = ConfigParser.ConfigParser()
         self._autoupd, self._freq, self._lastupd = self._load_cfg()
 
     ### PROPERTIES #
@@ -631,6 +631,11 @@ class StartUpConfig(object):
         startsection = self._start_section
         if not config.has_section(startsection):
             config.add_section(startsection)
+            defaults = StartUpConfig.DEFAULTS
+            config.set(startsection, 'auto-update', defaults['auto-update'])
+            config.set(startsection, 'frequency', defaults['frequency'])
+            config.set(startsection, 'last-update', defaults['last-update'])
+            
 
         # Read from file
         config.read(self._start_cfg_file)
