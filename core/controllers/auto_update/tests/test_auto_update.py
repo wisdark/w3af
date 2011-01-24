@@ -1,21 +1,31 @@
 '''
-Created on Jan 10, 2011
+test_auto_update.py
 
-@author: jandalia
+Copyright 2011 Andres Riancho
+
+This file is part of w3af, w3af.sourceforge.net .
+
+w3af is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation version 2 of the License.
+
+w3af is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with w3af; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
-
-#### TODO: REMOVE ME BEFORE COMMIT!!! ##
-import sys
-sys.path.append('/home/jandalia/workspace2/w3af')
-########################################
 
 from pymock import PyMockTestCase, method, override, dontcare, set_count
 
-from core.controllers.auto_update.auto_update import W3afSVNClient, Revision, \
+from core.controllers.auto_update.auto_update import w3afSVNClient, Revision,\
     VersionMgr, SVNFilesList, StartUpConfig, FILE_UPD, FILE_NEW, FILE_DEL, \
     ST_CONFLICT, ST_MODIFIED, ST_UNKNOWN
-
-del W3afSVNClient.__getattribute__
+#controllers.auto_update.auto_update.w3afSVNClient
+del w3afSVNClient.__getattribute__
 
 REPO_URL = 'http://localhost/svn/w3af'
 LOCAL_PATH = '/home/user/w3af'
@@ -25,7 +35,7 @@ def dummy(*args, **kwargs):
     pass
 
 
-class TestW3afSVNClient(PyMockTestCase):
+class Testw3afSVNClient(PyMockTestCase):
     
     rev = Revision(112, None)
     upd_files = SVNFilesList(
@@ -38,8 +48,8 @@ class TestW3afSVNClient(PyMockTestCase):
     def setUp(self):
         PyMockTestCase.setUp(self)
         
-        W3afSVNClient._get_repourl = dummy
-        self.client = W3afSVNClient(LOCAL_PATH)
+        w3afSVNClient._get_repourl = dummy
+        self.client = w3afSVNClient(LOCAL_PATH)
         self.client._repourl = REPO_URL
         self.client._svnclient = self.mock()
 
@@ -112,7 +122,7 @@ class TestW3afSVNClient(PyMockTestCase):
         
         expected_res = SVNFilesList([(f1, FILE_DEL), (f2, FILE_UPD)])
         self.assertEquals(expected_res, 
-            client._filter_files(filterbyactions=W3afSVNClient.UPD_ACTIONS))
+            client._filter_files(filterbyactions=w3afSVNClient.UPD_ACTIONS))
         ## Verify ##
         self.verify()
 
@@ -191,3 +201,6 @@ class TestVersionMgr(PyMockTestCase):
             self.setReturn(datetime.date.today() - datetime.timedelta(days=diffdays))
             self.replay()
             self.assertTrue(vmgr._has_to_update())
+    
+    def test_added_new_dependencies(self):
+        pass

@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from __future__ import with_statement
 from datetime import datetime, date, timedelta
 import os
+import re
 import time
 import ConfigParser
 import threading
@@ -127,7 +128,7 @@ pysvn_status_translator = {
 }
 
 
-class W3afSVNClient(SVNClient):
+class w3afSVNClient(SVNClient):
     '''
     Our wrapper for pysvn.Client class.
     '''
@@ -137,7 +138,7 @@ class W3afSVNClient(SVNClient):
     def __init__(self, localpath):
         self._svnclient = pysvn.Client()
         # Call parent's __init__
-        super(W3afSVNClient, self).__init__(localpath)
+        super(w3afSVNClient, self).__init__(localpath)
         # Set callback function
         self._svnclient.callback_notify = self._register
         # Events occurred in current action
@@ -243,7 +244,6 @@ class W3afSVNClient(SVNClient):
             rev = end_rev if (end_rev.number > start_rev.number) else start_rev
             return SVNLogList(logs, rev)
 
-
     def _get_repourl(self):
         '''
         Get repo's URL.
@@ -320,10 +320,9 @@ class Revision(object):
 PRINT_LINES = 20
 
 class SVNList(list):
-
     '''
     Wrapper for python list type. It may contain the number of the current
-    revision and do a custom list print. Child classes are encourage to 
+    revision and do a custom list print. Child classes are encouraged to 
     redefine the __str__ method.
     '''
 
@@ -390,10 +389,10 @@ class SVNLogList(SVNList):
 
 
 # Use this class to perform svn actions on code
-SVNClientClass = W3afSVNClient
+SVNClientClass = w3afSVNClient
 
 
-# Facade class. Intended to be used to to interact with the module
+# Facade class. Intended to be used to interact with the module
 class VersionMgr(object): #TODO: Make it singleton?
 
     # Events constants
@@ -404,7 +403,7 @@ class VersionMgr(object): #TODO: Make it singleton?
 
     def __init__(self, localpath, log):
         '''
-        W3af version manager class. Handles the logic concerning the 
+        w3af version manager class. Handles the logic concerning the 
         automatic update/commit process of the code.
         
         @param localpath: Working directory
@@ -441,39 +440,40 @@ class VersionMgr(object): #TODO: Make it singleton?
             rrev = client.get_revision(local=False)
 
             # If local rev is not lt repo's then we got nothing to update.
-            if not (lrev < rrev):
-                return files
-
-            proceed_upd = True
-            # Call callback function
-            if askvalue:
-                proceed_upd = askvalue(\
-                'Your current w3af installation is r%s. Do you want to ' \
-                'update to r%s [y/N]? ' % (lrev.number, rrev.number))
-                proceed_upd = (proceed_upd.lower() == 'y')
-
-            if proceed_upd:
-                msg = 'w3af is updating from the official SVN server...'
-                self._notify(VersionMgr.ON_UPDATE, msg)
-                # Find new deps.
-                newdeps = self._added_new_dependencies()
-                if newdeps:
-                    msg = 'At least one new dependency (%s) was included in ' \
-                    'w3af. Please update manually.' % str(', '.join(newdeps))
+            diff_rev = lrev < rrev
+            if diff_rev:
+                proceed_upd = True
+                # Call callback function
+                if askvalue:
+                    proceed_upd = askvalue(\
+                    'Your current w3af installation is r%s. Do you want to ' \
+                    'update to r%s [y/N]? ' % (lrev.number, rrev.number))
+                    proceed_upd = (proceed_upd.lower() == 'y')
+    
+                if proceed_upd:
+                    msg = 'w3af is updating from the official SVN server...'
                     self._notify(VersionMgr.ON_UPDATE, msg)
-                else:
-                    # Finally do the update!
-                    files = client.update()
-                    # Now save today as last-update date and persist it.
-                    self._start_cfg.last_upd = date.today()
-                    self._start_cfg.save()
+                    # Find new deps.
+                    newdeps = self._added_new_dependencies()
+                    if newdeps:
+                        msg = 'At least one new dependency (%s) was included' \
+                        ' in w3af. Please update manually.' % \
+                        str(', '.join(newdeps))
+                        self._notify(VersionMgr.ON_UPDATE, msg)
+                    else:
+                        # Finally do the update!
+                        files = client.update()
+
+            # Now save today as last-update date and persist it.
+            self._start_cfg.last_upd = date.today()
+            self._start_cfg.save()
 
             # Before returning perform some interaction with the user if
             # requested.
             if print_result:
                 self._log(str(files))
     
-            if show_log:
+            if show_log and diff_rev:
                 show_log = askvalue('Do you want to see a summary of the ' \
                 'new code commits log messages? [y/N]? ').lower() == 'y'
                 if show_log:
@@ -517,28 +517,32 @@ class VersionMgr(object): #TODO: Make it singleton?
         extliblocaldir = join(self._localpath, 'extlib')
         extlibcontent = (join(extliblocaldir, f) for f in \
                                                 os.listdir(extliblocaldir))
-        localdirs = (ospath.basename(d) for d in extlibcontent \
-                                                        if ospath.isdir(d))
+        localdirs = (ospath.basename(d) for d in \
+                                            extlibcontent if ospath.isdir(d))
         # New dependencies
         deps = tuple(set(repodirs).difference(localdirs))
 
         #
         # Additional constraint: We should verify that at least an import
-        # sentence was added to the dependencyCheck.py file
+        # sentence was added inside a try-except block to the 
+        # dependencyCheck.py files
         #
         if deps:
-            depcheck_fpath = 'core/controllers/misc/dependencyCheck.py'
-            diff_str = client.diff(depcheck_fpath)
-            # SVN shows HEAD rev's new lines preceeded by a '-' char.
-            newlineswithimport = \
-                [nl for nl in diff_str.split('\n') \
-                        if nl.startswith('-') and nl.find('import') != -1]
-            # Ok, no import sentence was detected so no dep. was *really*
-            # added.
-            if not newlineswithimport:
-                deps = ()
-
-        return deps
+            depfiles = ('core/controllers/misc/dependencyCheck.py',
+                        'core/ui/gtkUi/dependencyCheck.py')
+            for depfile in depfiles:
+                diff_str = client.diff(depfile)
+                nlines = (nl[1:].strip() for nl in \
+                                    diff_str.split('\n') if nl.startswith('-'))
+                try_counter = 0
+                for nl in nlines:
+                    if nl == 'try:':
+                        try_counter += 1
+                    elif re.match('except.*?:', nl):
+                        try_counter -= 1
+                    elif nl.find('import') != -1 and try_counter:
+                        return deps
+        return ()
     
     def _has_to_update(self):
         '''
@@ -548,6 +552,7 @@ class VersionMgr(object): #TODO: Make it singleton?
             1) IF auto_upd is False THEN return False
             2) IF last_upd == 'yesterday' and freq == 'D' THEN return True
             3) IF last_upd == 'two_days_ago' and freq == 'W' THEN return False.
+
         @return: Boolean value.
         '''
         startcfg = self._start_cfg
@@ -582,7 +587,7 @@ class StartUpConfig(object):
     def __init__(self):
         
         self._start_cfg_file = os.path.join(get_home_dir(), 'startup.conf')
-        self._start_section = 'StartConfig'
+        self._start_section = 'STARTUP_CONFIG'
         defaults = {'auto-update': 'true', 'frequency': 'D', 
                     'last-update': 'None'}
         self._config = ConfigParser.ConfigParser(defaults)

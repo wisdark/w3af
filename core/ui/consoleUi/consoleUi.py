@@ -83,23 +83,28 @@ class consoleUi:
     def __initRoot(self, do_upd):
         '''
         Root menu init routine.
-        '''
-        self._w3af = core.controllers.w3afCore.w3afCore()
-        self._w3af.setPlugins(['console'], 'output')
-        
-        if do_upd is not False:
+        '''        
+        if do_upd in (None, True):
             log = om.out.console
-            vmgr = VersionMgr(localpath=os.getcwd(), log=log)
-            msg = 'Checking if a new version is available in our code repo. ' \
-            'Please wait...'
-            vmgr.register(vmgr.ON_UPDATE, log, msg)
+            # Get w3af install dir
+            splitpath = __file__.split(os.sep)
+            index = 4 # This file's depth
+            install_dir = os.sep.join(splitpath[:-index])
             try:
-                vmgr.update(force=do_upd is True, askvalue=raw_input,
+                vmgr = VersionMgr(localpath=install_dir, log=log)
+                msg = 'Checking if a new version is available in our SVN ' \
+                'repository. Please wait...'
+                vmgr.register(vmgr.ON_UPDATE, log, msg)
+                vmgr.update(force=do_upd, askvalue=raw_input,
                             print_result=True, show_log=True)
             except SVNError, e:
                 om.out.error('An error occured while updating:\n%s' % e.args)
             except KeyboardInterrupt:
                 pass
+
+        # Core initialization
+        self._w3af = core.controllers.w3afCore.w3afCore()
+        self._w3af.setPlugins(['console'], 'output')
 
     def __initFromParent(self, parent):
         self._context = parent._context
