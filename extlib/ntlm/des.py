@@ -52,7 +52,7 @@ def str_to_key56(key_str):
     ""
     if type(key_str) != type(''):
         #rise DESException, 'ERROR. Wrong key type.'
-        pass
+        raise IOError, "ESTO ES CANDELA!"#pass
     if len(key_str) < 7:
         key_str = key_str + '\000\000\000\000\000\000\000'[:(7 - len(key_str))]
     key_56 = []

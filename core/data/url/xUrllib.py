@@ -809,7 +809,7 @@ class xUrllib(object):
         # TODO:
         # For now I leave it at 5, but I have to debug grep plugins and I will lower this eventually
         #
-        timeout_seconds = 5
+        timeout_seconds = 5*10000
         timedout_grep_wrapper = TimeLimited( grep_plugin.grep_wrapper, timeout_seconds)
         try:
             timedout_grep_wrapper(request, response)

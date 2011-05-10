@@ -55,20 +55,22 @@ class htmlParser(sgmlParser):
         
         sgmlParser.__init__(self, httpResponse, normalizeMarkup, verbose)
         
-    def _preParse( self, httpResponse ):
+    def _preParse(self, httpResponse):
         '''
         @parameter httpResponse: The HTTP response document that contains the
         HTML document inside its body.
         '''
         assert self._baseUrl, 'The base URL must be set.'
         
-        HTMLDocument = httpResponse.getBody()
+        html_doc = httpResponse.getBody()
     
         if self._normalizeMarkup:
-            HTMLDocument = httpResponse.getNormalizedBody() or ''
+            html_doc = httpResponse.getNormalizedBody()
+        else:
+            html_doc = html_doc.encode(httpResponse.getCharset())
 
         # Now we are ready to work
-        self._parse(HTMLDocument)
+        self._parse(html_doc)
         
     def _findForms(self, tag, attrs):
         '''
@@ -158,8 +160,8 @@ class htmlParser(sgmlParser):
         foundAction = False
         for attr in attrs:
             if attr[0].lower() == 'action':
-                action = self._baseUrl.urlJoin( attr[1] )
-                action = self._decode_URL( action , self._encoding)
+                action = self._baseUrl.urlJoin(attr[1])
+                action = self._decode_URL(action)
                 foundAction = True
 
         if not foundAction:
@@ -317,7 +319,9 @@ class htmlParser(sgmlParser):
             self._saved_inputs.append( ('input', self._optionAttrs) )
         else:
             form_obj = self._forms[-1]
-            form_obj.addSelect( self._selectTagName, self._optionAttrs )
+            self_tag_name = getattr(self, '_selectTagName', None)
+            if self_tag_name:
+                form_obj.addSelect( self._selectTagName, self._optionAttrs )
 
     def _handle_option_tag_inside_form(self, tag, attrs):
         """

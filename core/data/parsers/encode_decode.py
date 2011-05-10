@@ -48,7 +48,7 @@ def htmldecode(text, use_repr=False):
     charrefpat = re.compile(r'&(#(\d+|x[\da-fA-F]+)|[\w.:-]+);?')
     
     # FIXME: What if we have something like this: &aacute ?!?!
-    # I expected something like á , not a  '\xe1'
+    # I expected something like á, not a '\xe1'
     '''
     >>> from encode_decode import *
     >>> htmldecode('&aacute;')

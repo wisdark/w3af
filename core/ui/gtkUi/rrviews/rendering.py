@@ -160,8 +160,12 @@ class WebKitRenderingView(RenderingView):
         # mimeType = obj.getContentType()
         try:
             if obj.is_text_or_html():
-                self._renderingWidget.load_string(obj.getBody(), mimeType, 
-                        obj.getCharset(), str(obj.getURI()))
+                # First obtain a str from the unicode as load_string expects
+                # a string
+                charset = obj.getCharset()
+                body = obj.getBody().encode(charset)
+                self._renderingWidget.load_string(body, mimeType,
+                                                  charset, str(obj.getURI()))
             else:
                 raise
         except Exception:

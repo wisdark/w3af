@@ -291,13 +291,15 @@ def get_clean_body(response):
     url = response.getURL()
     to_replace = url.url_string.split('/')
     to_replace.append( url.url_string )
-    
-    for i in to_replace:
-        if len(i) > 6:
-            original_body = original_body.replace(i, '')
-            original_body = original_body.replace(urllib.unquote_plus(i), '')
-            original_body = original_body.replace(cgi.escape(i), '')
-            original_body = original_body.replace(cgi.escape(urllib.unquote_plus(i)), '')
+    try:
+        for i in to_replace:
+            if len(i) > 6:
+                original_body = original_body.replace(i, '')
+                original_body = original_body.replace(urllib.unquote_plus(i), '')
+                original_body = original_body.replace(cgi.escape(i), '')
+                original_body = original_body.replace(cgi.escape(urllib.unquote_plus(i)), '')
+    except Exception, e:
+        print e
 
     return original_body
 

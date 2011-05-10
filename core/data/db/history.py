@@ -251,8 +251,9 @@ class HistoryItem(object):
         # 
         # Save raw data to file
         # 
-        rrfile = open(os.path.join(self._sessionDir, str(self.response.id) + self._ext), 'wb')
-        p = Pickler(rrfile)
+        rrfile = open(os.path.join(self._sessionDir, 
+                                   str(self.response.id) + self._ext), 'wb')
+        p = Pickler(rrfile, protocol=-1)
         p.dump((self.request, self.response))
         rrfile.close()
         return True

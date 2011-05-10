@@ -45,7 +45,7 @@ class httpPostDataRequest(fuzzableRequest):
         needed by the multipart post handler.
         '''
         for value in self._dc.values():
-            if not isinstance(value, type('')):
+            if not isinstance(value, basestring):
                 # We have a file here, return the dc as it is.
                 return self._dc
         

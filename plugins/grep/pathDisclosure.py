@@ -124,7 +124,6 @@ class pathDisclosure(baseGrepPlugin):
 
                 # Decode the realurl
                 realurl = response.getURL().urlDecode()
-
                 
                 #   Sort by the longest match, this is needed for filtering out some false positives
                 #   please read the note below.

@@ -40,14 +40,16 @@ class sgmlParser(abstractParser, SGMLParser):
     '''
     
     def __init__(self, httpResponse, normalizeMarkup=True, verbose=0):
-        abstractParser.__init__( self, httpResponse )
+        
+        # Call parents' __init__
+        abstractParser.__init__(self, httpResponse)
         SGMLParser.__init__(self, verbose)
 
         # Set some constants
-        self._tagsContainingURLs =  ('go', 'a','img', 'link', 'script', 'iframe', 'object',
-                'embed', 'area', 'frame', 'applet', 'input', 'base',
-                'div', 'layer', 'ilayer', 'bgsound', 'form')
-        self._urlAttrs = ('href', 'src', 'data', 'action' )
+        self._tagsContainingURLs = ('go', 'a', 'img', 'link', 'script',
+                'iframe', 'object', 'embed', 'area', 'frame', 'applet',
+                'input', 'base', 'div', 'layer', 'ilayer', 'bgsound', 'form')
+        self._urlAttrs = ('href', 'src', 'data', 'action')
         
         # And some internal variables
         self._tag_and_url = []
@@ -68,11 +70,11 @@ class sgmlParser(abstractParser, SGMLParser):
         
         self._normalizeMarkup = normalizeMarkup
         
-        #    Fill self._re_URLs list with url objects
-        self._regex_url_parse( httpResponse )
+        # Fill self._re_URLs list with url objects
+        self._regex_url_parse(httpResponse)
         
         # Now we are ready to work
-        self._preParse( httpResponse )
+        self._preParse(httpResponse)
         
     def _preParse(self, document):
         '''
@@ -138,7 +140,7 @@ class sgmlParser(abstractParser, SGMLParser):
                     new_base_url = attr[1]
                     break
             # set the new base URL
-            self._baseUrl = self._baseUrl.urlJoin( new_base_url )
+            self._baseUrl = self._baseUrl.urlJoin(new_base_url)
         
         if tag.lower() == 'script':
             self._insideScript = True
@@ -148,16 +150,16 @@ class sgmlParser(abstractParser, SGMLParser):
         except Exception, e:
             msg = 'An unhandled exception was found while finding references inside a document.'
             msg += ' The exception is: "' + str(e) + '"'
-            om.out.error( msg )
-            om.out.error('Error traceback: ' + str( traceback.format_exc() ) )
+            om.out.error(msg)
+            om.out.error('Error traceback: ' + str(traceback.format_exc()))
 
         try:
             self._findForms(tag, attrs)
         except Exception, e:
             msg = 'An unhandled exception was found while finding forms inside a document.'
             msg += 'The exception is: "' + str(e) + '"'
-            om.out.error( msg )
-            om.out.error('Error traceback: ' + str( traceback.format_exc() ) )
+            om.out.error(msg)
+            om.out.error('Error traceback: ' + str(traceback.format_exc()))
 
         try:        
             if tag.lower() == 'meta':
@@ -165,18 +167,18 @@ class sgmlParser(abstractParser, SGMLParser):
         except Exception, e:
             msg = 'An unhandled exception was found while parsing meta tags inside a document.'
             msg += 'The exception is: "' + str(e) + '"'
-            om.out.error( msg )
-            om.out.error('Error traceback: ' + str( traceback.format_exc() ) )
+            om.out.error(msg)
+            om.out.error('Error traceback: ' + str(traceback.format_exc()))
     
-    def _parseMetaTags( self, tag , attrs ):
+    def _parseMetaTags(self, tag , attrs):
         '''
         This method parses the meta tags and creates a list of tuples with their values.
         The only exception made here is for the meta redirections, that are handled with "_findMetaRedir".
         '''
-        self._findMetaRedir( tag, attrs )
-        self._metaTags.append( attrs )
+        self._findMetaRedir(tag, attrs)
+        self._metaTags.append(attrs)
         
-    def _findMetaRedir( self, tag, attrs):
+    def _findMetaRedir(self, tag, attrs):
         '''
         Find meta tag redirections, like this one:
         <META HTTP-EQUIV="refresh" content="4;URL=http://www.f00.us/">
@@ -193,7 +195,7 @@ class sgmlParser(abstractParser, SGMLParser):
                     content = attr[1]
                     
             if hasContent and hasHTTP_EQUIV:
-                self._metaRedirs.append( content )
+                self._metaRedirs.append(content)
                 
                 # And finally I add the URL to the list of url's found in the document...
                 # The content variables looks something like... "4;URL=http://www.f00.us/"
@@ -201,11 +203,11 @@ class sgmlParser(abstractParser, SGMLParser):
                 # The content variables looks something like... "6  ; URL=http://www.f00.us/"
                 for url_string in re.findall('.*?URL.*?=(.*)', content, re.IGNORECASE):
                     url_string = url_string.strip()
-                    url_instance = self._baseUrl.urlJoin( url_string )
-                    url_instance = self._decode_URL( url_instance, self._encoding ) 
+                    url_instance = self._baseUrl.urlJoin(url_string)
+                    url_instance = self._decode_URL(url_instance) 
                     
-                    self._parsed_URLs.append( url_instance )
-                    self._tag_and_url.append( ('meta', url_instance ) )
+                    self._parsed_URLs.append(url_instance)
+                    self._tag_and_url.append(('meta', url_instance))
     
     def _findReferences(self, tag, attrs):
         '''
@@ -220,8 +222,8 @@ class sgmlParser(abstractParser, SGMLParser):
                 # Only add it to the result of the current URL is not a fragment
                 if attr_val and not attr_val.startswith('#'):
                     
-                    url_instance = self._baseUrl.urlJoin( attr_val )
-                    url_instance = self._decode_URL( url_instance, self._encoding)
+                    url_instance = self._baseUrl.urlJoin(attr_val)
+                    url_instance = self._decode_URL(url_instance)
                     url_instance.normalizeURL()
                     
                     if url_instance not in self._parsed_URLs:
@@ -236,27 +238,28 @@ class sgmlParser(abstractParser, SGMLParser):
         @parameter s: The document to parse (as a string)
         '''
         try:
-            self.findEmails( s )
+            self.findEmails(s)
             self.feed(s)
             self.close()
         except Exception, e:
-            # The user will call getEmails, getReferences, etc and will get all the information
-            # that the parser could find before dieing
-            om.out.debug('Exception found while parsing document. Exception: ' + str(e) + '. Document head: "' + s[0:20] +'".' )
-            om.out.debug( 'Traceback for this error: ' + str( traceback.format_exc() ) )
+            # The user will call getEmails, getReferences, etc and will get all
+            # the information that the parser could find before die'ing
+            om.out.debug('Traceback for this error: ' + str(traceback.format_exc()))
+            om.out.debug('Exception found while parsing document. Exception: ' + str(e) + '. Document head: "' + s[0:20] + '".')
+            om.out.debug('Traceback for this error: ' + str(traceback.format_exc()))
         else:
             # Saves A LOT of memory
             # without this a run will use 4,799,936
             # with this, a run will use 113,696
             del self.rawdata
         
-    def getForms( self ):
+    def getForms(self):
         '''
         @return: Returns list of forms.
         '''
         return self._forms
         
-    def getReferences( self ):
+    def getReferences(self):
         '''
         Searches for references on a page. w3af searches references in every html tag, including:
             - a
@@ -268,45 +271,45 @@ class sgmlParser(abstractParser, SGMLParser):
         @return: Two sets, one with the parsed URLs, and one with the URLs that came out of a
         regular expression. The second list is less trustworthy.
         '''
-        tmp_re_URLs = set(self._re_URLs) - set( self._parsed_URLs )
-        return list(set( self._parsed_URLs )), list(tmp_re_URLs)
+        tmp_re_URLs = set(self._re_URLs) - set(self._parsed_URLs)
+        return list(set(self._parsed_URLs)), list(tmp_re_URLs)
         
-    def getReferencesOfTag( self, tagType ):
+    def getReferencesOfTag(self, tagType):
         '''
         @return: A list of the URLs that the parser found in a tag of tagType = "tagType" (i.e img, a)
         '''
         return [ x[1] for x in self._tag_and_url if x[0] == tagType ]
         
-    def getComments( self ):
+    def getComments(self):
         '''
         @return: Returns list of comment strings.
         '''
-        return set( self._commentsInDocument )
+        return set(self._commentsInDocument)
     
-    def getScripts( self ):
+    def getScripts(self):
         '''
         @return: Returns list of scripts (mainly javascript, but can be anything)
         '''
-        return set( self._scriptsInDocument )
+        return set(self._scriptsInDocument)
         
-    def getMetaRedir( self ):
+    def getMetaRedir(self):
         '''
         @return: Returns list of meta redirections.
         '''
         return self._metaRedirs
     
-    def getMetaTags( self ):
+    def getMetaTags(self):
         '''
         @return: Returns list of all meta tags.
         '''
         return self._metaTags
         
-    def handle_comment( self , text ):
+    def handle_comment(self , text):
         '''
         This method is called by parse when a comment is found.
         '''
         if self._insideScript:
-            self._scriptsInDocument.append( text )
+            self._scriptsInDocument.append(text)
         else:
-            self._commentsInDocument.append( text )
+            self._commentsInDocument.append(text)
         

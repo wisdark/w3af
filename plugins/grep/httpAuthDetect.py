@@ -85,7 +85,7 @@ class httpAuthDetect(baseGrepPlugin):
         #
         if '@' in response.getURI():
 
-            if self._auth_uri_regex.match(response.getURI()):
+            if self._auth_uri_regex.match(response.getURI().url_string):
                 # An authentication URI was found!
                 v = vuln.vuln()
                 v.setPluginName(self.getName())

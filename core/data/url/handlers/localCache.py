@@ -349,7 +349,7 @@ class SQLCachedResponse(CachedResponse):
                                           resp.geturl(), resp.read(), resp.id)
         # BUGBUG: This is where I create/log the responses that always have
         # 0.2 as the time!
-        url_instance = url_object( url )
+        url_instance = url_object(url)
         resp = httpResponse.httpResponse(code, body, hdrs, url_instance,
                                          request.url_object, msg=msg, id=id,
                                          alias=gen_hash(request))

@@ -138,7 +138,7 @@ class wmlParser(sgmlParser):
             for attr in attrs:
                 if attr[0] == 'href':
                     action = self._baseUrl.urlJoin( attr[1] )
-                    action = self._decode_URL( action , self._encoding)
+                    action = self._decode_URL(action)
                     foundAction = True
                     
             if not foundAction:

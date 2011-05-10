@@ -245,7 +245,7 @@ def _createFileContentMutants( freq, mutantClass, mutant_str_list, fuzzableParam
     tmp = []
     if freq.getFileVariables():
         for mutant_str in mutant_str_list:
-            if type( mutant_str ) == str:
+            if isinstance(mutant_str, basestring):
                 # I have to create the string_file with a "name" attr. This is needed for MultipartPostHandler
                 str_file_instance = string_file( mutant_str )
                 extension = cf.cf.getData('fuzzFCExt' ) or 'txt'

@@ -71,7 +71,7 @@ class w3afMustStopOnUrlError(w3afMustStopException):
     
     def __init__(self, urlerr, req):
         reason = urlerr.reason
-        if type(reason) is str:
+        if isinstance(reason, basestring):
             ec, em = None, reason
         else:
             ec, em = reason[0], reason[1]

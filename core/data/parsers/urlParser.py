@@ -939,7 +939,7 @@ class url_object(object):
         @return: An URL-Decoded version of the URL.
         '''
         res = None
-        if type(self.url_string) == type(""):
+        if isinstance(self.url_string, basestring):
             res = urllib.unquote(string.replace(self.url_string, "+", " "))
             res = url_object( res )
         return res
