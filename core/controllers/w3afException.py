@@ -27,7 +27,7 @@ class w3afException(Exception):
     
     def __init__(self, value):
         Exception.__init__( self )
-        self.value = value
+        self.value = str(value)
     
     def __str__(self):
         return self.value
@@ -39,7 +39,7 @@ class w3afRunOnce(Exception):
     '''
     def __init__(self, value=''):
         Exception.__init__( self )
-        self.value = value
+        self.value = str(value)
     
     def __str__(self):
         return self.value
@@ -59,11 +59,12 @@ class w3afMustStopException(Exception):
     extensively.
     '''
     def __init__(self, msg, errs=()):
-        self.msg = msg
+        self.msg = str(msg)
         self.errs = errs
 
     def __str__(self):
-        return self.msg + '\n'.join(self.errs)
+        return self.msg + '\n'.join( [str(e) for e in self.errs] )
+    
     __repr__ = __str__
 
 
@@ -71,10 +72,13 @@ class w3afMustStopOnUrlError(w3afMustStopException):
     
     def __init__(self, urlerr, req):
         reason = urlerr.reason
-        if isinstance(reason, basestring):
+        if type(reason) is str:
             ec, em = None, reason
         else:
-            ec, em = reason[0], reason[1]
+            try:
+                ec, em = reason
+            except ValueError:
+                ec, em = None, reason[0]
         # Call parent's __init__
         w3afMustStopException.__init__(self, em)
         self.errcode = ec
@@ -90,7 +94,7 @@ class w3afMustStopByKnownReasonExc(w3afMustStopException):
     def __str__(self):
         _str = w3afMustStopException.__str__(self)
         if self.reason:
-            _str += '\n' + 'Reason: %s' % self.reason
+            _str += ' - Reason: %s' % self.reason
         return _str
 
 

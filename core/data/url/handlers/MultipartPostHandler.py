@@ -59,7 +59,7 @@ class MultipartPostHandler(urllib2.BaseHandler):
     def http_request(self, request):
         data = request.get_data()
         
-        if data and not isinstance(data, basestring):
+        if data is not None and type(data) != str:
             v_files = []
             v_vars = []
             

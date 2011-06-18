@@ -73,13 +73,15 @@ class info(dict):
         >>> i = info()
         >>> i.setURL('http://www.google.com/')
         Traceback (most recent call last):
-          File "<stdin>", line 1, in ?
-        ValueError: The URL in the info object must be of urlParser.url_object type.
-        >>> i = info()
-        >>> i.setURL( url_object('http://www.google.com/') )
+          ...
+        TypeError: The URL in the info object must be of urlParser.url_object type.
+        >>> url = url_object('http://www.google.com/')
+        >>> i.setURL(url)
+        >>> i.getURL() == url
+        True
         '''
         if not isinstance(url, url_object):
-            raise ValueError('The URL in the info object must be of urlParser.url_object type.')
+            raise TypeError('The URL in the info object must be of urlParser.url_object type.')
         
         self._url = url.uri2url()
         self._uri = url
@@ -93,12 +95,15 @@ class info(dict):
         >>> i.setURI('http://www.google.com/')
         Traceback (most recent call last):
           File "<stdin>", line 1, in ?
-        ValueError: The URI in the info object must be of urlParser.url_object type.
+        TypeError: The URI in the info object must be of urlParser.url_object type.
+        >>> uri = url_object('http://www.google.com/')
         >>> i = info()
-        >>> i.setURI( url_object('http://www.google.com/') )
+        >>> i.setURI(uri)
+        >>> i.getURI() == uri
+        True
         '''
         if not isinstance(uri, url_object):
-            raise ValueError('The URI in the info object must be of urlParser.url_object type.')
+            raise TypeError('The URI in the info object must be of urlParser.url_object type.')
         
         self._uri = uri
         self._url = uri.uri2url()
@@ -117,6 +122,12 @@ class info(dict):
 
         
     def getDesc( self ):
+        #
+        #    TODO: Who's creating a info() object and not setting a description?!
+        #
+        if self._desc is None:
+            return 'No description was set for this object.'
+        
         if self._id is not None and self._id != 0:
             if not self._desc.strip().endswith('.'):
                 self._desc += '.'

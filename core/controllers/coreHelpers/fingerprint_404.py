@@ -21,17 +21,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 from __future__ import with_statement
 
-import core.controllers.outputManager as om
-import core.data.kb.knowledgeBase as kb
 import core.data.kb.config as cf
+from core.data.fuzzer.fuzzer import createRandAlNum
 
-import core.data.parsers.urlParser as urlParser
-
-from core.data.fuzzer.fuzzer import createRandAlpha, createRandAlNum
+import core.controllers.outputManager as om
 from core.controllers.w3afException import w3afException, w3afMustStopException
 from core.controllers.misc.levenshtein import relative_distance_ge
 from core.controllers.misc.lru import LRU
-
 from core.controllers.threads.threadManager import threadManagerObj as tm
 
 import urllib
@@ -50,7 +46,7 @@ class fingerprint_404:
 
     _instance = None
     
-    def __init__( self, test_db=False ):
+    def __init__( self, test_db=[] ):
         #
         #   Set the opener, I need it to perform some tests and gain 
         #   the knowledge about the server's 404 response bodies.
@@ -68,6 +64,7 @@ class fingerprint_404:
         self.is_404_LRU = LRU(500)
         
         self._test_db = test_db
+        self._test_db_index = 0
 
     def set_urlopener(self, urlopener):
         self._urlOpener = urlopener
@@ -188,7 +185,15 @@ class fingerprint_404:
         '''
     
         #   This is here for testing.
-        #return False
+        if self._test_db:
+            i = self._test_db_index
+            try:
+                result = self._test_db[ i ]
+                self._test_db_index = i + 1
+            except:
+                raise Exception('Your test_db is incomplete!')
+            else:
+                return result
 
         #
         #   First we handle the user configured exceptions:
@@ -255,9 +260,9 @@ class fingerprint_404:
             self.is_404_LRU[ http_response.id ] = False
             return False
 
-def fingerprint_404_singleton():
+def fingerprint_404_singleton( test_db=[] ):
     if not fingerprint_404._instance:
-        fingerprint_404._instance = fingerprint_404()
+        fingerprint_404._instance = fingerprint_404( test_db )
     return fingerprint_404._instance
 
 
@@ -287,20 +292,19 @@ def get_clean_body(response):
     @parameter response: The httpResponse object to clean
     @return: A string that represents the "cleaned" response body of the response.
     '''
-    original_body = response.getBody()
-    url = response.getURL()
-    to_replace = url.url_string.split('/')
-    to_replace.append( url.url_string )
-    try:
-        for i in to_replace:
-            if len(i) > 6:
-                original_body = original_body.replace(i, '')
-                original_body = original_body.replace(urllib.unquote_plus(i), '')
-                original_body = original_body.replace(cgi.escape(i), '')
-                original_body = original_body.replace(cgi.escape(urllib.unquote_plus(i)), '')
-    except Exception, e:
-        print e
+    
+    body = response.body
+    
+    if response.is_text_or_html():
+        url = response.getURL()
+        to_replace = url.url_string.split('/')
+        to_replace.append( url.url_string )
+        
+        for repl in to_replace:
+            if len(repl) > 6:
+                body = body.replace(repl, '')
+                body = body.replace(urllib.unquote_plus(repl), '')
+                body = body.replace(cgi.escape(repl), '')
+                body = body.replace(cgi.escape(urllib.unquote_plus(repl)), '')
 
-    return original_body
-
-
+    return body

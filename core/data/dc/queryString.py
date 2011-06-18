@@ -22,12 +22,4 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 from core.data.dc.dataContainer import dataContainer
 
-
-class queryString(dataContainer):
-    '''
-    This class represents a Query String.
-    
-    @author: Andres Riancho ( andres.riancho@gmail.com )
-    '''
-    def __init__(self, init_val=(), strict=False):
-        dataContainer.__init__(self , init_val, strict )
+queryString = QueryString = dataContainer

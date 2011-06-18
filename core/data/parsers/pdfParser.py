@@ -24,10 +24,8 @@ import core.controllers.outputManager as om
 from core.data.parsers.abstractParser import abstractParser
 from core.data.parsers.urlParser import url_object
 
-try:
-    import extlib.pyPdf.pyPdf as pyPdf
-except:
-    import pyPdf
+
+import extlib.pyPdf.pyPdf as pyPdf
     
 import StringIO
 import re
@@ -47,7 +45,7 @@ class pdfParser(abstractParser):
         self._re_URLs = []
         
         #    Work !
-        self._preParse( httpResponse.getBody() )
+        self._preParse(httpResponse.body)
         
     def _preParse( self, document ):
         content_text = self.getPDFContent( document )

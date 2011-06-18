@@ -32,7 +32,7 @@ import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
 import core.data.kb.vuln as vuln
 
-from core.data.bloomfilter.pybloom import ScalableBloomFilter
+from core.data.bloomfilter.bloomfilter import scalable_bloomfilter
 
 from core.controllers.w3afException import w3afException
 import core.data.parsers.dpCache as dpCache
@@ -51,7 +51,7 @@ class strangeParameters(baseGrepPlugin):
         baseGrepPlugin.__init__(self)
         
         # Internal variables
-        self._already_reported = ScalableBloomFilter()
+        self._already_reported = scalable_bloomfilter()
         
     def grep(self, request, response):
         '''
@@ -154,6 +154,16 @@ class strangeParameters(baseGrepPlugin):
         '''
         @return: True if the parameter value is strange
         '''
+        if 'wicket:' in parameter:
+            #
+            #   The wicket framework uses, by default, strange URLs like this:
+            #   https://www.DOMAIN.com/?wicket:bookmarkablePage=:com.DOMAIN.SUBDOMAIN.web.pages.SignInPage
+            #   &wicket:interface=:0:signInForm::IFormSubmitListener::;jsessionid=7AC76A46A86BBC3F5253E374241BC892
+            #
+            #   Which are strange in all cases, except from wicket!
+            #
+            return False
+
         _strange_parameter_re = []
 
         # Seems to be a function

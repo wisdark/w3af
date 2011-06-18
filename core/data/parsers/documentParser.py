@@ -55,18 +55,18 @@ class documentParser:
             msg = 'There is no parser for "%s".' % httpResponse.getURL() 
             raise w3afException( msg )
     
-    def _isPDF( self, httpResponse ):
+    def _isPDF(self, httpResponse):
         '''
         @httpResponse: A http response object that contains a document of type HTML / PDF / WML / etc.
         @return: True if the document parameter is a string that contains a PDF document.
         '''
         if httpResponse.getContentType() in ['application/x-pdf', 'application/pdf']:
-            document = httpResponse.getBody()
+            document = httpResponse.body
             
             #   With the objective of avoiding this bug:
             #   https://sourceforge.net/tracker/?func=detail&atid=853652&aid=2954220&group_id=170274
             #   I perform this safety check:
-            if document == '':
+            if not document:
                 return False
         
             #   Some PDF files don't end with %%EOF, they end with

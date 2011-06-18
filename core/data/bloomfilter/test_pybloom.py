@@ -5,16 +5,13 @@ import string
 from guppy import hpy
 
 from pybloom import BloomFilter
-from pybloom import ScalableBloomFilter
+from core.data.bloomfilter.bloomfilter import scalable_bloomfilter
+
 
 class TestBloomFilter(unittest.TestCase):
 
     def test_bloom_int(self):
-        a = hpy().heap()
-        a = hpy().heap()
         f = BloomFilter(capacity=10000, error_rate=0.001)
-        b = hpy().heap()
-        print b.diff(a)
 
         for i in xrange(0, f.capacity):
              _ = f.add(i)
@@ -41,14 +38,17 @@ class TestBloomFilter(unittest.TestCase):
 
         self.assertEqual(rnd in f, True)
 
-class TestScalableBloomFilter(unittest.TestCase):
+class TestScalableBloomfilter(unittest.TestCase):
 
     def test_bloom_int(self):
-        f = ScalableBloomFilter(mode=ScalableBloomFilter.SMALL_SET_GROWTH)
+        h = hpy()
+        a = h.heap()
+
+        f = scalable_bloomfilter(mode=scalable_bloomfilter.SMALL_SET_GROWTH)
 
         for i in xrange(0, 10000):
              _ = f.add(i)
-
+             
         for i in xrange(0, 10000):
             self.assertEqual(i in f, True)
 
@@ -61,7 +61,7 @@ class TestScalableBloomFilter(unittest.TestCase):
             self.assertEqual(r in f, False)
 
     def test_bloom_string(self):
-        f = ScalableBloomFilter(mode=ScalableBloomFilter.SMALL_SET_GROWTH)
+        f = scalable_bloomfilter(mode=scalable_bloomfilter.SMALL_SET_GROWTH)
 
         for i in xrange(0, 10000):
             rnd = ''.join(random.choice(string.letters) for i in xrange(40))

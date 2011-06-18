@@ -21,7 +21,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
-from core.controllers.w3afException import w3afException
 
 from core.data.parsers.sgmlParser import sgmlParser
 from core.data.parsers.urlParser import url_object
@@ -137,8 +136,9 @@ class wmlParser(sgmlParser):
             foundAction = False
             for attr in attrs:
                 if attr[0] == 'href':
-                    action = self._baseUrl.urlJoin( attr[1] )
-                    action = self._decode_URL(action)
+                    action = self._baseUrl.urlJoin(attr[1]).url_string
+                    action = url_object(self._decode_URL(action),
+                                        encoding=self._encoding)
                     foundAction = True
                     
             if not foundAction:
@@ -146,7 +146,7 @@ class wmlParser(sgmlParser):
                 # <form name="frmRegistrar" onsubmit="valida();">
             else:
                 self._insideForm = True
-                f = form.form()
+                f = form.form(encoding=self._encoding)
                 f.setMethod( method )           
                 f.setAction( action )
                 self._forms.append( f )

@@ -13,7 +13,7 @@ class test_disk_list(unittest.TestCase):
     def setUp(self):
         create_temp_dir()
 
-    def test_bloom_int(self):
+    def test_int(self):
         dl = disk_list()
 
         for i in xrange(0, 1000):
@@ -27,7 +27,7 @@ class test_disk_list(unittest.TestCase):
             r = random.randint(1000,1000 * 2)
             self.assertEqual(r in dl, False)
         
-    def test_bloom_string(self):
+    def test_string(self):
         dl = disk_list()
 
         for i in xrange(0, 1000):
@@ -40,6 +40,40 @@ class test_disk_list(unittest.TestCase):
             self.assertEqual(i in dl, False)
 
         self.assertEqual(rnd in dl, True)
+
+    def test_len(self):
+        dl = disk_list()
+
+        for i in xrange(0, 100):
+            _ = dl.append(i)
+
+        self.assertEqual( len(dl) == 100, True)
+
+    def test_pickle(self):
+        dl = disk_list()
+
+        dl.append( 'a' )
+        dl.append( 1 )
+        dl.append( [3,2,1] )
+
+        values = []
+        for i in dl:
+            values.append(i)
+        
+        self.assertEqual( values[0] == 'a', True)
+        self.assertEqual( values[1] == 1, True)
+        self.assertEqual( values[2] == [3,2,1], True)
+
+    def test_getitem(self):
+        dl = disk_list()
+
+        dl.append( 'a' )
+        dl.append( 1 )
+        dl.append( [3,2,1] )
+
+        self.assertEqual( dl[0] == 'a', True)
+        self.assertEqual( dl[1] == 1  , True)
+        self.assertEqual( dl[2] == [3,2,1], True)
 
 if __name__ == '__main__':
     unittest.main()

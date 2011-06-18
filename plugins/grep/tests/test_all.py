@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import unittest
+import os
 import cProfile
 
 import core.controllers.w3afCore
@@ -51,15 +52,45 @@ class test_all(unittest.TestCase):
         self._plugins = []
         for pname in self._w3af.getPluginList('grep'):
             self._plugins.append( self._w3af.getPluginInstance(pname, 'grep') )
-        
+
+    def test_options_for_grep_plugins(self):
+        '''
+        We're not going to assert anything here. What just want to see if
+        the plugins implement the following methods:
+            - getOptions()
+            - setOptions()
+            - getPluginDeps()
+            - getLongDesc()
+            
+        And don't crash in any way when we call them.
+        '''
+        for plugin in self._plugins:
+            o = plugin.getOptions()
+            plugin.setOptions( o )
+            
+            plugin.getPluginDeps()
+            plugin.getLongDesc()
+            
+            plugin.end()
+                
     def test_all_grep_plugins(self):
-        #
-        #   To be profiled
-        #
+        '''
+        Run a set of 5 html files through all grep plugins. As with the previous
+        test, the only thing we want to see is if the grep plugin crashes or not.
+        
+        We're not asserting any results. 
+        '''
         def profile_me():
-            for foo in xrange(10):
+            '''
+            To be profiled
+            '''
+            for _ in xrange(10):
                 for counter in xrange(1,5):
-                    body = file('test-' + str(counter) + '.html').read()
+                    
+                    file_name = 'test-' + str(counter) + '.html'
+                    file_path = os.path.join('plugins','grep','tests',file_name)
+                    
+                    body = file( file_path ).read()
                     response = httpResponse(200, body, {'Content-Type': 'text/html'},
                                             url_object( self.url_str + str(counter) ),
                                             url_object( self.url_str + str(counter) ) )
@@ -81,5 +112,3 @@ class test_all(unittest.TestCase):
         #cProfile.run('profile_me()', 'output.stats')
 
 
-if __name__ == "__main__":
-    unittest.main()

@@ -24,7 +24,7 @@ from core.controllers.w3afException import w3afException
 import copy
 
 
-class mutant:
+class mutant(object):
     '''
     This class is a wrapper for fuzzable requests that have been modified.
     '''
@@ -50,6 +50,28 @@ class mutant:
         @parameter index: The index. This was added to support repeated parameter names.
             a=123&a=456
         If I want to overwrite 456, index has to be 1.
+
+        >>> from core.data.parsers.urlParser import url_object
+        >>> from core.data.request.fuzzableRequest import fuzzableRequest
+        >>> fr = fuzzableRequest()
+        >>> url = url_object('http://www.w3af.com')
+        >>> fr.setURL( url ) 
+        >>> m = mutant( fr )
+        
+        # By default
+        >>> m.setVar( 'a' )
+        >>> m.getVar()
+        'a'
+        >>> m.getVarIndex()
+        0
+
+        # With specific index
+        >>> m.setVar( 'b', 3 )
+        >>> m.getVar()
+        'b'
+        >>> m.getVarIndex()
+        3
+        
         '''
         self._var = var
         self._index = index
@@ -69,7 +91,7 @@ class mutant:
         '''
         try:
             self._freq._dc[ self.getVar() ][ self._index ] = val
-        except Exception, e:
+        except Exception:
             msg = 'The mutant object wasn\'t correctly initialized. Either the variable to be'
             msg += ' modified, or the index of that variable are incorrect. This error was'
             msg += ' found in mutant.setModValue()'
@@ -119,10 +141,14 @@ class mutant:
         self._originalResponseBody = orBody
         
     #
-    # All the other methods are forwarded to the fuzzable request
+    # All the other methods are forwarded to the fuzzable request except for
+    # the magic methods.
     #
-    def __getattr__( self, name ):
-        return getattr( self._freq, name )
+    def __getattr__(self, name):
+        if name.startswith('__'):
+            raise AttributeError, ("%s instance has no attribute '%s'" %
+                                   (self.__class__.__name__, name))
+        return getattr(self._freq, name)
         
     def foundAt(self):
         '''

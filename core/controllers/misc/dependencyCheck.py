@@ -108,13 +108,13 @@ def dependencyCheck():
     except:
         packages.append('pyOpenSSL')
         packages_debian.append('python-pyopenssl')
-        packages_mac_ports.extend(['py26-socket-ssl','py26-openssl'])
+        packages_mac_ports.extend(['py26-openssl'])
         reasonForExit = True
 
     try:
         from lxml import etree
     except:
-        packages.append('libxml2')
+        packages.append('lxml')
         packages_debian.append('python-lxml')
         #TODO
         #packages_mac_port.append()

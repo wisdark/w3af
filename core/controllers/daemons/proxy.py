@@ -37,6 +37,7 @@ import core.controllers.outputManager as om
 from core.data.parsers.urlParser import url_object
 from core.data.request.fuzzableRequest import fuzzableRequest
 
+
 class proxy(w3afThread):
     '''
     This class defines a simple HTTP proxy, it is mainly used for "complex" plugins.
@@ -200,7 +201,7 @@ class w3afProxyHandler(BaseHTTPRequestHandler):
                 self.doAll()
         except Exception,  e:
             ### FIXME: Maybe I should perform some more detailed error handling...
-            om.out.debug('An exception ocurred in w3afProxyHandler.handle_one_request() :' + str(e) )
+            om.out.debug('An exception occurred in w3afProxyHandler.handle_one_request() :' + str(e) )
 
     def _getPostData(self):
         '''
@@ -298,10 +299,9 @@ class w3afProxyHandler(BaseHTTPRequestHandler):
         else:
 
             # most likely a GET request
-            qs = uri_instance.getQueryString()
             try:
                 httpCommandMethod = getattr( self._urlOpener, self.command )
-                res = httpCommandMethod(uri_instance, data=str(qs), headers=self.headers,  grepResult=grep )
+                res = httpCommandMethod(uri_instance, data=None, headers=self.headers,  grepResult=grep )
             except w3afException, w:
                 traceback.print_exc()
                 om.out.error('The proxy request failed, error: ' + str(w) )
@@ -333,7 +333,7 @@ class w3afProxyHandler(BaseHTTPRequestHandler):
 
         except Exception, e:
             traceback.print_exc()
-            om.out.debug('An error ocurred in proxy._sendError(). Maybe the browser closed the connection?')
+            om.out.debug('An error occurred in proxy._sendError(). Maybe the browser closed the connection?')
             om.out.debug('Exception: ' + str(e) )
         self.wfile.close()
     

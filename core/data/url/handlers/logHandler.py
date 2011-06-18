@@ -29,13 +29,11 @@ import core.controllers.outputManager as om
 import core.data.url.httpResponse as httpResponse
 from core.data.url.HTTPRequest import HTTPRequest as HTTPRequest
 
-import core.data.kb.knowledgeBase as kb
 from core.controllers.misc.number_generator import consecutive_number_generator
 from core.data.request.frFactory import createFuzzableRequestRaw
 
 
-class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler,
-                 urllib2.HTTPRedirectHandler):
+class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.HTTPRedirectHandler):
     """
     Add an unique id attribute to http responses and then log them.
     """
@@ -208,17 +206,11 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler,
                                       headers=headers)
 
         if isinstance(response, httpResponse.httpResponse):
-            res = response
+            resp = response
         else:
-            code, msg, hdrs = response.code, response.msg, response.info()
-            url = response.geturl()
-            body = response.read()
-            id = response.id
-            # BUGBUG: This is where I create/log the responses that always
-            # have 0.2 as the time!
-            url_instance = url_object( url )
-            res = httpResponse.httpResponse(code, body, hdrs, 
-                            request.url_object, url_instance, msg=msg, id=id)
+            resp = httpResponse.from_httplib_resp(response,
+                                              original_url=request.url_object)
+            resp.setId(response.id)
         
-        om.out.logHttp(fr, res)
+        om.out.logHttp(fr, resp)
 

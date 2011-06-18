@@ -109,7 +109,7 @@ EXTRA ATTRIBUTES AND METHODS
 
 # $Id: keepalive.py,v 1.16 2006/09/22 00:58:05 mstenner Exp $
 
-from __future__ import with_statement
+from collections import deque
 import urllib2
 import httplib
 import operator
@@ -122,7 +122,6 @@ import time
 import core.controllers.outputManager as om
 from core.controllers.w3afException import w3afException, \
     w3afMustStopByKnownReasonExc
-from core.controllers.misc.datastructs import deque
 import core.data.kb.config as cf
 from core.data.constants.httpConstants import NO_CONTENT
 
@@ -202,6 +201,22 @@ class HTTPResponse(httplib.HTTPResponse):
         self._connection = None # (same)
         self._method = method
         self._multiread = None
+        self._encoding = None
+    
+    @property
+    def URL(self):
+        return self.geturl()
+
+    def geturl(self):
+        return self._url
+    
+    @property
+    def encoding(self):
+        return self._encoding
+    
+    @encoding.setter
+    def encoding(self, enc):
+        self._encoding = enc
 
     def _raw_read(self, amt=None):
         '''
@@ -257,13 +272,6 @@ class HTTPResponse(httplib.HTTPResponse):
 
     def info(self):
         return self.headers
-
-    @property
-    def URL(self):
-        return self.geturl()
-
-    def geturl(self):
-        return self._url
 
     @closeonerror
     def read(self, amt=None):
@@ -689,8 +697,7 @@ class KeepAliveHandler:
         '''
         try:
             if req.has_data():
-                data = req.get_data()
-                data = str(data)
+                data = str(req.get_data())
                 conn.putrequest(req.get_method(), req.get_selector(),
                                 skip_host=1, skip_accept_encoding=1)
 
@@ -764,8 +771,10 @@ class HTTPSHandler(KeepAliveHandler, urllib2.HTTPSHandler):
 
 class _HTTPConnection(httplib.HTTPConnection):
 
-    def __init__(self, host, port=None, strict=None):
-        httplib.HTTPConnection.__init__(self, host, port, strict)
+    def __init__(self, host, port=None, strict=None,
+                 timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+        httplib.HTTPConnection.__init__(self, host, port, strict,
+                                        timeout=TIMEOUT)
         self.is_fresh = True
 
 
@@ -845,22 +854,14 @@ class HTTPConnection(_HTTPConnection):
     # use the modified response class
     response_class = HTTPResponse
 
-    # TODO: In Python > 2.5 the timeout is a constructor parameter. The 
-    # socket.setdefaulttimeout(TIMEOUT) call will no longer be needed.
-    # CHANGE ME!!
     def __init__(self, host, port=None, strict=None):
-        _HTTPConnection.__init__(self, host, port, strict)
-        socket.setdefaulttimeout(TIMEOUT)
+        _HTTPConnection.__init__(self, host, port, strict, TIMEOUT)
 
 class HTTPSConnection(httplib.HTTPSConnection):
     response_class = HTTPResponse
 
-    # TODO: In Python > 2.5 the timeout is a constructor parameter. The 
-    # socket.setdefaulttimeout(TIMEOUT) call will no longer be needed.
-    # CHANGE ME!!
     def __init__(self, host, port=None, key_file=None, cert_file=None,
                  strict=None):
         httplib.HTTPSConnection.__init__(self, host, port, key_file, cert_file,
-                                        strict)
-        socket.setdefaulttimeout(TIMEOUT)
+                                        strict, timeout=TIMEOUT)
         self.is_fresh = True

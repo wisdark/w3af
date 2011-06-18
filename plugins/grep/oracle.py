@@ -20,14 +20,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-import core.controllers.outputManager as om
-
 # options
-from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
-from core.data.bloomfilter.pybloom import ScalableBloomFilter
+from core.data.bloomfilter.bloomfilter import scalable_bloomfilter
 
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
@@ -42,7 +39,7 @@ class oracle(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
-        self._already_analyzed = ScalableBloomFilter()
+        self._already_analyzed = scalable_bloomfilter()
         
     def grep(self, request, response):
         '''
@@ -51,6 +48,54 @@ class oracle(baseGrepPlugin):
         @parameter request: The HTTP request object.
         @parameter response: The HTTP response object
         @return: None
+
+        Init
+        >>> from core.data.url.httpResponse import httpResponse
+        >>> from core.data.request.fuzzableRequest import fuzzableRequest
+        >>> from core.data.parsers.urlParser import url_object
+        >>> from core.controllers.coreHelpers.fingerprint_404 import fingerprint_404_singleton
+        >>> f = fingerprint_404_singleton( [False, False, False] )
+
+        Simple test, empty string.
+        >>> body = ''
+        >>> url = url_object('http://www.w3af.com/')
+        >>> headers = {'content-type': 'text/html'}
+        >>> response = httpResponse(200, body , headers, url, url)
+        >>> request = fuzzableRequest()
+        >>> request.setURL(url)
+        >>> request.setMethod('GET')
+        >>> o = oracle()
+        >>> o.grep(request, response)
+        >>> len(kb.kb.getData('oracle', 'oracle'))
+        0
+
+        One long string
+        >>> body = 'ABC ' * 10000
+        >>> url = url_object('http://www.w3af.com/')
+        >>> headers = {'content-type': 'text/html'}
+        >>> response = httpResponse(200, body , headers, url, url)
+        >>> request = fuzzableRequest()
+        >>> request.setURL(url)
+        >>> request.setMethod('GET')
+        >>> o = oracle()
+        >>> o.grep(request, response)
+        >>> len(kb.kb.getData('oracle', 'oracle'))
+        0
+
+        Something interesting to match
+        >>> body = 'ABC ' * 100
+        >>> body += '<!-- Created by Oracle '
+        >>> body += '</br> ' * 50
+        >>> url = url_object('http://www.w3af.com/')
+        >>> headers = {'content-type': 'text/html'}
+        >>> response = httpResponse(200, body , headers, url, url)
+        >>> request = fuzzableRequest()
+        >>> request.setURL(url)
+        >>> request.setMethod('GET')
+        >>> o = oracle()
+        >>> o.grep(request, response)
+        >>> len(kb.kb.getData('oracle', 'oracle'))
+        1
         '''
         url = response.getURL()
         if response.is_text_or_html() and url not in self._already_analyzed:

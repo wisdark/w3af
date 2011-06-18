@@ -55,9 +55,11 @@ class collectCookies(baseGrepPlugin):
             inst['cookie-object'] = obj
             cstr = obj.output(header='')
         
-        if cstr:
+        if cstr is not None:
             inst['cookie-string'] = cstr
-            inst.addToHighlight(cstr)
+        
+            if cstr:
+                inst.addToHighlight(cstr)
     
     def grep(self, request, response):
         '''
@@ -66,19 +68,71 @@ class collectCookies(baseGrepPlugin):
         @parameter response: The HTTP response object
         @return: None
 
+        Init
         >>> from core.data.url.httpResponse import httpResponse
-        >>> from core.data.url.HTTPRequest import HTTPRequest
+        >>> from core.data.request.fuzzableRequest import fuzzableRequest
         >>> from core.data.parsers.urlParser import url_object
-        
-        Simple test, empty string.
+        >>> from core.controllers.coreHelpers.fingerprint_404 import fingerprint_404_singleton
+        >>> f = fingerprint_404_singleton( [False, False, False] )
+
+        Simple test, empty string, no cookies.
         >>> body = ''
         >>> url = url_object('http://www.w3af.com/')
         >>> headers = {'content-type': 'text/html'}
         >>> response = httpResponse(200, body , headers, url, url)
-        >>> request = HTTPRequest(url)
-        >>> s = ssn(); s._already_inspected = set()
-        >>> s.grep(request, response)
-        >>> len(kb.kb.getData('ssn', 'ssn'))
+        >>> request = fuzzableRequest()
+        >>> request.setURL(url)
+        >>> request.setMethod('GET')
+        >>> c = collectCookies()
+        >>> c.grep(request, response)
+        >>> len(kb.kb.getData('collectCookies', 'cookies'))
+        0
+        >>> len(kb.kb.getData('collectCookies', 'invalid-cookies'))
+        0
+
+        >>> kb.kb.cleanup()
+        >>> body = ''
+        >>> url = url_object('http://www.w3af.com/')
+        >>> headers = {'content-type': 'text/html', 'Set-Cookie': 'abc=def'}
+        >>> response = httpResponse(200, body , headers, url, url)
+        >>> request = fuzzableRequest()
+        >>> request.setURL(url)
+        >>> request.setMethod('GET')
+        >>> c = collectCookies()
+        >>> c.grep(request, response)
+        >>> len(kb.kb.getData('collectCookies', 'cookies'))
+        1
+        >>> len(kb.kb.getData('collectCookies', 'invalid-cookies'))
+        0
+
+        >>> kb.kb.cleanup()
+        >>> body = ''
+        >>> url = url_object('http://www.w3af.com/')
+        >>> headers = {'content-type': 'text/html', 'Set-Cookie': 'abc=def; secure; HttpOnly'}
+        >>> response = httpResponse(200, body , headers, url, url)
+        >>> request = fuzzableRequest()
+        >>> request.setURL(url)
+        >>> request.setMethod('GET')
+        >>> c = collectCookies()
+        >>> c.grep(request, response)
+        >>> len(kb.kb.getData('collectCookies', 'cookies'))
+        1
+        >>> len(kb.kb.getData('collectCookies', 'invalid-cookies'))
+        0
+
+        >>> kb.kb.cleanup()
+        >>> body = ''
+        >>> url = url_object('http://www.w3af.com/')
+        >>> headers = {'content-type': 'text/html', 'Set-Cookie': ''}
+        >>> response = httpResponse(200, body , headers, url, url)
+        >>> request = fuzzableRequest()
+        >>> request.setURL(url)
+        >>> request.setMethod('GET')
+        >>> c = collectCookies()
+        >>> c.grep(request, response)
+        >>> len(kb.kb.getData('collectCookies', 'cookies'))
+        1
+        >>> len(kb.kb.getData('collectCookies', 'invalid-cookies'))
         0
 
         '''

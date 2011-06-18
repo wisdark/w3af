@@ -20,49 +20,37 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-import core.controllers.outputManager as om
+import copy
+import datetime
+import os
+import Queue
+import sys
+import time
+import traceback
 
-# Called here to init some variables in the config ( cf.cf.save() )
-# DO NOT REMOVE
-import core.controllers.miscSettings as miscSettings
-
-import os, sys
-
-from core.controllers.misc.homeDir import create_home_dir, get_home_dir, home_dir_is_writable
-from core.controllers.misc.temp_dir import create_temp_dir, remove_temp_dir, get_temp_dir
+from core.controllers.coreHelpers.export import export
+from core.controllers.coreHelpers.fingerprint_404 import \
+    fingerprint_404_singleton
+from core.controllers.coreHelpers.progress import progress
 from core.controllers.misc.factory import factory
 from core.controllers.misc.get_local_ip import get_local_ip
+from core.controllers.misc.homeDir import (create_home_dir,
+    verify_dir_has_perm, HOME_DIR)
 from core.controllers.misc.number_generator import consecutive_number_generator
-
-from core.data.url.xUrllib import xUrllib
-from core.data.parsers.urlParser import url_object
-from core.controllers.w3afException import w3afException, w3afRunOnce, \
-    w3afFileException, w3afMustStopException, w3afMustStopByUnknownReasonExc, \
-    w3afMustStopOnUrlError
+from core.controllers.misc.temp_dir import (create_temp_dir, remove_temp_dir,
+    TEMP_DIR)
 from core.controllers.targetSettings import targetSettings as targetSettings
-
-import traceback
-import copy
-import Queue
-import time
-import datetime
-
-import core.data.kb.knowledgeBase as kb
-import core.data.kb.config as cf
-from core.data.request.frFactory import createFuzzableRequests
 from core.controllers.threads.threadManager import threadManagerObj as tm
-
-# 404 detection
-from core.controllers.coreHelpers.fingerprint_404 import fingerprint_404_singleton
-
-# Progress tracking
-from core.controllers.coreHelpers.progress import progress
-
-# Export fuzzable requests helper
-from core.controllers.coreHelpers.export import export
-
-# Profile objects
+from core.controllers.w3afException import (w3afException, w3afRunOnce,
+    w3afFileException, w3afMustStopException, w3afMustStopByUnknownReasonExc,
+    w3afMustStopOnUrlError)
 from core.data.profile.profile import profile as profile
+from core.data.request.frFactory import createFuzzableRequests
+from core.data.url.xUrllib import xUrllib
+import core.controllers.miscSettings as miscSettings
+import core.controllers.outputManager as om
+import core.data.kb.config as cf
+import core.data.kb.knowledgeBase as kb
 
 
 class w3afCore(object):
@@ -103,14 +91,11 @@ class w3afCore(object):
         create_home_dir()
 
         # If this fails, maybe it is because the home directory doesn't exist
-        # or simply because it ain't writable
-        if not home_dir_is_writable():
-
-            # We have a problem!
-            # The home directory isn't writable, we can't create .w3af ...
-            msg = ('The w3af home directory "%s" is not writable. Please set '
-            'the correct permissions and ownership.' % get_home_dir())
-            print msg
+        # or simply because it ain't writable|readable by this user
+        if not verify_dir_has_perm(HOME_DIR, perm=os.W_OK|os.R_OK, levels=1):
+            print('Either the w3af home directory "%s" or its contents are not'
+                  ' writable or readable. Please set the correct permissions '
+                  'and ownership.' % HOME_DIR)
             sys.exit(-3)
             
     def _tmp_directory(self):
@@ -122,7 +107,7 @@ class w3afCore(object):
             create_temp_dir()
         except:
             msg = ('The w3af tmp directory "%s" is not writable. Please set '
-            'the correct permissions and ownership.' % get_temp_dir())
+            'the correct permissions and ownership.' % TEMP_DIR)
             print msg
             sys.exit(-3)            
 
@@ -132,17 +117,19 @@ class w3afCore(object):
         loads a new profile.
         '''
         # A dict with plugin types as keys and a list of plugin names as values
-        self._strPlugins = {'audit':[], 'grep':[], 'bruteforce':[], 'discovery':[], \
-        'evasion':[], 'mangle':[], 'output':[]}
+        self._strPlugins = {'audit': [], 'grep': [],
+                            'bruteforce': [], 'discovery': [],
+                            'evasion': [], 'mangle': [], 'output': []}
 
-        self._pluginsOptions = {'audit':{}, 'grep':{}, 'bruteforce':{}, 'discovery':{}, \
-        'evasion':{}, 'mangle':{}, 'output':{}, 'attack':{}}
+        self._pluginsOptions = {'audit': {}, 'grep': {}, 'bruteforce': {},
+                                'discovery': {}, 'evasion': {}, 'mangle': {},
+                                'output': {}, 'attack': {}}
     
     def getHomePath( self ):
         '''
         @return: The location of the w3af directory inside the home directory of the current user.
         '''
-        return get_home_dir()
+        return HOME_DIR
         
     def _initializeInternalVariables(self):
         '''
@@ -358,8 +345,6 @@ class w3afCore(object):
         res = []
         discovered_fr_list = []
         
-        # this will help identify the total discovery time
-        self._discovery_start_time_epoch = time.time()
         self._time_limit_reported = False
         
         while go:
@@ -452,34 +437,31 @@ class w3afCore(object):
         error handling!
         '''
         try:
-            try:
-                self._realStart()
-            except MemoryError:
-                msg = 'Python threw a MemoryError, this means that your'
-                msg += ' OS is running very low in memory. w3af is going'
-                msg += ' to stop.'
-                om.out.error( msg )
-                raise
-            except w3afMustStopByUnknownReasonExc:
-                #
-                # TODO: Jan 31, 2011. Temporary workaround. Make w3af crash on
-                # purpose so we can find out the *really* unknown error
-                # conditions.
-                #
-                raise
-            except w3afMustStopException, wmse:
-                self._end(wmse)
-                om.out.error('\n**IMPORTANT** The following error was '
-                 'detected by w3af and couldn\'t be resolved:\n %s\n' % wmse)
-            except Exception:
-                om.out.error('\nUnhandled error, traceback: %s\n' %
-                             traceback.format_exc()) 
-                raise
-            else:
-                msg =  'Scan finished in ' + self._get_time_string()
-                om.out.information( msg )
-                
+            self._realStart()
+        except MemoryError:
+            msg = 'Python threw a MemoryError, this means that your'
+            msg += ' OS is running very low in memory. w3af is going'
+            msg += ' to stop.'
+            om.out.error( msg )
+            raise
+        except w3afMustStopByUnknownReasonExc:
+            #
+            # TODO: Jan 31, 2011. Temporary workaround. Make w3af crash on
+            # purpose so we can find out the *really* unknown error
+            # conditions.
+            #
+            raise
+        except w3afMustStopException, wmse:
+            self._end(wmse, ignore_err=True)
+            om.out.error('\n**IMPORTANT** The following error was '
+             'detected by w3af and couldn\'t be resolved:\n %s\n' % wmse)
+        except Exception:
+            om.out.error('\nUnhandled error, traceback: %s\n' %
+                         traceback.format_exc()) 
+            raise
         finally:
+            msg = 'Scan finished in %s' % self._get_time_string()
+            om.out.information( msg )
             self.progress.stop()
             
     def _realStart(self):
@@ -489,8 +471,11 @@ class w3afCore(object):
         initPlugins() method before calling start.
         
         @return: No value is returned.
-        ''' 
+        '''
         om.out.debug('Called w3afCore.start()')
+        
+        # This will help identify the total discovery time
+        self._discovery_start_time_epoch = time.time()
         
         # Let the output plugins know what kind of plugins we're
         # using during the scan
@@ -517,9 +502,23 @@ class w3afCore(object):
 
                 for url in cf.cf.getData('targets'):
                     try:
+                        #
+                        #    GET the initial target URLs in order to save them
+                        #    in a list and use them as our bootstrap URLs
+                        #
                         response = self.uriOpener.GET(url, useCache=True)
                         self._fuzzableRequestList += filter(
                             get_curr_scope_pages, createFuzzableRequests(response))
+
+                        #
+                        #    NOTE: I need to perform this test here in order to avoid some weird
+                        #    thread locking that happens when the webspider calls is_404, and
+                        #    because I want to initialize the is_404 database in a controlled
+                        #    try/except block.
+                        #
+                        from core.controllers.coreHelpers.fingerprint_404 import is_404
+                        is_404(response)
+
                     except KeyboardInterrupt:
                         self._end()
                         raise
@@ -535,14 +534,6 @@ class w3afCore(object):
                                      'output for more information.' % e)
                         om.out.error('Traceback for this error: %s' % 
                                      traceback.format_exc())
-                    else:
-                        #
-                        # NOTE: I need to perform this test here in order to avoid some weird
-                        # thread locking that happens when the webspider calls is_404, and 
-                        # the function locks in order to calculate the 
-                        #
-                        from core.controllers.coreHelpers.fingerprint_404 import is_404
-                        is_404(response)
                 
                 # Load the target URLs to the KB
                 self._updateURLsInKb( self._fuzzableRequestList )
@@ -653,9 +644,8 @@ class w3afCore(object):
                     tmp_fr_list.sort()
 
                     om.out.information('The list of fuzzable requests is:')
-                    for i in tmp_fr_list:
-                        om.out.information( i )
-                
+                    map(om.out.information, tmp_fr_list)
+                    
                     self._audit()
                     
                 self._end()
@@ -711,7 +701,7 @@ class w3afCore(object):
         self.uriOpener.stop()
         
         # End the grep plugins
-        self._end()
+        self._end(ignore_err=True)
     
     def quit( self ):
         '''
@@ -726,7 +716,7 @@ class w3afCore(object):
         # Now it's safe to remove the temp_dir
         remove_temp_dir()
         
-    def _end( self, exceptionInstance=None ):
+    def _end(self, exc_inst=None, ignore_err=False):
         '''
         This method is called when the process ends normally or by an error.
         '''
@@ -736,28 +726,27 @@ class w3afCore(object):
             # Create a new one, so it can be used by exploit plugins.
             self.uriOpener = xUrllib()
             
-            # Let the progress module know our status.
-            self.progress.stop()
-            
-            if exceptionInstance:
-                om.out.error( str(exceptionInstance) )
-            
-            # FIXME: Feb 1, 2011. Next block is potentialy a real source of
-            # errors that turns into crashes if called when w3af has to stop
-            # bc of a previous error. I think it is fine to ignore them in 
-            # those cases; otherwise let the exception pass.
+            # Silently ignore. w3af is stopped
             try:
-                tm.join(joinAll=True)
-                tm.stopAllDaemons()
+                # Let the progress module know our status.
+                self.progress.stop()
             except:
-                if not exceptionInstance:
-                    raise
+                pass
+            
+            if exc_inst:
+                om.out.debug(str(exc_inst))
+            
+            tm.join(joinAll=True)
+            tm.stopAllDaemons()
             
             for plugin in self._plugins['grep']:
                 plugin.end()
             
             # Also, close the output manager.
             om.out.endOutputPlugins()
+        except Exception, ex:
+            if not ignore_err:
+                raise
         finally:
             # Now I'm definitly not running:
             self._isRunning = False
@@ -1276,7 +1265,7 @@ class w3afCore(object):
             - One that contains the instances of the valid profiles that were loaded
             - One with the file names of the profiles that are invalid
         '''
-        profile_home = os.path.join(get_home_dir(), 'profiles')
+        profile_home = os.path.join(HOME_DIR, 'profiles')
         str_profile_list = self._getListOfFiles(profile_home, extension='.pw3af')
         
         instance_list = []

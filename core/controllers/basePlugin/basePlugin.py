@@ -136,7 +136,8 @@ class basePlugin(configurable):
         >>> v2 = vuln.vuln()
         >>> v2.setDesc('world')
         >>> info_obj = [ v1, v2 ]
-        >>> b.printUniq( info_obj, None )
+        >>> b.printUniq(info_obj, None) is None
+        True
         '''
 
         # Create the list of things to inform
@@ -174,9 +175,8 @@ class basePlugin(configurable):
         Sends a mutant to the remote web server.
         '''
         #
-        #
-        #   IMPORTANT NOTE: If you touch something here, the whole framework may stop working!
-        #
+        # IMPORTANT NOTE: If you touch something here, the whole framework may
+        # stop working!
         #
         url = mutant.getURI()
         data = mutant.getData()
@@ -190,7 +190,7 @@ class basePlugin(configurable):
         args = ( url, )
         method = mutant.getMethod()
         
-        functor = getattr( self._urlOpener , method )
+        functor = getattr(self._urlOpener , method)
         # run functor , run !   ( forest gump flash )
         res = functor(*args, data=data, headers=headers,
                       grepResult=grepResult, useCache=useCache)

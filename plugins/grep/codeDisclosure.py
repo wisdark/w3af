@@ -34,7 +34,7 @@ import core.data.constants.severity as severity
 
 from core.controllers.coreHelpers.fingerprint_404 import is_404
 from core.controllers.misc.is_source_file import is_source_file
-from core.data.bloomfilter.pybloom import ScalableBloomFilter
+from core.data.bloomfilter.bloomfilter import scalable_bloomfilter
 
 
 class codeDisclosure(baseGrepPlugin):
@@ -48,7 +48,7 @@ class codeDisclosure(baseGrepPlugin):
         baseGrepPlugin.__init__(self)
         
         #   Internal variables
-        self._already_added = ScalableBloomFilter()
+        self._already_added = scalable_bloomfilter()
         self._first_404 = True
 
     def grep(self, request, response):
@@ -62,15 +62,20 @@ class codeDisclosure(baseGrepPlugin):
         @return: None
         Init
         >>> import codeDisclosure
-        >>> codeDisclosure.is_404 = lambda x: False
         >>> from core.data.url.httpResponse import httpResponse
         >>> from core.data.request.fuzzableRequest import fuzzableRequest
         >>> from core.controllers.misc.temp_dir import create_temp_dir
+        >>> from core.data.parsers.urlParser import url_object
+        >>> from core.controllers.coreHelpers.fingerprint_404 import fingerprint_404_singleton
+        >>> from core.data.url.xUrllib import xUrllib
+        >>> xurllib = xUrllib()
+        >>> f = fingerprint_404_singleton( [False, False, False] )
+        >>> f.set_urlopener( xurllib )
         >>> o = create_temp_dir()
 
         Simple test, empty string.
         >>> body = ''
-        >>> url = 'http://www.w3af.com/'
+        >>> url = url_object('http://www.w3af.com/')
         >>> headers = {'content-type': 'text/html'}
         >>> response = httpResponse(200, body , headers, url, url)
         >>> request = fuzzableRequest()
@@ -84,7 +89,7 @@ class codeDisclosure(baseGrepPlugin):
         Disclose some PHP code,
         >>> kb.kb.cleanup()
         >>> body = 'header <? echo "a"; ?> footer'
-        >>> url = 'http://www.w3af.com/'
+        >>> url = url_object('http://www.w3af.com/')
         >>> headers = {'content-type': 'text/html'}
         >>> response = httpResponse(200, body , headers, url, url)
         >>> request = fuzzableRequest()

@@ -131,9 +131,15 @@ class sourceforge_bug_report(object):
         # Ask for a bug title and description
         summary, userdesc = self._ask_bug_info()
         
-        return self.sourceforge.report_bug(summary, userdesc, self.tback,
-                                           self.fname, self.plugins,
-                                           self.autogen, user)
+        result = None
+        try:
+            result = self.sourceforge.report_bug(summary, userdesc, self.tback,
+                                                 self.fname, self.plugins,
+                                                 self.autogen, user)
+        except:
+            pass
+        else:
+            return result
     
     def _login_sf(self):
         '''
@@ -366,6 +372,7 @@ class bug_report_window(simple_base_window, sourceforge_bug_report):
         self.label.select_region(0, 0)
     
     def report_bug(self, widg):
+        self.butt_send.set_sensitive(False)
         sourceforge_bug_report.report_bug(self)
     
     def _display_result(self, bug_url):

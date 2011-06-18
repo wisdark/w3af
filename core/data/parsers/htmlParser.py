@@ -21,11 +21,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
-from core.controllers.w3afException import w3afException
-import core.data.kb.config as cf
-
-from lxml import etree
-
 from core.data.parsers.sgmlParser import sgmlParser
 from core.data.parsers.urlParser import url_object
 
@@ -40,10 +35,11 @@ class htmlParser(sgmlParser):
     '''
     
     def __init__(self, httpResponse, normalizeMarkup=True, verbose=0):
-        self._tagsContainingURLs =  ('a', 'img', 'link', 'script', 'iframe', 'object',
-                'embed', 'area', 'frame', 'applet', 'input', 'base',
-                'div', 'layer', 'ilayer', 'bgsound', 'form')
-        self._urlAttrs = ('href', 'src', 'data', 'action' )
+        self._tagsContainingURLs =  ('a', 'img', 'link', 'script', 'iframe',
+                                     'object', 'embed', 'area', 'frame',
+                                     'applet', 'input', 'base', 'div', 'layer',
+                                     'ilayer', 'bgsound', 'form')
+        self._urlAttrs = ('href', 'src', 'data', 'action')
         
         # An internal list to be used to save input tags that are found outside
         # of the scope of a form tag.
@@ -54,20 +50,18 @@ class htmlParser(sgmlParser):
         self._source_url = httpResponse.getURL()
         
         sgmlParser.__init__(self, httpResponse, normalizeMarkup, verbose)
-        
-    def _preParse(self, httpResponse):
+    
+    def _preParse(self, http_resp):
         '''
-        @parameter httpResponse: The HTTP response document that contains the
+        @parameter http_resp: The HTTP response document that contains the
         HTML document inside its body.
         '''
         assert self._baseUrl, 'The base URL must be set.'
         
-        html_doc = httpResponse.getBody()
-    
         if self._normalizeMarkup:
-            html_doc = httpResponse.getNormalizedBody()
+            html_doc = http_resp.getNormalizedBody()
         else:
-            html_doc = html_doc.encode(httpResponse.getCharset())
+            html_doc = http_resp.body.encode(http_resp.charset)
 
         # Now we are ready to work
         self._parse(html_doc)
@@ -160,8 +154,9 @@ class htmlParser(sgmlParser):
         foundAction = False
         for attr in attrs:
             if attr[0].lower() == 'action':
-                action = self._baseUrl.urlJoin(attr[1])
-                action = self._decode_URL(action)
+                action = self._baseUrl.urlJoin(attr[1]).url_string
+                action = url_object(self._decode_URL(action),
+                                    encoding=self._encoding)
                 foundAction = True
 
         if not foundAction:
@@ -174,7 +169,7 @@ class htmlParser(sgmlParser):
 
         # Create the form object and store everything for later use
         self._insideForm = True
-        form_obj = form.form()
+        form_obj = form.form(encoding=self._encoding)
         form_obj.setMethod( method )
         form_obj.setAction( action )
         self._forms.append( form_obj )
@@ -252,9 +247,6 @@ class htmlParser(sgmlParser):
             self._insideTextarea = False
         else:
             self._insideTextarea = True
-            if self._forms:
-                form_obj = self._forms[-1]
-                form_obj.addInput([('name', self._textareaTagName), ('value', '')])
 
     def handle_data(self, data):
         """
@@ -273,13 +265,14 @@ class htmlParser(sgmlParser):
         """
         Handler for textarea end tag
         """
+        attrs = [('name', self._textareaTagName),
+                 ('value', self._textareaData)]
         sgmlParser._handle_textarea_endtag(self)
         if not self._forms:
-            self._saved_inputs.append( ('input', attrs) )
+            self._saved_inputs.append(('input', attrs))
         else:
             form_obj = self._forms[-1]
-            # Replace with real value
-            form_obj[self._textareaTagName][-1] = self._textareaData
+            form_obj.addInput(attrs)
 
     def _handle_select_tag_inside_form(self, tag, attrs):
         """
@@ -319,9 +312,7 @@ class htmlParser(sgmlParser):
             self._saved_inputs.append( ('input', self._optionAttrs) )
         else:
             form_obj = self._forms[-1]
-            self_tag_name = getattr(self, '_selectTagName', None)
-            if self_tag_name:
-                form_obj.addSelect( self._selectTagName, self._optionAttrs )
+            form_obj.addSelect( self._selectTagName, self._optionAttrs )
 
     def _handle_option_tag_inside_form(self, tag, attrs):
         """

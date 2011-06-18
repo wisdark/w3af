@@ -40,10 +40,10 @@ import gtk, gobject
 
 # This is just general info, to help people knowing their system
 print "Starting w3af, running on:"
-print "  Python version:"
+print "  Python version: "
 print "\n".join("    "+x for x in sys.version.split("\n"))
-print "  GTK version:", ".".join(str(x) for x in gtk.gtk_version)
-print "  PyGTK version:", ".".join(str(x) for x in gtk.pygtk_version)
+print "  GTK version: ", ".".join(str(x) for x in gtk.gtk_version)
+print "  PyGTK version: ", ".".join(str(x) for x in gtk.pygtk_version)
 print
 
 # Threading initializer
@@ -71,9 +71,10 @@ except ImportError:
     sys.exit( 1 )
 
 import threading, shelve, os
-import core.controllers.w3afCore
+from core.controllers.w3afCore import wCore
 import core.controllers.miscSettings
-from core.controllers.auto_update import VersionMgr, is_working_copy
+from core.controllers.auto_update import (VersionMgr, is_working_copy,
+                                          W3AF_LOCAL_PATH)
 from core.controllers.w3afException import w3afException
 import core.data.kb.config as cf
 from core.data.parsers.urlParser import url_object
@@ -83,7 +84,7 @@ from . import export_request
 from . import entries, encdec, messages, logtab, pluginconfig, confpanel
 from . import wizard, guardian, proxywin
 
-from core.controllers.misc.homeDir import get_home_dir
+from core.controllers.misc.homeDir import get_home_dir, verify_dir_has_perm
 from core.controllers.misc.get_w3af_version import get_w3af_version
 
 import webbrowser, time
@@ -262,7 +263,8 @@ class MainApp(object):
         self.window.connect('key_press_event', self.helpF1)
         splash.push(_("Loading..."))
         
-        if do_upd in (None, True) and is_working_copy():
+        if do_upd in (None, True) and is_working_copy() and \
+            verify_dir_has_perm(W3AF_LOCAL_PATH, os.W_OK, levels=1):
             # Do SVN update stuff
             vmgr = VersionMgr(log=splash.push)
             
@@ -322,7 +324,7 @@ class MainApp(object):
         mainvbox.show()
 
         splash.push(_("Initializing core..."))
-        self.w3af = core.controllers.w3afCore.w3afCore()
+        self.w3af = wCore
         
         # This is inited before all, to have a full logging facility.
         om.out.setOutputPlugins( ['gtkOutput'] )
@@ -573,12 +575,15 @@ class MainApp(object):
         # saving windows config
         self.generalconfig["mainwindow-size"] = self.window.get_size()
         self.generalconfig["mainwindow-position"] = self.window.get_position()
-        self.generalconfig.close()
-        gtk.main_quit()
-        time.sleep(0.5)
-        self.w3af.stop()
-        self.w3af.quit()
-        return False
+        
+        try:
+            self.generalconfig.close()
+        finally:
+            gtk.main_quit()
+            time.sleep(0.5)
+            self.w3af.stop()
+            self.w3af.quit()
+            return False
 
     def _scan_director(self, widget):
         '''Directs what to do with the Scan.'''

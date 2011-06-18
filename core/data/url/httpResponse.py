@@ -33,7 +33,7 @@ from core.data.parsers.urlParser import url_object
 import codecs
 def _returnEscapedChar(exc):
     slash_x_XX = repr(exc.object[exc.start:exc.end])[1:-1]
-    return (unicode(slash_x_XX) , exc.end)
+    return (unicode(slash_x_XX), exc.end)
 
 codecs.register_error("returnEscapedChar", _returnEscapedChar)
 
@@ -44,22 +44,46 @@ LF = '\n'
 CRLF = CR + LF
 SP = ' '
 
+
+def from_httplib_resp(httplibresp, original_url=None):
+    '''
+    Factory function. Build a httpResponse object from a httplib.HTTPResponse
+    instance
+    
+    @param httplibresp: httplib.HTTPResponse instance
+    @param original_url: Optional 'url_object' instance.
+    
+    @return: A httpResponse instance
+    '''
+    resp = httplibresp
+    code, msg, hdrs, url_inst, body = (resp.code, resp.msg, resp.info(),
+                                       url_object(resp.geturl()), resp.read())
+    original_url = original_url or url_inst
+    
+    charset = getattr(httplibresp, 'encoding', None)
+    return httpResponse(code, body, hdrs, url_inst,
+                        original_url, msg, charset=charset)
+
+
 class httpResponse(object):
 
     def __init__(self, code, read, info, geturl, original_url,
                  msg='OK', id=None, time=0.2, alias=None, charset=None):
         '''
+        @param code: 
+        @param read: 
+        @param info: 
+        @param geturl: url_object instance
+        @param original_url: url_object instance
+        @param msg:
+        @param id:  
         @parameter time: The time between the request and the response.
+        @param alias: 
+        @param charset: 
         '''
-        if not isinstance(geturl, url_object):
-            raise TypeError('The geturl.__init__() parameter of a httpResponse'
-                            ' object must be of urlParser.url_object type.')
-
-        if not isinstance(original_url, url_object):
-            raise TypeError('The original_url.__init__() parameter of a '
-                'httpResponse object must be of urlParser.url_object type.')
-        
         self._charset = charset
+        self._body = None
+        self._raw_body = read
         self._content_type = ''
         self._dom = None
         self._clear_text_body = None
@@ -70,23 +94,23 @@ class httpResponse(object):
         self._uri = original_url
         # Set the info
         self._info = info
-        # The URL where we were redirected to (equal to original_url when no redirect)
+        # The URL where we were redirected to (equal to original_url when
+        # no redirect)
         self._redirectedURL = geturl
         self._redirectedURI = geturl.uri2url()
         
         # Set the rest
         self.setCode(code)
 
-        # Save the type for fast access, so I don't need to calculate the type each time
-        # someone calls the "is_text_or_html" method. This attributes are set in the
-        # setHeaders() method.
+        # Save the type for fast access, so I don't need to calculate the type
+        # each time someone calls the "is_text_or_html" method. This attributes
+        # are set in the setHeaders() method.
         self._is_text_or_html_response = False
         self._is_swf_response = False
         self._is_pdf_response = False
         self._is_image_response = False
         self.setHeaders(info)
         
-        self.setBody(read)
         self._msg = msg
         self._time = time
         self._alias = alias
@@ -95,7 +119,7 @@ class httpResponse(object):
         self.id = id
         # Defaults to False
         self._fromCache = False
-
+    
     def __contains__(self, string_to_test):
         '''
         Determine if the `string_to_test` is contained by the HTTP response
@@ -103,42 +127,52 @@ class httpResponse(object):
 
         @param string_to_test: String to look for in the body  
         '''
-        return string_to_test in self._body
+        return string_to_test in self.body
     
     def __repr__(self):
-        res = '< httpResponse | %s | %s ' % (self.getCode() , self.getURL())
 
-        # extra info
-        if self.id is not None:
-            res += ' | id:' + str(self.id)
-
-        if self._fromCache != False:
-            res += ' | fromCache:True'
-
-        # aaaand close...
-        res += ' >'
-        return res
+        vals = {'code': self.getCode(),
+                'url': str(self.getURL()),
+                'id': self.id and ' | id:%s' % self.id or '',
+                'fcache': self._fromCache and ' | fromCache:True' or ''}
+        return '<httpResponse | %(code)s | %(url)s%(id)s%(fcache)s>' % vals
+    
+    def setId(self, id):
+        self.id = id
     
     def getId(self):
         return self.id
-    
-    def getRedirURL(self):
-        return self._redirectedURL
-    
-    def getRedirURI(self):
-        return self._redirectedURI
+
+    def setCode(self, code):
+        self._code = code
     
     def getCode(self):
         return self._code
-    
-    def getAlias(self):
-        return self._alias
-    
-    def getBody(self):
+
+    @property
+    def body(self):
+        if self._body is None:
+            self._body, self._charset = self._charset_handling()
+            # Free 'raw_body'
+            self._raw_body = None
         return self._body
     
-    def info(self):
-        return self._info
+    @body.setter
+    def body(self, body):
+        # Reset body
+        self._body = None
+        self._raw_body = body
+    
+    def setBody(self, body):
+        '''
+        Setter for body.
+
+        @body: A string that represents the body of the HTTP response
+        '''
+        self.body = body
+    
+    def getBody(self):
+        return self.body
 
     def getClearTextBody(self):
         '''
@@ -159,6 +193,16 @@ class httpResponse(object):
                 self._clear_text_body = ''.join(map(ff, dom.getiterator()))
                 return self._clear_text_body
 
+    def getNormalizedBody(self):
+        '''
+        @return: A normalized *unicode* representation of the body.
+        '''
+        dom = self.getDOM()
+        if dom:
+            return etree.tostring(dom, encoding=unicode,
+                                  method='html', xml_declaration=False)
+        return u''
+
     def getDOM(self):
         '''
         I don't want to calculate the DOM for all responses, only for those
@@ -170,154 +214,42 @@ class httpResponse(object):
         if self._dom is None:
             try:
                 parser = etree.HTMLParser(recover=True)
-                self._dom = etree.fromstring(self._body, parser)
+                self._dom = etree.fromstring(self.body, parser)
             except Exception:
-                msg = 'The HTTP body for "%s" could NOT be ' \
-                'parsed by libxml2.' % self.getURL()
+                msg = ('The HTTP body for "%s" could NOT be parsed by '
+                       'libxml2.' % self.getURL())
                 om.out.debug(msg)
         return self._dom
     
-    def getNormalizedBody(self):
-        '''
-        @return: A normalized body *string* representation.
-        '''
-        dom = self.getDOM()
-        if dom:
-            dom = etree.tostring(dom, encoding=unicode,
-                                 method='html', xml_declaration=False)
-        return dom or ''
+    @property
+    def charset(self):
+        if not self._charset:
+            self._body, self._charset = self._charset_handling()
+            # Free 'raw_body'
+            self._raw_body = None
+        return self._charset
     
-    def getHeaders(self):
-        return self._headers
-
-    def getLowerCaseHeaders(self):
-        '''
-        If the original headers were:
-            'Abc-Def: f00N3s'
-        This will return:
-            'abc-def: f00N3s'
-        
-        The only thing that changes is the header name.
-        '''
-        return dict((k.lower(), v) for k, v in self._headers.iteritems())
-        
-    def getURL(self):
-        return self._realurl
-
-    def getURI(self):
-        return self._uri
+    @charset.setter
+    def charset(self, charset):
+        self._charset = charset
     
-    def getWaitTime(self):
-        return self._time
-    
-    def getMsg(self):
-        return self._msg
+    def setCharset(self, charset):
+        self.charset = charset
     
     def getCharset(self):
-        return self._charset
+        return self.charset
     
     def setRedirURL(self, ru):
         self._redirectedURL = ru
     
+    def getRedirURL(self):
+        return self._redirectedURL
+
     def setRedirURI(self, ru):
         self._redirectedURI = ru
     
-    def setCode(self, code):
-        self._code = code
-    
-    def setBody(self, body):
-        '''
-        This method decodes the body based on the header(or metadata) encoding
-        and afterwards, it creates the necesary metadata to speed up string
-        searches inside the body string.
-
-        @body: A string that represents the body of the HTTP response
-        '''
-        # Sets self's `_body` and `_charset` attributes 
-        self._charset_handling(body)
-        
-        if type(self._body) is str:
-            print
-
-    def _charset_handling(self, body):
-        '''
-        This method decodes the body based on the header(or metadata) encoding.
-        
-        This is one of the most important methods, because it will decode any
-        string (usually HTTP response body contents) and return a unicode
-        object. If `body` is unicode this method will only figure out the
-        right encoding; it won't try to decode anything.         
-
-        @body: A <unicode> or <str> object that represents the body of the
-            HTTP response
-        '''
-        # A sample header just to remember how they look like:
-        # "content-type: text/html; charset=iso-8859-1"
-        lowerCaseHeaders = self.getLowerCaseHeaders()
-        
-        if not 'content-type' in lowerCaseHeaders:
-            om.out.debug('hmmm... wtf?! The remote web server failed to send '
-                         'the content-type header.')
-            self._body = body
-            self._charset = self._charset or DEFAULT_CHARSET
-        
-        elif not self.is_text_or_html():
-            # Not text, save as it is.
-##            self._body = body
-            self._body = u''
-            self._charset = self._charset or DEFAULT_CHARSET
-        else:
-            # According to the web server, the body content is text, html,
-            # xml or something similar
-            
-            ## Figure out charset to work with ##
-            charset = self._charset
-            
-            if not charset:
-                            
-                # Start with the headers
-                charset_mo = re.search('charset=\s*?([\w-]+)',
-                                        lowerCaseHeaders['content-type'])
-                if charset_mo:
-                    # Seems like the response's headers contain a charset
-                    charset = charset_mo.groups()[0].lower().strip()
-                else:
-                    # Continue with the body's meta tag. Sth like this:
-                    # <meta http-equiv="Content-Type" content="text/html; 
-                    # charset=utf-8">
-                    charset_mo = re.search(
-                            '<meta.*?content=".*?charset=\s*?([\w-]+)".*?>',
-                            body, re.IGNORECASE)
-                    if charset_mo:
-                        charset = charset_mo.groups()[0].lower().strip()
-                    else:
-                        try:
-                            # TODO: Play here with chardet
-                            raise Exception
-                        except:
-                            charset = DEFAULT_CHARSET
-
-            # Only try to decode <string> objects
-            if type(body) is str:
-
-                # Now that we have the charset, we use it! (and save it)
-                # The return value of the decode function is a unicode obj.
-                try:
-                    body = body.decode(charset, 'returnEscapedChar')
-                except LookupError:
-                    # warn about a buggy charset
-                    msg = ('Charset LookupError: unknown charset: %s; '
-                        'ignored and set to default: %s' % 
-                        (charset, self._charset))
-                    om.out.debug(msg)
-                    
-                    # Use the default
-                    charset = DEFAULT_CHARSET
-                    body = body.decode(charset, 'returnEscapedChar')
-           
-            self._body = body
-            # Overwrite charset
-            self._charset = charset
+    def getRedirURI(self):
+        return self._redirectedURI
 
     def setHeaders(self, headers):
         '''
@@ -359,6 +291,181 @@ class httpResponse(object):
                 # Image?
                 if self._content_type.lower().count('image'):
                     self._is_image_response = True
+    
+    def getHeaders(self):
+        return self._headers
+
+    def getLowerCaseHeaders(self):
+        '''
+        If the original headers were:
+            'Abc-Def: f00N3s'
+        This will return:
+            'abc-def: f00N3s'
+        
+        The only thing that changes is the header name.
+        '''
+        return dict((k.lower(), v) for k, v in self._headers.iteritems())
+
+    def setURL(self, url):
+        '''
+        >>> url = url_object('http://www.google.com')
+        >>> r = httpResponse(200, '' , {}, url, url)
+        >>> r.setURL('http://www.google.com/')
+        Traceback (most recent call last):
+          ...
+        TypeError: The URL of a httpResponse object must be of urlParser.url_object type.
+        >>> r.setURL(url)
+        >>> r.getURL() == url
+        True
+        '''
+        if not isinstance(url, url_object):
+            raise TypeError('The URL of a httpResponse object must be of '
+                             'urlParser.url_object type.')
+        
+        self._realurl = url.uri2url()
+        
+    def getURL(self):
+        return self._realurl
+
+    def setURI(self, uri):
+        '''
+        >>> uri = url_object('http://www.google.com/')
+        >>> r = httpResponse(200, '' , {}, uri, uri)
+        >>> r.setURI('http://www.google.com/')
+        Traceback (most recent call last):
+          ...
+        TypeError: The URI of a httpResponse object must be of urlParser.url_object type.
+        >>> r.setURI(uri)
+        >>> r.getURI() == uri
+        True
+        '''
+        if not isinstance(uri, url_object):
+            raise TypeError('The URI of a httpResponse object must be of '
+                             'urlParser.url_object type.')
+        
+        self._uri = uri
+        self._realurl = uri.uri2url()
+
+    def getURI(self):
+        return self._uri
+
+    def setFromCache(self, fcache):
+        '''
+        @parameter fcache: True if this response was obtained from the
+        local cache.
+        '''
+        self._fromCache = fcache
+    
+    def getFromCache(self):
+        '''
+        @return: True if this response was obtained from the local cache.
+        '''
+        return self._fromCache
+
+    def setWaitTime(self, t):
+        self._time = t
+    
+    def getWaitTime(self):
+        return self._time
+
+    def setAlias(self, alias):
+        self._alias = alias
+        
+    def getAlias(self):
+        return self._alias
+
+    def info(self):
+        return self._info
+
+    def getStatusLine(self):
+        '''Return status-line of response.'''
+        return 'HTTP/1.1' + SP + str(self._code) + SP + self._msg + CRLF
+    
+    def getMsg(self):
+        return self._msg
+    
+    def _charset_handling(self):
+        '''
+        Decode the body based on the header (or metadata) encoding.
+        The implemented algorithm follows the logic used by FF:
+
+            1) First try to find a charset using the following search criteria:
+                a) Look in the 'content-type' HTTP header. Example:
+                    content-type: text/html; charset=iso-8859-1
+                b) Look in the 'meta' HTML header. Example:
+                    <meta .* content="text/html; charset=utf-8" />
+                c) Determine the charset using the chardet module
+                d) Use the DEFAULT_CHARSET
+            
+            2) Try to decode the body using the found charset. If it fails,
+            then force it to use the DEFAULT_CHARSET
+        
+        Finally return the unicode (decoded) body and the used charset.  
+        
+        Note: If the body is already a unicode string return it as it is.
+        '''
+        lowerCaseHeaders = self.getLowerCaseHeaders()
+        charset = self._charset
+        rawbody = self._raw_body
+        
+        # Only try to decode <str> strings. Skip <unicode> strings
+        if type(rawbody) is unicode:
+            _body = rawbody
+            assert charset is not None, ("httpResponse objects containing "
+                             "unicode body must have an associated charset")
+        
+        elif not 'content-type' in lowerCaseHeaders:
+            om.out.debug('hmmm... wtf?! The remote web server failed to send '
+                         'the content-type header.')
+            _body = rawbody
+            charset = charset or DEFAULT_CHARSET
+        
+        elif not self.is_text_or_html():
+            # Not text, save as it is.
+            _body = rawbody
+            charset = charset or DEFAULT_CHARSET
+        else:
+            # According to the web server, the body content is text, html,
+            # xml or something similar
+            
+            # Figure out charset to work with
+            if not charset:
+                # Start with the headers
+                charset_mo = re.search('charset=\s*?([\w-]+)',
+                                        lowerCaseHeaders['content-type'])
+                if charset_mo:
+                    # Seems like the response's headers contain a charset
+                    charset = charset_mo.groups()[0].lower().strip()
+                else:
+                    # Continue with the body's meta tag
+                    charset_mo = re.search(
+                            '<meta.*?content=".*?charset=\s*?([\w-]+)".*?>',
+                            rawbody, re.IGNORECASE)
+                    if charset_mo:
+                        charset = charset_mo.groups()[0].lower().strip()
+                    else:
+                        try:
+                            # TODO: Play here with chardet
+                            raise Exception
+                        except:
+                            charset = DEFAULT_CHARSET
+
+
+            # Now that we have the charset, we use it!
+            # The return value of the decode function is a unicode string.
+            try:
+                _body = rawbody.decode(charset, 'returnEscapedChar')
+            except LookupError:
+                # Warn about a buggy charset
+                msg = ('Charset LookupError: unknown charset: %s; '
+                    'ignored and set to default: %s' % 
+                    (charset, self._charset))
+                om.out.debug(msg)
+                # Forcing it to use the default
+                charset = DEFAULT_CHARSET
+                _body = rawbody.decode(charset, 'returnEscapedChar')
+            
+        return _body, charset
 
     def getContentType(self):
         '''
@@ -390,62 +497,6 @@ class httpResponse(object):
         '''
         return self._is_image_response
             
-    def setURL(self, url):
-        '''
-        >>> u = url_object('http://www.google.com')
-        >>> r = httpResponse(200, '' , {}, u, u)
-        >>> r.setURL('http://www.google.com/')
-        Traceback (most recent call last):
-          File "<stdin>", line 1, in ?
-        ValueError: The URL of a httpResponse object must be of urlParser.url_object type.
-        >>> u = url_object('http://www.google.com')
-        >>> r = httpResponse(200, '' , {}, u, u)
-        >>> r.setURL( url_object('http://www.google.com/') )
-        '''
-        if not isinstance(url, url_object):
-            raise ValueError('The URL of a httpResponse object must be of '
-                             'urlParser.url_object type.')
-        
-        self._realurl = url.uri2url()
-    
-    def setURI(self, uri):
-        '''
-        >>> u = url_object('http://www.google.com')
-        >>> r = httpResponse(200, '' , {}, u, u)
-        >>> r.setURI('http://www.google.com/')
-        Traceback (most recent call last):
-          File "<stdin>", line 1, in ?
-        ValueError: The URI of a httpResponse object must be of urlParser.url_object type.
-        >>> u = url_object('http://www.google.com')
-        >>> r = httpResponse(200, '' , {}, u, u)
-        >>> r.setURI( url_object('http://www.google.com/') )
-        '''
-        if not isinstance(uri, url_object):
-            raise ValueError('The URI of a httpResponse object must be of '
-                             'urlParser.url_object type.')
-        
-        self._uri = uri
-        self._realurl = uri.uri2url()
-        
-    def setWaitTime(self, t):
-        self._time = t
-
-    def getFromCache(self):
-        '''
-        @return: True if this response was obtained from the local cache.
-        '''
-        return self._fromCache
-        
-    def setFromCache(self, fcache):
-        '''
-        @parameter fcache: True if this response was obtained from the local cache.
-        '''
-        self._fromCache = fcache
-
-    def getStatusLine(self):
-        '''Return status-line of response.'''
-        return 'HTTP/1.1' + SP + str(self._code) + SP + self._msg + CRLF
-
     def dumpResponseHead(self):
         '''
         @return: A string with:
@@ -453,13 +504,18 @@ class httpResponse(object):
             Header1: Value1
             Header2: Value2
         '''
-        return "%s%s" % (self.getStatusLine(), self.dumpHeaders())
+        dump_head = "%s%s" % (self.getStatusLine(), self.dumpHeaders())
+        return dump_head.encode(self.charset)
 
     def dump(self):
         '''
         Return a DETAILED str representation of this HTTP response object.
         '''
-        return "%s%s%s" % (self.dumpResponseHead(), CRLF, self.getBody())
+        if not self._is_text_or_html_response:
+            body = '<BINARY DATA>'
+        else:
+            body = self.body.encode(self.charset)
+        return "%s%s%s" % (self.dumpResponseHead(), CRLF, body)
         
     def dumpHeaders(self):
         '''

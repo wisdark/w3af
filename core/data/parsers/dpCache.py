@@ -59,7 +59,7 @@ class dpCache:
         #   given that the LRU has only 30 positions, the real probability of a colission is too low.
         #
 
-        hash_string = hash( httpResponse.getBody() )
+        hash_string = hash(httpResponse.body)
         
         with self._LRULock:
             if hash_string in self._cache:

@@ -20,61 +20,42 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-from __future__ import with_statement
-
-import urlOpenerSettings
-
-#
-#   Misc imports
-#
-import core.controllers.outputManager as om
-from core.controllers.misc.timeout_function import TimeLimited, TimeLimitExpired
-from core.controllers.misc.lru import LRU
-from core.controllers.misc.homeDir import get_home_dir
-from core.controllers.misc.memoryUsage import dumpMemoryUsage
-from core.controllers.misc.datastructs import deque
-# This is a singleton that's used for assigning request IDs
-from core.controllers.misc.number_generator import \
-consecutive_number_generator as seq_gen
-
-from core.controllers.threads.threadManager import threadManagerObj as thread_manager
-
-from core.controllers.w3afException import w3afMustStopException, \
-    w3afMustStopByUnknownReasonExc, w3afMustStopByKnownReasonExc, \
-    w3afException, w3afMustStopOnUrlError
-
-#
-#   Data imports
-#
-from core.data.parsers.httpRequestParser import httpRequestParser
-from core.data.parsers.urlParser import url_object
-
-from core.data.request.frFactory import createFuzzableRequestRaw
-from core.data.constants.httpConstants import NO_CONTENT
-from core.data.url.handlers.keepalive import URLTimeoutError
-from core.data.url.handlers import logHandler
-from core.data.url.httpResponse import httpResponse as httpResponse
-from core.data.url.HTTPRequest import HTTPRequest as HTTPRequest
-from core.data.url.handlers.localCache import CachedResponse
-import core.data.kb.config as cf
-import core.data.kb.knowledgeBase as kb
-
-
-# For subclassing requests and other things
-import urllib2
-import urllib
-
-import errno
+from collections import deque
+import httplib
 import os
+import re
 import socket
 import threading
 import time
-
-# for better debugging of handlers
 import traceback
-import re
+import urllib, urllib2
 
-    
+
+from core.controllers.misc.homeDir import get_home_dir
+from core.controllers.misc.timeout_function import TimeLimited, TimeLimitExpired
+from core.controllers.misc.lru import LRU
+from core.controllers.misc.memoryUsage import dumpMemoryUsage
+from core.controllers.misc.number_generator import \
+    consecutive_number_generator as seq_gen
+from core.controllers.threads.threadManager import threadManagerObj as \
+    thread_manager
+from core.controllers.w3afException import (w3afMustStopException,
+    w3afMustStopByUnknownReasonExc, w3afMustStopByKnownReasonExc,
+    w3afException, w3afMustStopOnUrlError)
+from core.data.constants.httpConstants import NO_CONTENT
+from core.data.parsers.httpRequestParser import httpRequestParser
+from core.data.parsers.urlParser import url_object
+from core.data.request.frFactory import createFuzzableRequestRaw
+from core.data.url.handlers.keepalive import URLTimeoutError
+from core.data.url.handlers import logHandler
+from core.data.url.httpResponse import httpResponse, from_httplib_resp
+from core.data.url.HTTPRequest import HTTPRequest as HTTPRequest
+from core.data.url.handlers.localCache import CachedResponse
+import core.controllers.outputManager as om
+import core.data.kb.config as cf
+import urlOpenerSettings
+
+
 class xUrllib(object):
     '''
     This is a urllib2 wrapper.
@@ -127,7 +108,7 @@ class xUrllib(object):
         self._sleepIfPausedDieIfStopped()
         
         self._memoryUsageCounter += 1
-        if self._memoryUsageCounter == 2000:
+        if self._memoryUsageCounter == 300:
             dumpMemoryUsage()
             self._memoryUsageCounter = 0
     
@@ -297,10 +278,12 @@ class xUrllib(object):
         @return: An httpResponse object.
         '''
         #
-        #    Validate what I'm sending, init the library (if needed) and check blacklists.
+        # Validate what I'm sending, init the library (if needed) and check
+        # blacklists.
         #
         if not isinstance(uri, url_object):
-            raise ValueError('The uri parameter of xUrllib.GET() must be of urlParser.url_object type.')
+            raise TypeError('The uri parameter of xUrllib.GET() must be of '
+                            'urlParser.url_object type.')
 
         self._init()
 
@@ -308,15 +291,15 @@ class xUrllib(object):
             return self._new_no_content_resp(uri, log_it=True)
 
         #
-        #    Create and send the request
+        # Create and send the request
         #
-        if data is not None:
+        if data:
             uri = uri.copy()
             uri.setQueryString(str(data))
             
-        req = HTTPRequest( uri )
-        req = self._add_headers( req, headers )
-        return self._send( req , useCache=useCache, grepResult=grepResult)
+        req = HTTPRequest(uri)
+        req = self._add_headers(req, headers)
+        return self._send(req, useCache=useCache, grepResult=grepResult)
     
     def _new_no_content_resp(self, uri, log_it=False):
         '''
@@ -324,8 +307,9 @@ class xUrllib(object):
         subscribed log handlers
         
         @param uri: URI string or request object
+        
         @param log_it: Boolean that indicated whether to log request
-            and response.        
+        and response.  
         '''
         # accept a URI or a Request object
         if isinstance(uri, url_object):
@@ -338,14 +322,15 @@ class xUrllib(object):
             raise Exception( msg )
 
         # Work,
-        nc_resp = httpResponse(NO_CONTENT, '', {}, uri, uri, msg='No Content')
+        no_content_response = httpResponse(NO_CONTENT, '', {}, uri, uri, msg='No Content')
         if log_it:
             # This also assigns the id to both objects.
-            logHandler.logHandler().http_response(req, nc_resp)
-        else:
-            nc_resp.id = seq_gen.inc()
+            logHandler.logHandler().http_response(req, no_content_response)
+        
+        if no_content_response.id is None:
+            no_content_response.id = seq_gen.inc()
             
-        return nc_resp
+        return no_content_response
             
     def POST(self, uri, data='', headers={}, grepResult=True, useCache=False):
         '''
@@ -503,7 +488,7 @@ class xUrllib(object):
         
         # Evasion
         original_url = req._Request__original
-        original_url_instance = req.url_object
+        original_url_inst = req.url_object
         req = self._evasion(req)
         
         start_time = time.time()
@@ -527,8 +512,9 @@ class xUrllib(object):
             geturl_instance = url_object(e.geturl())
             read = self._readRespose(e)
             httpResObj = httpResponse(code, read, info, geturl_instance,
-                                      original_url_instance, id=e.id,
-                                      time=time.time()-start_time, msg=e.msg)
+                                      original_url_inst, id=e.id,
+                                      time=time.time()-start_time, msg=e.msg,
+                                      charset=getattr(e.fp, 'encoding', None))
             
             # Clear the log of failed requests; this request is done!
             req_id = id(req)
@@ -591,7 +577,7 @@ class xUrllib(object):
             if req_id in self._errorCount:
                 del self._errorCount[req_id]
 
-            original_url_instance = url_object(original_url)
+            original_url_inst = url_object(original_url)
 
             trace_str = traceback.format_exc()
             parsed_traceback = re.findall('File "(.*?)", line (.*?), in (.*)',
@@ -604,7 +590,7 @@ class xUrllib(object):
 
             self._incrementGlobalErrorCount(e, parsed_traceback)
             
-            return self._new_no_content_resp(original_url_instance, log_it=True)
+            return self._new_no_content_resp(original_url_inst, log_it=True)
 
         else:
             # Everything went well!
@@ -622,16 +608,12 @@ class xUrllib(object):
                 msg += ' - from cache.'
             om.out.debug(msg)
 
-            code = int(res.code)
-            info = res.info()
-            geturl = res.geturl()
-            geturl_instance = url_object(geturl)
-            read = self._readRespose( res )
-            httpResObj = httpResponse(code, read, info, geturl_instance,
-                                      original_url_instance, id=res.id,
-                                      time=time.time()-start_time, msg=res.msg)
+            httpResObj = from_httplib_resp(res, original_url=original_url_inst)
+            httpResObj.setId(id=res.id)
+            httpResObj.setWaitTime(time.time()-start_time)
 
-            # Let the upper layers know that this response came from the local cache.
+            # Let the upper layers know that this response came from the
+            # local cache.
             if isinstance(res, CachedResponse):
                 httpResObj.setFromCache(True)
 
@@ -645,15 +627,15 @@ class xUrllib(object):
                 self._grepResult(req, httpResObj)
             else:
                 om.out.debug('No grep for: %s, the plugin sent grepResult='
-                             'False.' % geturl)
+                             'False.' % res.geturl())
             return httpResObj
 
     def _readRespose( self, res ):
         read = ''
         try:
             read = res.read()
-        except KeyboardInterrupt, k:
-            raise k
+        except KeyboardInterrupt:
+            raise
         except Exception, e:
             om.out.error(str(e))
         return read
@@ -670,7 +652,6 @@ class xUrllib(object):
             om.out.debug('Re-sending request...')
             return self._send(req, useCache)
         else:
-            error_amt = self._errorCount[req_id]
             # Clear the log of failed requests; this one definitely failed.
             # Let the caller decide what to do
             del self._errorCount[req_id]
@@ -710,21 +691,47 @@ class xUrllib(object):
                 # Known reason errors. See errno module for more info on these
                 # errors.
                 from errno import ECONNREFUSED, EHOSTUNREACH, ECONNRESET, \
-                    ENETDOWN, ENETUNREACH
+                    ENETDOWN, ENETUNREACH, ETIMEDOUT, ENOSPC
                 EUNKNSERV = -2 # Name or service not known error
+                EINVHOSTNAME = -5 # No address associated with hostname
                 known_errors = (EUNKNSERV, ECONNREFUSED, EHOSTUNREACH,
-                                ECONNRESET, ENETDOWN, ENETUNREACH)
+                                ECONNRESET, ENETDOWN, ENETUNREACH,
+                                EINVHOSTNAME, ETIMEDOUT, ENOSPC)
                 
                 msg = ('xUrllib found too much consecutive errors. The '
                 'remote webserver doesn\'t seem to be reachable anymore.')
                 
-                if isinstance(error, urllib2.URLError) and \
-                    isinstance(error.reason, socket.error) and \
-                    error.reason[0] in known_errors:
-                    reason = error.reason
-                    raise w3afMustStopByKnownReasonExc(msg, reason=reason)
-                else:
-                    raise w3afMustStopByUnknownReasonExc(msg, errs=last_errors)                    
+                if type(error) is urllib2.URLError:
+                    # URLError exceptions may wrap either httplib.HTTPException
+                    # or socket.error exception instances. We're interested on
+                    # treat'em in a special way.
+                    reason_err = error.reason 
+                    reason_msg = None
+                    
+                    if isinstance(reason_err, socket.error):
+                        if isinstance(reason_err, socket.sslerror):
+                            reason_msg = 'SSL Error: %s' % error.reason
+                        elif reason_err[0] in known_errors:
+                            reason_msg = str(reason_err)
+                    
+                    elif isinstance(reason_err, httplib.HTTPException):
+                        #
+                        #    Here we catch:
+                        #
+                        #    BadStatusLine, ResponseNotReady, CannotSendHeader, 
+                        #    CannotSendRequest, ImproperConnectionState,
+                        #    IncompleteRead, UnimplementedFileMode, UnknownTransferEncoding,
+                        #    UnknownProtocol, InvalidURL, NotConnected.
+                        #
+                        #    TODO: Maybe we're being TOO generic in this isinstance?
+                        #
+                        reason_msg = '%s: %s' % (error.__class__.__name__,
+                                             error.args)
+                    if reason_msg is not None:
+                        raise w3afMustStopByKnownReasonExc(reason_msg,
+                                                           reason=reason_err)
+                
+                raise w3afMustStopByUnknownReasonExc(msg, errs=last_errors)                    
 
     def ignore_errors(self, yes_no):
         '''
@@ -765,8 +772,6 @@ class xUrllib(object):
             except w3afException, e:
                 msg = 'Evasion plugin "%s" failed to modify the request. Exception: "%s"' % (eplugin.getName(), e)
                 om.out.error( msg )
-            except Exception, e:
-                raise e
                 
         return request
         
@@ -809,7 +814,7 @@ class xUrllib(object):
         # TODO:
         # For now I leave it at 5, but I have to debug grep plugins and I will lower this eventually
         #
-        timeout_seconds = 5*10000
+        timeout_seconds = 5
         timedout_grep_wrapper = TimeLimited( grep_plugin.grep_wrapper, timeout_seconds)
         try:
             timedout_grep_wrapper(request, response)
