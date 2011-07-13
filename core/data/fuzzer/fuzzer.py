@@ -109,8 +109,8 @@ def createMutants(freq, mutant_str_list, append=False,
         # File content of multipart forms
         if 'fuzzFileContent' in _fuzzable:
             om.out.debug('Fuzzing file content')
-            result.extend(_createFileContentMutants(freq, mutantFileContent,
-                                   mutant_str_list, fuzzableParamList, append))
+            result.extend(_createFileContentMutants(freq, mutant_str_list,
+                                                    fuzzableParamList, append))
     # Headers
     if 'headers' in _fuzzable:
         om.out.debug('Fuzzing headers')
@@ -245,7 +245,7 @@ def isJSON( freq ):
         # No need to do any JSON stuff, the postdata is urlencoded
         return False
     
-def _createFileContentMutants( freq, mutantClass, mutant_str_list, fuzzableParamList , append ):
+def _createFileContentMutants(freq, mutant_str_list, fuzzableParamList, append):
     '''
     @parameter freq: A fuzzable request with a dataContainer inside.
     @parameter mutantClass: The class to use to create the mutants
@@ -255,16 +255,22 @@ def _createFileContentMutants( freq, mutantClass, mutant_str_list, fuzzableParam
     @return: Mutants that have the file content changed with the strings at mutant_str_list
     '''
     res = []
-    tmp = []
-    if freq.getFileVariables():
+    file_vars = freq.getFileVariables()
+    
+    if file_vars:
+        tmp = []
+        extension = cf.cf.getData('fuzzFCExt') or 'txt'
+        
         for mutant_str in mutant_str_list:
-            if type( mutant_str ) == str:
-                # I have to create the string_file with a "name" attr. This is needed for MultipartPostHandler
-                str_file_instance = string_file( mutant_str )
-                extension = cf.cf.getData('fuzzFCExt' ) or 'txt'
-                str_file_instance.name = createRandAlpha( 7 ) + '.' + extension
-                tmp.append( str_file_instance )
-        res = _createMutantsWorker( freq, mutantClass, tmp, freq.getFileVariables() , append )
+            if type(mutant_str) == str:
+                # I have to create the string_file with a "name" attr.
+                # This is needed for MultipartPostHandler
+                str_file_instance = string_file(mutant_str)
+                str_file_instance.name = createRandAlpha(7) + '.' + extension
+                tmp.append(str_file_instance)
+        res = _createMutantsWorker(freq, mutantFileContent,
+                                   tmp, file_vars, append)
+    
     return res
     
 def _createFileNameMutants( freq, mutantClass, mutant_str_list, fuzzableParamList , append ):
@@ -327,7 +333,8 @@ def _createFileNameMutants( freq, mutantClass, mutant_str_list, fuzzableParamLis
                     res.append( m2 )
     return res
     
-def _createMutantsWorker( freq, mutantClass, mutant_str_list, fuzzableParamList,append, dataContainer=None):
+def _createMutantsWorker(freq, mutantClass, mutant_str_list,
+                         fuzzableParamList, append, dataContainer=None):
     '''
     An auxiliary function to createMutants.
     

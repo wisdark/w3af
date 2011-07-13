@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 import copy
 
-from core.data.parsers.encode_decode import urlencode
+import core.data.parsers.encode_decode as enc_dec
 
 DEFAULT_ENCODING = 'utf-8'
 
@@ -53,7 +53,7 @@ class dataContainer(dict):
                     raise TypeError('key, val = item')
                 self[key] = val
                 
-    def __str__( self ):
+    def __str__(self):
         '''
         This method returns a string representation of the dataContainer Object.
         
@@ -66,7 +66,7 @@ class dataContainer(dict):
 
         @return: string representation of the dataContainer Object.
         '''
-        return urlencode(self, encoding=self.encoding)
+        return enc_dec.urlencode(self, encoding=self.encoding)
         
     def copy(self):
         '''
@@ -75,4 +75,4 @@ class dataContainer(dict):
         @return: A copy of myself.
         '''
         return copy.deepcopy(self)
-        
+       

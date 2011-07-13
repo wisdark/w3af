@@ -346,10 +346,11 @@ class SQLCachedResponse(CachedResponse):
         headers = dict(request.headers)
         headers.update(request.unredirected_hdrs)
     
-        req = createFuzzableRequestRaw(method=request.get_method(),
-                                      url=request.url_object,
-                                      postData=str(request.get_data() or ''),
-                                      headers=headers)
+        req = createFuzzableRequestRaw(
+                   method=request.get_method(),
+                   url=request.url_object,
+                   postData=str(request.get_data() or ''),
+                   headers=headers)
         hi.request = req
 
         # Set the response

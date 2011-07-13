@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
-from core.data.parsers.abstractParser import abstractParser
+from core.data.parsers.abstractParser import BaseParser
 from core.data.parsers.urlParser import url_object
 
 
@@ -31,36 +31,32 @@ import StringIO
 import re
 
 
-class pdfParser(abstractParser):
+class pdfParser(BaseParser):
     '''
     This class parses pdf documents to find mails and URLs. It's based in the pyPdf library.
     
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     def __init__(self, httpResponse):
-        abstractParser.__init__(self , httpResponse)
+        BaseParser.__init__(self , httpResponse)
         
-        #    Two lists with url objects
-        self._parsed_URLs = []
-        self._re_URLs = []
-        
-        #    Work !
+        # Work !
         self._preParse(httpResponse.body)
         
-    def _preParse( self, document ):
-        content_text = self.getPDFContent( document )
-        self._parse( content_text )
+    def _preParse(self, document):
+        content_text = self.getPDFContent(document)
+        self._parse(content_text)
     
-    def _parse( self, content_text ):
+    def _parse(self, content_text):
         # Get the URLs using a regex
         url_regex = '((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|'
         url_regex += '%[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)'
-        self._re_URLs = [ url_object( x[0] ) for x in re.findall(url_regex, content_text ) ]
+        self._re_urls.update(url_object(x[0]) for x in re.findall(url_regex, content_text))
         
         # Get the mail addys
-        self.findEmails( content_text )
+        self._findEmails(content_text)
         
-    def getPDFContent( self, documentString ):
+    def getPDFContent(self, documentString):
         #   With the objective of avoiding this bug:
         #   https://sourceforge.net/tracker/?func=detail&atid=853652&aid=2954220&group_id=170274
         #   I perform this safety check:
@@ -110,9 +106,8 @@ class pdfParser(abstractParser):
         
         @return: Two lists, one with the parsed URLs, and one with the URLs that came out of a
         regular expression. The second list if less trustworthy.
-        '''        
-        tmp_re_URLs = set(self._re_URLs) - set( self._parsed_URLs )
-        return list(set( self._parsed_URLs )), list(tmp_re_URLs)
+        '''
+        return ([], list(self._re_urls))
         
     def _returnEmptyList( self, *args, **kwds ):
         '''

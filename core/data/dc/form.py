@@ -25,7 +25,7 @@ import operator
 import random
 
 import core.controllers.outputManager as om
-from core.data.dc.dataContainer import dataContainer
+from core.data.dc.dataContainer import dataContainer, DEFAULT_ENCODING
 from core.data.parsers.encode_decode import urlencode
 from core.data.parsers.urlParser import url_object
 
@@ -42,7 +42,7 @@ class form(dataContainer):
     MAX_VARIANTS_TOTAL = 10**9
     SEED = 1
     
-    def __init__(self, init_val=(), encoding='utf-8'):
+    def __init__(self, init_val=(), encoding=DEFAULT_ENCODING):
         dataContainer.__init__(self, init_val, encoding)
         
         # Internal variables

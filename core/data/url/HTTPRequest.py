@@ -41,8 +41,8 @@ class HTTPRequest(urllib2.Request):
         self.url_object = url
         
         # Call the base class
-        urllib2.Request.__init__(self, str(url), data, headers,
-                                 origin_req_host, unverifiable)
+        urllib2.Request.__init__(self, str(url.urlEncode()), data,
+                                 headers, origin_req_host, unverifiable)
 
     def copy(self):
         return copy.deepcopy(self)

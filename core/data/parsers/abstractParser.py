@@ -29,16 +29,16 @@ from core.data.parsers.encode_decode import htmldecode
 from core.data.parsers.urlParser import url_object
 
 
-class abstractParser(object):
+class BaseParser(object):
     '''
     This class is an abstract document parser.
     
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    SAFE_CHARS = {'\x00': '%00', ' ': '%20'}
+    SAFE_CHARS = (('\x00', '%00'),)
     
-    def __init__( self, httpResponse ):
+    def __init__(self, httpResponse):
         # "setBaseUrl"
         url = httpResponse.getURL()
         redirURL = httpResponse.getRedirURL()
@@ -48,81 +48,157 @@ class abstractParser(object):
         self._baseUrl = url
         self._baseDomain = url.getDomain()
         self._rootDomain = url.getRootDomain()
-        
-        # A nice default
-        self._encoding = 'utf-8'
+        self._encoding = httpResponse.getCharset()
         
         # To store results
         self._emails = []
-        self._re_URLs = []
-    
-    def findEmails( self , documentString ):
+        self._re_urls = set()
+
+    def getEmails(self, domain=None):
         '''
-        @return: A list with all mail users that are present in the documentString.
+        @parameter domain: Indicates what email addresses I want to retrieve:   "*@domain".
+        @return: A list of email accounts that are inside the document.
+        
+        >>> from core.data.url.httpResponse import httpResponse as httpResponse
+        >>> u = url_object('http://www.w3af.com/')
+        >>> response = httpResponse( 200, '', {}, u, u )
+        >>> a = BaseParser(response)
+        >>> a._emails = ['a@w3af.com', 'foo@not-w3af.com']
+        
+        >>> a.getEmails()
+        ['a@w3af.com', 'foo@not-w3af.com']
+
+        >>> a.getEmails( domain='w3af.com')
+        ['a@w3af.com']
+
+        >>> a.getEmails( domain='not-w3af.com')
+        ['foo@not-w3af.com']
+                
+        '''
+        if domain:
+            return [i for i in self._emails if domain == i.split('@')[1]]
+        else:
+            return self._emails
+            
+    def getForms(self):
+        '''
+        @return: A list of forms.
+        '''        
+        raise NotImplementedError('You should create your own parser class '
+                                  'and implement the getForms() method.')
+        
+    def getReferences(self):
+        '''
+        Searches for references on a page. w3af searches references in every html tag, including:
+            - a
+            - forms
+            - images
+            - frames
+            - etc.
+        
+        @return: Two sets, one with the parsed URLs, and one with the URLs that came out of a
+        regular expression. The second list if less trustworthy.
+        '''
+        raise NotImplementedError('You should create your own parser class '
+                                  'and implement the getReferences() method.')
+        
+    def getComments(self):
+        '''
+        @return: A list of comments.
+        '''        
+        raise NotImplementedError('You should create your own parser class '
+                                  'and implement the getComments() method.')
+    
+    def getScripts(self):
+        '''
+        @return: A list of scripts (like javascript).
+        '''        
+        raise NotImplementedError('You should create your own parser class '
+                                  'and implement the getScripts() method.')
+        
+    def getMetaRedir(self):
+        '''
+        @return: Returns list of meta redirections.
+        '''
+        raise NotImplementedError('You should create your own parser class '
+                                  'and implement the getMetaRedir() method.')
+    
+    def getMetaTags(self):
+        '''
+        @return: Returns list of all meta tags.
+        '''
+        raise NotImplementedError('You should create your own parser class '
+                                  'and implement the getMetaTags() method.')
+    
+    def _findEmails(self, doc_str):
+        '''
+        @return: A list with all mail users that are present in the doc_str.
 
         Init,
         >>> from core.data.url.httpResponse import httpResponse as httpResponse
         >>> u = url_object('http://www.w3af.com/')
         >>> response = httpResponse( 200, '', {}, u, u )
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         
         First test, no emails.
         >>> a.findEmails( '' )
         []
         
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> a.findEmails(u' abc@w3af.com ')
         [u'abc@w3af.com']
         
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> a.findEmails(u'<a href="mailto:abc@w3af.com">test</a>')
         [u'abc@w3af.com']
 
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> a.findEmails(u'<a href="mailto:abc@w3af.com">abc@w3af.com</a>')
         [u'abc@w3af.com']
 
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> a.findEmails(u'<a href="mailto:abc@w3af.com">abc_def@w3af.com</a>')
         [u'abc@w3af.com', u'abc_def@w3af.com']
 
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> a.findEmails(u'header abc@w3af-scanner.com footer')
         [u'abc@w3af-scanner.com']
         
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> a.findEmails(u'header abc4def@w3af.com footer')
         [u'abc4def@w3af.com']
         '''
-        # First, we decode all chars. I have found some strange sites where they encode the @... some other
-        # sites where they encode the email, or add some %20 padding... strange stuff... so better be safe...
-        documentString = urllib.unquote_plus(documentString)
+        # First, we decode all chars. I have found some strange sites where
+        # they encode the @... some other sites where they encode the email,
+        # or add some %20 padding... strange stuff... so better be safe...
+        doc_str = urllib.unquote_plus(doc_str)
         
         # Now we decode the HTML special characters...
-        documentString = htmldecode(documentString)
+        doc_str = htmldecode(doc_str)
         
-        # Perform a fast search for the @. In w3af, if we don't have an @ we don't have an email
+        # Perform a fast search for the @. In w3af, if we don't have an @ we
+        # don't have an email
         # We don't support mails like myself <at> gmail !dot! com
-        if documentString.find('@') != -1:
+        if doc_str.find('@') != -1:
             compiled_re = re.compile('[^\w@\-\\.]', re.UNICODE)
-            documentString = re.sub(compiled_re, ' ', documentString)
+            doc_str = re.sub(compiled_re, ' ', doc_str)
 
             # NOTE: emailRegex is also used in pks search engine.
-            # Now we have a clean documentString; and we can match the mail addresses!
-            emailRegex = '([A-Z0-9\._%-]{1,45}@([A-Z0-9\.-]{1,45}\.){1,10}[A-Z]{2,4})'
-            for email, domain in re.findall(emailRegex, documentString, re.I):
+            # Now we have a clean doc_str; and we can match the mail addresses!
+            emailRegex = re.compile('([\w\.%-]{1,45}@([A-Z0-9\.-]{1,45}\.){1,10}[A-Z]{2,4})', re.I|re.U) 
+            for email, domain in re.findall(emailRegex, doc_str):
                 if email not in self._emails:
                     self._emails.append(email)
                     
         return self._emails
-
+    
     def _regex_url_parse(self, http_resp):
         '''
         Use regular expressions to find new URLs.
         
         @param httpResponse: The http response object that stores the
             response body and the URL.
-        @return: None. The findings are stored in self._re_URLs as url_objects
+        @return: None. The findings are stored in self._re_urls as url_objects
 
         Init,
         >>> from core.data.url.httpResponse import httpResponse as httpResponse
@@ -130,44 +206,44 @@ class abstractParser(object):
         >>> response = httpResponse( 200, '', {}, u, u )
 
         Simple, empty result
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> response = httpResponse( 200, '', {}, u, u )
         >>> a._regex_url_parse( response )
-        >>> a._re_URLs
-        []
+        >>> len(a._re_urls)
+        0
         
         Full URL
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> response = httpResponse( 200, 'header http://www.w3af.com/foo/bar/index.html footer', {}, u, u )
-        >>> a._regex_url_parse( response )
-        >>> a._re_URLs[0].url_string
-        'http://www.w3af.com/foo/bar/index.html'
+        >>> a._regex_url_parse(response)
+        >>> url_object('http://www.w3af.com/foo/bar/index.html') in a._re_urls
+        True
 
         One relative URL
-        >>> a = abstractParser(response)
-        >>> response = httpResponse( 200, 'header /foo/bar/index.html footer', {}, u, u )
-        >>> a._regex_url_parse( response )
-        >>> a._re_URLs[0].url_string
-        'http://www.w3af.com/foo/bar/index.html'
+        >>> a = BaseParser(response)
+        >>> response = httpResponse(200, 'header /foo/bar/index.html footer', {}, u, u)
+        >>> a._regex_url_parse(response)
+        >>> url_object('http://www.w3af.com/foo/bar/index.html') in a._re_urls
+        True
 
         Relative with initial "/" , inside an href
-        >>> a = abstractParser(response)
-        >>> response = httpResponse( 200, 'header <a href="/foo/bar/index.html">foo</a> footer', {}, u, u )
-        >>> a._regex_url_parse( response )
-        >>> a._re_URLs[0].url_string
-        'http://www.w3af.com/foo/bar/index.html'
+        >>> a = BaseParser(response)
+        >>> response = httpResponse(200, 'header <a href="/foo/bar/index.html">foo</a> footer', {}, u, u)
+        >>> a._regex_url_parse(response)
+        >>> url_object('http://www.w3af.com/foo/bar/index.html') in a._re_urls
+        True
 
         Simple index relative URL
-        >>> a = abstractParser(response)
-        >>> response = httpResponse( 200, 'header <a href="index">foo</a> footer', {}, u, u )
+        >>> a = BaseParser(response)
+        >>> response = httpResponse(200, 'header <a href="index">foo</a> footer', {}, u, u)
         >>> a._regex_url_parse( response )
-        >>> len( a._re_URLs )
+        >>> len(a._re_urls)
         0
         '''
-        re_urls = self._re_URLs
+        re_urls = self._re_urls
         resp_body = http_resp.getBody()
         #url_regex = '((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|%[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)'
-        url_regex = '((http|https)://([a-zA-Z0-9_:@\-\./]*?)/[^ \n\r\t"\'<>]*)'
+        url_regex = re.compile('((http|https)://([a-zA-Z0-9_:@\-\./]*?)/[^ \n\r\t"\'<>]*)', re.U)
         
         for url in re.findall(url_regex, resp_body):
             # This try is here because the _decode_URL method raises an
@@ -178,20 +254,21 @@ class abstractParser(object):
             except w3afException:
                 pass
             else:
-                re_urls.append(decoded_url)
+                re_urls.add(decoded_url)
         
         #
         # Now detect some relative URL's (also using regexs)
         #
-        def find_relative(doc):
-            res = []
+        def find_relative():
+            res = set()
             
             # TODO: Also matches //foo/bar.txt and http://host.tld/foo/bar.txt
             # I'm removing those matches manually below
-            regex = '((:?[/]{1,2}[A-Z0-9a-z%_\-~\.]+)+\.[A-Za-z0-9]{2,4}(((\?)([a-zA-Z0-9]*=\w*)){1}((&)([a-zA-Z0-9]*=\w*))*)?)'
-            relative_regex = re.compile(regex)
+            regex = '((:?[/]{1,2}[\w%\-~\.]+)+\.[A-Za-z0-9]{2,4}' \
+                    '(((\?)([a-zA-Z0-9]*=\w*)){1}((&)([a-zA-Z0-9]*=\w*))*)?)'
+            relative_regex = re.compile(regex, re.U)
             
-            for match_tuple in relative_regex.findall(doc):
+            for match_tuple in relative_regex.findall(resp_body):
                 
                 match_str = match_tuple[0]
                 
@@ -206,92 +283,14 @@ class abstractParser(object):
                 url = http_resp.getURL().urlJoin(match_str).url_string
                 url = url_object(self._decode_URL(url),
                                  encoding=self._encoding)
-                res.append(url)
+                res.add(url)
             
             return res
         
-        re_urls.extend(find_relative(resp_body))
+        re_urls.update(find_relative())
         
         # Finally normalize the urls
-        map(lambda u: u.normalizeURL(), re_urls)
-        
-        self._re_URLs = list(set(re_urls))
-
-    def getEmails( self, domain=None ):
-        '''
-        @parameter domain: Indicates what email addresses I want to retrieve:   "*@domain".
-        @return: A list of email accounts that are inside the document.
-        
-        >>> from core.data.url.httpResponse import httpResponse as httpResponse
-        >>> u = url_object('http://www.w3af.com/')
-        >>> response = httpResponse( 200, '', {}, u, u )
-        >>> a = abstractParser(response)
-        >>> a._emails = ['a@w3af.com', 'foo@not-w3af.com']
-        
-        >>> a.getEmails()
-        ['a@w3af.com', 'foo@not-w3af.com']
-
-        >>> a.getEmails( domain='w3af.com')
-        ['a@w3af.com']
-
-        >>> a.getEmails( domain='not-w3af.com')
-        ['foo@not-w3af.com']
-                
-        '''
-        if domain:
-#            return [ i for i in self._emails if domain == i.split('@')[1] ]
-            l = []
-            for em in self._emails:
-                x = em.split('@')[1]
-                if domain == x:
-                    l.append(x)
-            return l
-        else:
-            return self._emails
-            
-    def getForms( self ):
-        '''
-        @return: A list of forms.
-        '''        
-        raise Exception('You should create your own parser class and implement the getForms() method.')
-        
-    def getReferences( self ):
-        '''
-        Searches for references on a page. w3af searches references in every html tag, including:
-            - a
-            - forms
-            - images
-            - frames
-            - etc.
-        
-        @return: Two sets, one with the parsed URLs, and one with the URLs that came out of a
-        regular expression. The second list if less trustworthy.
-        '''
-        raise Exception('You should create your own parser class and implement the getReferences() method.')
-        
-    def getComments( self ):
-        '''
-        @return: A list of comments.
-        '''        
-        raise Exception('You should create your own parser class and implement the getComments() method.')
-    
-    def getScripts( self ):
-        '''
-        @return: A list of scripts (like javascript).
-        '''        
-        raise Exception('You should create your own parser class and implement the getScripts() method.')
-        
-    def getMetaRedir( self ):
-        '''
-        @return: Returns list of meta redirections.
-        '''
-        raise Exception('You should create your own parser class and implement the getMetaRedir() method.')
-    
-    def getMetaTags( self ):
-        '''
-        @return: Returns list of all meta tags.
-        '''
-        raise Exception('You should create your own parser class and implement the getMetaTags() method.')
+        map(lambda u: u.normalizeURL(), re_urls)    
         
     def _decode_URL(self, url_string):
         '''
@@ -316,7 +315,7 @@ class abstractParser(object):
         >>> from core.data.url.httpResponse import httpResponse as httpResponse
         >>> u = url_object('http://www.w3af.com/')
         >>> response = httpResponse(200, u'', {}, u, u, charset='latin1')
-        >>> a = abstractParser(response)
+        >>> a = BaseParser(response)
         >>> a._encoding = 'latin1'
         
         Simple, no strange encoding
@@ -345,13 +344,20 @@ class abstractParser(object):
             is_unicode = True
             url_string = url_string.encode(enc)
                 
-        urldecoded = urllib.unquote(url_string)
-        for sch, repl in self.SAFE_CHARS.items():
-            urldecoded = urldecoded.replace(sch, repl)
+        dec_url = urllib.unquote(url_string)
+        for sch, repl in self.SAFE_CHARS:
+            dec_url = dec_url.replace(sch, repl)
         
         if is_unicode:
             # Take it back to unicode
             # TODO: Any improvement for this? We're certainly losing
-            # information.
-            urldecoded = urldecoded.decode(enc, 'ignore')
-        return urldecoded
+            # information by using the 'ignore' error handling
+            dec_url = dec_url.decode(enc, 'ignore')
+
+##            index = dec_url.find('?')
+##            if index > -1:
+##                dec_url = (dec_url[:index].decode(enc, 'ignore') +
+##                           dec_url[index:].decode('utf-8', 'ignore'))
+        
+        return dec_url
+

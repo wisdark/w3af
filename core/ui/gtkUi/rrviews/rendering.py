@@ -163,7 +163,7 @@ class WebKitRenderingView(RenderingView):
             if obj.is_text_or_html():
             
                 body = obj.getBody()
-                charset = obj.getCharset()
+                charset = 'utf-8'
                 uri = obj.getURI().url_string
                 try:
                     load_string(body, mimeType, charset, uri)

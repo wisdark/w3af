@@ -888,7 +888,8 @@ class w3afCore(object):
             #   Print the new URLs in a sorted manner.
             tmp_sort.sort()
             for u in tmp_sort:
-                om.out.information('New URL found by ' + pluginWhoFoundIt +' plugin: ' +  u )
+                om.out.information('New URL found by %s plugin: %s' %
+                                            (pluginWhoFoundIt, unicode(u)))
                 
             # Update the list / queue that lives in the KB
             self._updateURLsInKb( newFR )

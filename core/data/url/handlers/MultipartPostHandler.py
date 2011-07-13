@@ -59,28 +59,39 @@ class MultipartPostHandler(urllib2.BaseHandler):
     def http_request(self, request):
         data = request.get_data()
         
-        if data is not None and type(data) != str:
+        to_str = lambda _str: _str.encode('utf-8') if type(_str) \
+                                is unicode else _str
+        
+        if data and not isinstance(data, basestring):
             v_files = []
             v_vars = []
             
             try:
-                for parameter_name in data:
+                for pname in data:
                     # Added to support repeated parameter names
-                    for element_index, element in enumerate(data[parameter_name]):
-                        if type(element) == file:
-                            if not element.closed:
-                                v_files.append((parameter_name, element))
+                    enc_pname = to_str(pname)
+                    for elem in data[pname]:
+                        if type(elem) == file:
+                            if not elem.closed:
+                                v_files.append((enc_pname, elem))
                             else:
-                                v_vars.append((parameter_name, ''))
-                        elif hasattr( element, 'isFile'):
-                            v_files.append((parameter_name, element))
+                                v_vars.append((enc_pname, ''))
+                        elif hasattr(elem, 'isFile'):
+                            v_files.append((enc_pname, elem))
                         else:
-                            v_vars.append((parameter_name, element))
+                            # Ensuring we actually send a string
+                            elem = to_str(elem)
+                            v_vars.append((enc_pname, elem))
             except TypeError:
-                systype, value, traceback = sys.exc_info()
-                raise TypeError, "not a valid non-string sequence or mapping object", traceback
+                try:
+                    tb = sys.exc_info()[2]
+                    raise (TypeError, "not a valid non-string sequence or "
+                           "mapping object", tb)
+                finally:
+                    del tb
+                
 
-            if len(v_files) == 0:
+            if not v_files:
                 data = urllib.urlencode(v_vars, doseq)
             else:
                 boundary, data = self.multipart_encode(v_vars, v_files)
@@ -114,13 +125,12 @@ class MultipartPostHandler(urllib2.BaseHandler):
             buffer += '\r\n\r\n' + value + '\r\n'
         
         for(key, fd) in files:
-            file_size = getFileSize( fd )
             filename = fd.name.split( os.path.sep )[-1]
             contenttype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
             buffer += '--%s\r\n' % boundary
             buffer += 'Content-Disposition: form-data; name="%s"; filename="%s"\r\n' % (key, filename)
             buffer += 'Content-Type: %s\r\n' % contenttype
-            # buffer += 'Content-Length: %s\r\n' % file_size
+            # buffer += 'Content-Length: %s\r\n' % getFileSize(fd)
             fd.seek(0)
             buffer += '\r\n' + fd.read() + '\r\n'
         buffer += '--%s--\r\n\r\n' % boundary

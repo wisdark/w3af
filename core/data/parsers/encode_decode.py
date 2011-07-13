@@ -34,7 +34,7 @@ def htmldecode(text, use_repr=False):
 
     >>> htmldecode('hola mundo')
     'hola mundo'
-    >>> print htmldecode('hólá múndó')
+    >>> print htmldecode(u'hólá múndó')
     hólá múndó
     >>> print htmldecode('hola mundo &#0443')
     hola mundo ƻ
@@ -55,7 +55,7 @@ def htmldecode(text, use_repr=False):
     '\xe1'
     '''
     #uchr = lambda value: value > 255 and unichr(value).encode('utf-8') or chr(value)
-    uchr = lambda value: unichr(value).encode('utf-8')
+    uchr = lambda value: unichr(value)
     
     # Internal function to do the work
     def entitydecode(match):
@@ -73,19 +73,17 @@ def htmldecode(text, use_repr=False):
     return charrefpat.sub(entitydecode, text)
 
 
-def urlencode(query, encoding, doseq=0, safe='/<>"\'=:()'):
+def urlencode(query, encoding, safe='/<>"\'=:()'):
     '''
-    This is my version of urllib.urlencode , that adds "/" as a safe character
+    This is my version of urllib.urlencode. It adds "/" as a safe character
     and also adds support for "repeated parameter names".
     
     Note:
         This function is EXPERIMENTAL and should be used with care ;)
-    
-    Maybe this is the place to fix this bug:
-        http://sourceforge.net/tracker2/?func=detail&aid=2675634&group_id=170274&atid=853652
         
     Original documentation:
-        Encode a sequence of two-element tuples or dictionary into a URL query string.
+        Encode a sequence of two-element tuples or dictionary into a URL query
+        string.
 
         If any values in the query arg are sequences and doseq is true, each
         sequence element is converted to a separate parameter.
@@ -137,7 +135,7 @@ def urlencode(query, encoding, doseq=0, safe='/<>"\'=:()'):
     for k, v in query:
         # first work with keys
         k = k.encode(encoding) if is_unicode(k) else str(k)
-        k = urllib.quote_plus(k, safe)
+        k = urllib.quote(k, safe)
         
         if isinstance(v, basestring):
             v = [v]
@@ -149,7 +147,7 @@ def urlencode(query, encoding, doseq=0, safe='/<>"\'=:()'):
                 v = [str(v)]
         for ele in v:
             ele = ele.encode(encoding) if is_unicode(ele) else str(ele) 
-            l.append(k + '=' + urllib.quote_plus(ele, safe))
+            l.append(k + '=' + urllib.quote(ele, safe))
     
     return '&'.join(l)
 

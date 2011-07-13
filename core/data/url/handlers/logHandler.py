@@ -83,15 +83,16 @@ class logHandler(urllib2.BaseHandler, urllib2.HTTPDefaultErrorHandler, urllib2.H
             # do the same.
             
             # This path correctly assigns an id for the request/response
-            #newurl = newurl.replace(' ', '%20')
-            new_url_obj = url_object(newurl)
             if 'Content-length' in req.headers:
                 req.headers.pop('Content-length')
             
-            new_request = HTTPRequest(new_url_obj,
-                            headers=req.headers,
-                            origin_req_host=req.get_origin_req_host(),
-                            unverifiable=True)
+            enc = req.url_object.encoding
+            
+            new_request = HTTPRequest(
+                                url_object(newurl.decode(enc), encoding=enc),
+                                headers=req.headers,
+                                origin_req_host=req.get_origin_req_host(),
+                                unverifiable=True)
             
             return new_request
         else:

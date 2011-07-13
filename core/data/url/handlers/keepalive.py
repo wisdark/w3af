@@ -696,8 +696,9 @@ class KeepAliveHandler:
         The real workhorse.
         '''
         try:
-            if req.has_data():
-                data = str(req.get_data())
+            data = req.get_data()
+            if data is not None:
+                data = str(data)
                 conn.putrequest(req.get_method(), req.get_selector(),
                                 skip_host=1, skip_accept_encoding=1)
 
@@ -714,18 +715,18 @@ class KeepAliveHandler:
             raise
         except (socket.error, httplib.HTTPException), err:
             raise urllib2.URLError(err)
-
-        # Add headers.
-        headerDict = dict(self.parent.addheaders)
-        headerDict.update(req.headers)
-        headerDict.update(req.unredirected_hdrs)
-
-        for k, v in headerDict.iteritems():
-            conn.putheader(k, v)
-        conn.endheaders()
-
-        if req.has_data():
-            conn.send(data)
+        else:
+            # Add headers.
+            headerDict = dict(self.parent.addheaders)
+            headerDict.update(req.headers)
+            headerDict.update(req.unredirected_hdrs)
+    
+            for k, v in headerDict.iteritems():
+                conn.putheader(k, v)
+            conn.endheaders()
+    
+            if data is not None:
+                conn.send(data)
 
     def _get_connection(self, host):
         '''

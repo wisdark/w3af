@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
+from itertools import imap
 from core.data.request.fuzzableRequest import fuzzableRequest
 
 
@@ -43,12 +44,23 @@ class httpPostDataRequest(fuzzableRequest):
         we return the data container as it is. This is needed by the multipart
         post handler.
         '''
+
+        # TODO: This is a hack I'm not comfortable with. There should
+        # be a fancier way to do this.
+        from core.data.fuzzer.fuzzer import string_file
+        isfile = lambda v: isinstance(v, file) or isinstance(v, string_file)
+        
+        # If contains a file then we are not interested on returning
+        # its string representation
         for value in self._dc.itervalues():
-            if not isinstance(value, type('')):
-                # We have a file here, return the dc as it is.
+            
+            if isinstance(value, basestring):
+                continue
+            elif isfile(value) or (hasattr(value, "__iter__") and
+                                   any(imap(isfile, value))):
                 return self._dc
         
-        # return the string representation
+        # Ok, no file was found; return the string representation
         return str(self._dc)
         
     def setFileVariables( self, file_variables ):
