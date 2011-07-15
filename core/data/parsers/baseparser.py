@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 '''
-abstractParser.py
+baseparser.py
 
 Copyright 2006 Andres Riancho
 
@@ -36,6 +36,10 @@ class BaseParser(object):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
+    #URL_RE = ('((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|%'
+    #    '[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)')
+    URL_RE = re.compile(
+                    '((http|https)://([\w:@\-\./]*?)/[^ \n\r\t"\'<>]*)', re.U)
     SAFE_CHARS = (('\x00', '%00'),)
     
     def __init__(self, httpResponse):
@@ -56,7 +60,8 @@ class BaseParser(object):
 
     def getEmails(self, domain=None):
         '''
-        @parameter domain: Indicates what email addresses I want to retrieve:   "*@domain".
+        @param domain: Indicates what email addresses I want to
+            retrieve: "*@domain".
         @return: A list of email accounts that are inside the document.
         
         >>> from core.data.url.httpResponse import httpResponse as httpResponse
@@ -141,31 +146,31 @@ class BaseParser(object):
         >>> a = BaseParser(response)
         
         First test, no emails.
-        >>> a.findEmails( '' )
+        >>> a._findEmails( '' )
         []
         
         >>> a = BaseParser(response)
-        >>> a.findEmails(u' abc@w3af.com ')
+        >>> a._findEmails(u' abc@w3af.com ')
         [u'abc@w3af.com']
         
         >>> a = BaseParser(response)
-        >>> a.findEmails(u'<a href="mailto:abc@w3af.com">test</a>')
+        >>> a._findEmails(u'<a href="mailto:abc@w3af.com">test</a>')
         [u'abc@w3af.com']
 
         >>> a = BaseParser(response)
-        >>> a.findEmails(u'<a href="mailto:abc@w3af.com">abc@w3af.com</a>')
+        >>> a._findEmails(u'<a href="mailto:abc@w3af.com">abc@w3af.com</a>')
         [u'abc@w3af.com']
 
         >>> a = BaseParser(response)
-        >>> a.findEmails(u'<a href="mailto:abc@w3af.com">abc_def@w3af.com</a>')
+        >>> a._findEmails(u'<a href="mailto:abc@w3af.com">abc_def@w3af.com</a>')
         [u'abc@w3af.com', u'abc_def@w3af.com']
 
         >>> a = BaseParser(response)
-        >>> a.findEmails(u'header abc@w3af-scanner.com footer')
+        >>> a._findEmails(u'header abc@w3af-scanner.com footer')
         [u'abc@w3af-scanner.com']
         
         >>> a = BaseParser(response)
-        >>> a.findEmails(u'header abc4def@w3af.com footer')
+        >>> a._findEmails(u'header abc4def@w3af.com footer')
         [u'abc4def@w3af.com']
         '''
         # First, we decode all chars. I have found some strange sites where
@@ -203,12 +208,12 @@ class BaseParser(object):
         Init,
         >>> from core.data.url.httpResponse import httpResponse as httpResponse
         >>> u = url_object('http://www.w3af.com/')
-        >>> response = httpResponse( 200, '', {}, u, u )
+        >>> response = httpResponse(200, '', {}, u, u)
 
         Simple, empty result
         >>> a = BaseParser(response)
-        >>> response = httpResponse( 200, '', {}, u, u )
-        >>> a._regex_url_parse( response )
+        >>> response = httpResponse(200, '', {}, u, u)
+        >>> a._regex_url_parse(response)
         >>> len(a._re_urls)
         0
         
@@ -242,10 +247,8 @@ class BaseParser(object):
         '''
         re_urls = self._re_urls
         resp_body = http_resp.getBody()
-        #url_regex = '((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|%[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)'
-        url_regex = re.compile('((http|https)://([a-zA-Z0-9_:@\-\./]*?)/[^ \n\r\t"\'<>]*)', re.U)
         
-        for url in re.findall(url_regex, resp_body):
+        for url in re.findall(BaseParser.URL_RE, resp_body):
             # This try is here because the _decode_URL method raises an
             # exception whenever it fails to decode a url.
             try:
@@ -329,18 +332,18 @@ class BaseParser(object):
         
         Decoding of safe chars skipped ('\x00' and ' ')
         >>> a._decode_URL(u'http://w3af.com/search.php?a=%00x&b=2%20c=3%D1') ==\
-        u'http://w3af.com/search.php?a=%00x&b=2%20c=3\xd1'
+        u'http://w3af.com/search.php?a=%00x&b=2 c=3\xd1'
         True
         
         Ignoring possible decoding errors
         >>> a._encoding = 'utf-8'
-        >>> a._decode_URL(u'http://w3af.com/blah.jsp?p=SQU-300&bgc=%FFFFFF')
-        u'http://w3af.com/blah.jsp?p=SQU-300&bgc=FFFF'
+        >>> a._decode_URL(u'http://w3af.com/blah.jsp?p=SQU-300&bgc=%FFAAAA')
+        u'http://w3af.com/blah.jsp?p=SQU-300&bgc=AAAA'
         '''
         enc = self._encoding
         is_unicode = False
 
-        if type(url_string) is unicode:
+        if isinstance(url_string, unicode):
             is_unicode = True
             url_string = url_string.encode(enc)
                 
@@ -353,7 +356,22 @@ class BaseParser(object):
             # TODO: Any improvement for this? We're certainly losing
             # information by using the 'ignore' error handling
             dec_url = dec_url.decode(enc, 'ignore')
-
+            #
+            # TODO: Lines below will remain commented until we make a
+            # decision regarding which is the (right?) way to decode URLs.
+            # The tests made on FF and Chrome revealed that if strange
+            # (i.e. non ASCII) characters are present in a URL the browser
+            # will urlencode the URL string encoded until the beginning
+            # of the query string using the page charset and the query 
+            # string itself encoded in UTF-8.
+            #
+            # Apparently this is not a universal practice. We've found
+            # some static sites having URL's encoded *only* in Windows-1255
+            # (hebrew) for example.
+            #
+            # This is what de W3C recommends (not a universal practice either):
+            #    http://www.w3.org/TR/REC-html40/appendix/notes.html#h-B.2
+            #
 ##            index = dec_url.find('?')
 ##            if index > -1:
 ##                dec_url = (dec_url[:index].decode(enc, 'ignore') +

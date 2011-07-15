@@ -52,6 +52,7 @@ from core.data.fuzzer.mutantFileContent import mutantFileContent
 
 import core.controllers.outputManager as om
 
+from core.controllers.misc.io import NamedStringIO
 from core.data.dc.form import form
 
 
@@ -66,7 +67,6 @@ IGNORED_PARAMETERS = [
     'jsf_viewid', 'jsf_state', 'cfid', 'cftoken','ASP.NET_sessionid',
     'ASPSESSIONID', 'PHPSESSID', 'JSESSIONID'
     ]
-                                          
 
 def createMutants(freq, mutant_str_list, append=False,
                   fuzzableParamList=[], oResponse=None):
@@ -259,15 +259,15 @@ def _createFileContentMutants(freq, mutant_str_list, fuzzableParamList, append):
     
     if file_vars:
         tmp = []
-        extension = cf.cf.getData('fuzzFCExt') or 'txt'
+        ext = cf.cf.getData('fuzzFCExt') or 'txt'
         
         for mutant_str in mutant_str_list:
-            if type(mutant_str) == str:
-                # I have to create the string_file with a "name" attr.
+            if isinstance(mutant_str, basestring):
+                # I have to create the NamedStringIO with a "name".
                 # This is needed for MultipartPostHandler
-                str_file_instance = string_file(mutant_str)
-                str_file_instance.name = createRandAlpha(7) + '.' + extension
-                tmp.append(str_file_instance)
+                fname = "%s.%s" % (createRandAlpha(7), ext)
+                str_file = NamedStringIO(mutant_str, name=fname)
+                tmp.append(str_file)
         res = _createMutantsWorker(freq, mutantFileContent,
                                    tmp, file_vars, append)
     
@@ -291,11 +291,11 @@ def _createFileNameMutants( freq, mutantClass, mutant_str_list, fuzzableParamLis
 
     >>> mutant_list = _createFileNameMutants( fr, mutantFileName, ['ping!','pong-'], [], False )
     >>> [ m.getURL().url_string for m in mutant_list]
-    ['http://www.w3af.com/abc/ping%21.html', 'http://www.w3af.com/abc/pong-.html', 'http://www.w3af.com/abc/def.ping%21', 'http://www.w3af.com/abc/def.pong-']
+    [u'http://www.w3af.com/abc/ping%21.html', u'http://www.w3af.com/abc/pong-.html', u'http://www.w3af.com/abc/def.ping%21', u'http://www.w3af.com/abc/def.pong-']
     
     >>> mutant_list = _createFileNameMutants( fr, mutantFileName, ['/etc/passwd',], [], False )
     >>> [ m.getURL().url_string for m in mutant_list]
-    ['http://www.w3af.com/abc/%2Fetc%2Fpasswd.html', 'http://www.w3af.com/abc//etc/passwd.html', 'http://www.w3af.com/abc/def.%2Fetc%2Fpasswd', 'http://www.w3af.com/abc/def./etc/passwd']
+    [u'http://www.w3af.com/abc/%2Fetc%2Fpasswd.html', u'http://www.w3af.com/abc//etc/passwd.html', u'http://www.w3af.com/abc/def.%2Fetc%2Fpasswd', u'http://www.w3af.com/abc/def./etc/passwd']
 
     '''
     res = []
@@ -454,12 +454,12 @@ def _createMutantsWorker(freq, mutantClass, mutant_str_list,
                     # __HERE__
                     # Please see the comment above for an explanation of what we are doing here:
                     for var_name in freq.getFileVariables():
-                        # I have to create the string_file with a "name" attr.
+                        # I have to create the NamedStringIO with a "name".
                         # This is needed for MultipartPostHandler
-                        str_file_instance = string_file( '' )
-                        extension = cf.cf.getData('fuzzFCExt' ) or 'txt'
-                        str_file_instance.name = createRandAlpha( 7 ) + '.' + extension
-                        dc_copy[var_name][0] = str_file_instance
+                        fname = "%s.%s" % (createRandAlpha(7), 
+                                           cf.cf.getData('fuzzFCExt' ) or 'txt') 
+                        str_file = NamedStringIO('', name=fname)
+                        dc_copy[var_name][0] = str_file
                     
                     # Create the mutant
                     freq_copy = freq.copy()
@@ -567,15 +567,6 @@ def createFormatString(  length ):
     result = '%n' * length
     return result
 
-class string_file( str ):
-    isFile = True
-    name = ''
-    def read( self, size = 0 ):
-        return self.__repr__()[1:-1]
-        
-    def seek( self, foo = 0 ):
-        pass
-        
 def _createFuzzable( freq ):
     '''
     @return: This function verifies the configuration, and creates a map of

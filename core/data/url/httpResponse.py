@@ -25,10 +25,12 @@ import codecs
 import copy
 import re
 import httplib
+
 from lxml import etree
 
-import core.controllers.outputManager as om
+from core.data.constants.encodings import DEFAULT_ENCODING
 from core.data.parsers.urlParser import url_object
+import core.controllers.outputManager as om
 
 # Handle codecs. Register error handling scheme
 def _returnEscapedChar(exc):
@@ -38,7 +40,7 @@ def _returnEscapedChar(exc):
 codecs.register_error("returnEscapedChar", _returnEscapedChar)
 
 
-DEFAULT_CHARSET = 'utf-8'
+DEFAULT_CHARSET = DEFAULT_ENCODING
 CR = '\r'
 LF = '\n'
 CRLF = CR + LF
@@ -79,16 +81,16 @@ class httpResponse(object):
     def __init__(self, code, read, info, geturl, original_url,
                  msg='OK', id=None, time=0.2, alias=None, charset=None):
         '''
-        @param code: 
-        @param read: 
-        @param info: 
+        @param code: HTTP code
+        @param read: HTTP body text; typically a string
+        @param info: HTTP headers, typically a dict or a httplib.HTTPMessage
         @param geturl: url_object instance
         @param original_url: url_object instance
-        @param msg:
-        @param id:  
-        @parameter time: The time between the request and the response.
-        @param alias: 
-        @param charset: 
+        @param msg: HTTP message
+        @param id: Optional response identifier
+        @parameter time: The time between the request and the response
+        @param alias: Optional alias for the response
+        @param charset: Response's encoding; obligatory when `read` is unicode
         '''
         self._charset = charset
         self._body = None
@@ -398,7 +400,7 @@ class httpResponse(object):
                     content-type: text/html; charset=iso-8859-1
                 b) Look in the 'meta' HTML header. Example:
                     <meta .* content="text/html; charset=utf-8" />
-                c) Determine the charset using the chardet module
+                c) Determine the charset using the chardet module (TODO)
                 d) Use the DEFAULT_CHARSET
             
             2) Try to decode the body using the found charset. If it fails,
@@ -519,10 +521,11 @@ class httpResponse(object):
         '''
         Return a DETAILED str representation of this HTTP response object.
         '''
-        if not self.is_text_or_html():
-            body = '<BINARY DATA>'
-        else:
-            body = self.body.encode(DEFAULT_CHARSET)
+        body = self.body
+        # Images, pdf and binary responses in general are never decoded
+        # to unicode
+        if isinstance(body, unicode):
+            body = body.encode(DEFAULT_CHARSET, 'replace')
         return "%s%s%s" % (self.dumpResponseHead(), CRLF, body)
         
     def dumpHeaders(self):

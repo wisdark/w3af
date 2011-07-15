@@ -41,7 +41,7 @@ class documentParser:
     
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__(self, httpResponse, normalizeMarkup=True):
+    def __init__(self, httpResponse):
         
         # Create the proper parser instance
         if self._isWML(httpResponse):

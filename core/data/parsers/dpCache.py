@@ -38,7 +38,7 @@ class dpCache:
         self._cache = LRU(30)
         self._LRULock = threading.RLock()
         
-    def getDocumentParserFor( self, httpResponse, normalizeMarkup=True ):
+    def getDocumentParserFor(self, httpResponse):
         res = None
         
         #   Before I used md5, but I realized that it was unnecessary. I experimented a little bit with
@@ -66,7 +66,7 @@ class dpCache:
                 res = self._cache[ hash_string ]
             else:
                 # Create a new instance of dp, add it to the cache
-                res = documentParser.documentParser( httpResponse, normalizeMarkup )
+                res = documentParser.documentParser(httpResponse)
                 self._cache[ hash_string ] = res
             
             return res

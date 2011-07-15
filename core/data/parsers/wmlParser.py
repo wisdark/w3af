@@ -34,7 +34,6 @@ class wmlParser(SGMLParser):
     
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    TAGS_WITH_URLS = tuple(list(SGMLParser.TAGS_WITH_URLS) + ['anchor'])
     
     def __init__(self, httpResponse):
         self._select_tag_name = ""
@@ -74,7 +73,7 @@ class wmlParser(SGMLParser):
         #    >>> re
         #    []
         #    >>> parsed[0].url_string
-        #    'http://www.w3af.com/index.aspx'
+        #    u'http://www.w3af.com/index.aspx'
 
         Get a link by applying regular expressions
         >>> response = httpResponse(200, 'header /index.aspx footer', {}, u, u)
@@ -86,7 +85,7 @@ class wmlParser(SGMLParser):
         >>> re
         []
         >>> parsed[0].url_string
-        'http://www.w3af.com/index.aspx'
+        u'http://www.w3af.com/index.aspx'
         '''
         SGMLParser._pre_parse(self, httpResponse)
         assert self._baseUrl is not None, 'The base URL must be set.'
@@ -94,11 +93,7 @@ class wmlParser(SGMLParser):
     def _handle_go_tag_start(self, tag, attrs):
         
         # Find method
-        method = attrs.get('method', '').upper()
-        if not method:
-            om.out.debug('wmlParser found a form without a method. Using GET '
-                         'as the default.')
-            method = 'GET'
+        method = attrs.get('method', 'GET').upper()
         
         # Find action
         action = attrs.get('href', '')
@@ -116,18 +111,21 @@ class wmlParser(SGMLParser):
             om.out.debug('wmlParser found a form without an action. '
                          'Javascript is being used.')
     
+    def _handle_go_tag_end(self, tag):
+        self._inside_form = False
+    
     def _handle_input_tag_start(self, tag, attrs):
         if self._inside_form:
             # We are working with the last form
             f = self._forms[-1]
             f.addInput(attrs.items())
     
-    _handle_postfield_tag_start = _handle_setvar_tag_start = _handle_input_tag_start
-    
+    _handle_postfield_tag_start = \
+                            _handle_setvar_tag_start = _handle_input_tag_start
     
     def _handle_select_tag_start(self, tag, attrs):
         if self._inside_form:
-            self._select_tag_name = select_name = attrs.get('name', None) or \
+            self._select_tag_name = select_name = attrs.get('name', '') or \
                                                     attrs.get('id', '')
             if select_name:
                 self._inside_select = True
@@ -142,7 +140,4 @@ class wmlParser(SGMLParser):
             f = self._forms[-1]
             attrs['name'] = self._select_tag_name 
             f.addInput(attrs.items())
-    
-    def _handle_go_tag_end(self, tag):
-        self._inside_form = False
     

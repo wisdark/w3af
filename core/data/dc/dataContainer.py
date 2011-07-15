@@ -22,9 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 import copy
 
+from core.data.constants.encodings import DEFAULT_ENCODING
 import core.data.parsers.encode_decode as enc_dec
-
-DEFAULT_ENCODING = 'utf-8'
 
 
 class dataContainer(dict):

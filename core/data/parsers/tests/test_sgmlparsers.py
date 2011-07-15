@@ -170,20 +170,22 @@ class TestSGMLParser(PyMockTestCase):
 
     def test_baseurl(self):
         body = HTML_DOC % {'head': BASE_TAG, 'body': ''}
-        p = _SGMLParser(_build_http_response(URL, body))
-        p._parse(body)
+        resp = _build_http_response(URL, body)
+        p = _SGMLParser(resp)
+        p._parse(resp)
         self.assertEquals(url_object('http://www.w3afbase.com/'), p._baseUrl)
         
     def test_regex_urls(self):
-        #self._regex_url_parse(httpresp)
+        #self._regex_url_parse(resp)
         self.assertTrue(1==0)
     
     def test_meta_tags(self):
         body = HTML_DOC % \
             {'head': META_REFRESH + META_REFRESH_WITH_URL,
             'body': ''}
-        p = _SGMLParser(_build_http_response(URL, body))
-        p._parse(body)
+        resp = _build_http_response(URL, body)
+        p = _SGMLParser(resp)
+        p._parse(resp)
         self.assertTrue(2, len(p.meta_redirs))
         self.assertTrue("2;url=http://crawler.w3af.com/" in p.meta_redirs)
         self.assertTrue("600" in p.meta_redirs)
@@ -220,13 +222,14 @@ class TestSGMLParser(PyMockTestCase):
                     ele = getattr(tag, choice(ops))()
                 body_elems.append(ele)
             
-            p = _SGMLParser(_build_http_response(URL, ''))
+            body = HTML_DOC % {'head': '', 'body': ''.join(body_elems)}
+            resp = _build_http_response(URL, body)
+            p = _SGMLParser(resp)
             args = (IfTrue(islower), IfTrue(islower))
             override(p, 'start').expects(*args).returns(None).at_least(10)
-            body = HTML_DOC % {'head': '', 'body': ''.join(body_elems)}
             # Replay
             self.replay()
-            p._parse(body)
+            p._parse(resp)
             # Verify and reset
             self.verify()
             self.reset()
@@ -266,8 +269,9 @@ class TestHTMLParser(PyMockTestCase):
              'body': FORM_METHOD_GET % {'form_content': ''} +
                      FORM_WITHOUT_ACTION % {'form_content': ''}
             }
-        p = _HTMLParser(_build_http_response(URL, body))
-        p._parse(body)
+        resp = _build_http_response(URL, body)
+        p = _HTMLParser(resp)
+        p._parse(resp)
         self.assertEquals(2, len(p.forms))
     
     def test_form_without_meth(self):
@@ -278,8 +282,9 @@ class TestHTMLParser(PyMockTestCase):
                     {'head': '',
                      'body': FORM_WITHOUT_METHOD % {'form_content': ''}
                     }
-        p = _HTMLParser(_build_http_response(URL, body))
-        p._parse(body)
+        resp = _build_http_response(URL, body)
+        p = _HTMLParser(resp)
+        p._parse(resp)
         self.assertEquals('GET', p.forms[0].getMethod())
     
     def test_form_without_action(self):
@@ -290,8 +295,9 @@ class TestHTMLParser(PyMockTestCase):
                     {'head': '',
                      'body': FORM_WITHOUT_ACTION % {'form_content': ''}
                     }
-        p = _HTMLParser(_build_http_response(URL, body))
-        p._parse(body)
+        resp = _build_http_response(URL, body)
+        p = _HTMLParser(resp)
+        p._parse(resp)
         self.assertEquals(URL, p.forms[0].getAction())
     
     def test_inputs_inside_form(self):
@@ -307,8 +313,9 @@ class TestHTMLParser(PyMockTestCase):
                   INPUT_RADIO_WITH_NAME + INPUT_CHECKBOX_WITH_NAME +
                   INPUT_HIDDEN)
             }
-        p = _HTMLParser(_build_http_response(URL, body))
-        p._parse(body)
+        resp = _build_http_response(URL, body)
+        p = _HTMLParser(resp)
+        p._parse(resp)
         # Only one form
         self.assertTrue(len(p.forms) == 1)
         # Ensure that parsed inputs actually belongs to the form and

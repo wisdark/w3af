@@ -98,8 +98,6 @@ class formAutocomplete(baseGrepPlugin):
                         kb.kb.append(self, 'formAutocomplete', inf)
                         # Also send 'msg' to console
                         om.out.information(msg)
-                        # Enough with one input
-                        continue
 
 
     def setOptions(self, OptionList):

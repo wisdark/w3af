@@ -20,7 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-from core.data.dc.dataContainer import dataContainer, DEFAULT_ENCODING
+from core.data.constants.encodings import DEFAULT_ENCODING
+from core.data.dc.dataContainer import dataContainer
 import core.data.parsers.encode_decode as enc_dec
 
 

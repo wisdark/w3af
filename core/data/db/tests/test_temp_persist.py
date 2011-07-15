@@ -1,3 +1,5 @@
+# -*- coding: UTF-8 -*-
+
 import random
 import unittest
 import string
@@ -74,6 +76,15 @@ class test_disk_list(unittest.TestCase):
         self.assertEqual( dl[0] == 'a', True)
         self.assertEqual( dl[1] == 1  , True)
         self.assertEqual( dl[2] == [3,2,1], True)
+
+    def test_unicode(self):
+        dl = disk_list()
+
+        dl.append( u'à' )
+        dl.append( u'המלצת השבוע' )
+        
+        self.assertEqual( dl[0] == u'à', True)
+        self.assertEqual( dl[1] == u'המלצת השבוע', True)
 
 if __name__ == '__main__':
     unittest.main()

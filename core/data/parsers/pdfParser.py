@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 import core.controllers.outputManager as om
-from core.data.parsers.abstractParser import BaseParser
+from core.data.parsers.baseparser import BaseParser
 from core.data.parsers.urlParser import url_object
 
 
@@ -41,17 +41,16 @@ class pdfParser(BaseParser):
         BaseParser.__init__(self , httpResponse)
         
         # Work !
-        self._preParse(httpResponse.body)
+        self._pre_parse(httpResponse.body)
         
-    def _preParse(self, document):
+    def _pre_parse(self, document):
         content_text = self.getPDFContent(document)
         self._parse(content_text)
     
     def _parse(self, content_text):
         # Get the URLs using a regex
-        url_regex = '((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|'
-        url_regex += '%[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)'
-        self._re_urls.update(url_object(x[0]) for x in re.findall(url_regex, content_text))
+        self._re_urls.update(url_object(x[0]) for x in 
+                             re.findall(BaseParser.URL_RE, content_text))
         
         # Get the mail addys
         self._findEmails(content_text)
@@ -86,12 +85,13 @@ class pdfParser(BaseParser):
         Added to avoid this bug:
         ===============
         
-        "/home/ulises2k/programas/w3af-svn/w3af/core/data/parsers/abstractParser.py
+        "/home/ulises2k/programas/w3af-svn/w3af/core/data/parsers/baseparser.py
         ", line 52, in findAccounts
         if line.count('@'+self._baseDomain):
         UnicodeDecodeError: 'ascii' codec can't decode byte 0xc3 in position 13:
         ordinal not in range(128)
         '''
+        # TODO: Review this line
         res = unicode(content,'utf-8','ignore').encode('utf-8')
         return res
     

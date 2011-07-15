@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import zlib
 
-from core.data.parsers.abstractParser import BaseParser
+from core.data.parsers.baseparser import BaseParser
     
 
 class swfParser(BaseParser):

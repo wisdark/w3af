@@ -24,10 +24,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import operator
 import random
 
-import core.controllers.outputManager as om
-from core.data.dc.dataContainer import dataContainer, DEFAULT_ENCODING
+from core.data.constants.encodings import DEFAULT_ENCODING
+from core.data.dc.dataContainer import dataContainer
 from core.data.parsers.encode_decode import urlencode
 from core.data.parsers.urlParser import url_object
+import core.controllers.outputManager as om
 
 
 class form(dataContainer):
@@ -127,7 +128,7 @@ class form(dataContainer):
             # with the same name, and different types
             self._types[name] = 'file'
     
-    def __str__( self ):
+    def __str__(self):
         '''
         This method returns a string representation of the form Object.
         
@@ -146,7 +147,8 @@ class form(dataContainer):
         >>> f = form() # Default encoding UTF-8
         >>> _ = f.addInput([("type", "text"), ("name", u"v"),("value", u"áéíóú")])
         >>> _ = f.addInput([("type", "text"), ("name", u"c"), ("value", u"ñçÑÇ")])
-        >>> urllib.unquote(str(f)).decode('utf-8') == u'c=ñçÑÇ&v=áéíóú'
+        >>> f.addSubmit('address', 'bsas')
+        >>> urllib.unquote(str(f)).decode('utf-8') == u'c=ñçÑÇ&address=bsas&v=áéíóú'
         True
 
         @return: string representation of the form Object.
@@ -155,7 +157,9 @@ class form(dataContainer):
         # FIXME: hmmm I think that we are missing something here... what about
         # self._select values. See FIXME below. Maybe we need another for?
         #
-        return urlencode(dict(self.iteritems()), encoding=self.encoding)
+        d = dict(self)
+        d.update(self._submitMap)
+        return urlencode(d, encoding=self.encoding)
         
     def addSubmit( self, name, value ):
         '''

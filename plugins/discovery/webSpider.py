@@ -178,7 +178,7 @@ class webSpider(baseDiscoveryPlugin):
                             continue
                         seen.add(ref)
                         
-                        # I don't want w3af sending request to 3rd parties!
+                        # I don't want w3af sending requests to 3rd parties!
                         if ref.getDomain() != self._target_domain:
                             continue
                         

@@ -54,7 +54,8 @@ class findComments(baseGrepPlugin):
             'user', 'pass', 'xxx', 'fix', 'bug', 'broken', 'oops', 'hack',
             'caution', 'todo', 'note', 'warning', '!!!', '???', 'shit',
             'stupid', 'tonto', 'porqueria', 'ciudado', 'usuario', 'contrase',
-            'puta', 'secret', '@', 'email','security','captcha',
+            'puta', 'secret', '@', 'email','security','captcha', 'pinga',
+			'cojones',
             # some in Portuguese
             'banco', 'bradesco', 'itau', 'visa', 'bancoreal', u'transfêrencia',
             u'depósito', u'cartão', u'crédito', 'dados pessoais'

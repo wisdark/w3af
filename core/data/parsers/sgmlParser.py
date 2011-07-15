@@ -26,7 +26,7 @@ import traceback
 
 from lxml import etree
 
-from core.data.parsers.abstractParser import BaseParser
+from core.data.parsers.baseparser import BaseParser
 from core.data.parsers.urlParser import url_object
 import core.controllers.outputManager as om
 
@@ -41,9 +41,9 @@ class SGMLParser(BaseParser):
     '''
     
     TAGS_WITH_URLS = (
-        'go', 'a', 'img', 'link', 'script', 'iframe', 'object', 'embed',
-        'area', 'frame', 'applet', 'input', 'base', 'div', 'layer', 'form',
-        'ilayer', 'bgsound'
+        'go', 'a', 'anchor', 'img', 'link', 'script', 'iframe', 'object',
+        'embed', 'area', 'frame', 'applet', 'input', 'base', 'div', 'layer',
+        'form', 'ilayer', 'bgsound'
         )
     
     URL_ATTRS = ('href', 'src', 'data', 'action')
@@ -234,12 +234,6 @@ class SGMLParser(BaseParser):
     
     ## Methods for tags handling ##
 
-    def _handle_form_tag_start(self, tag, attrs):
-        self._inside_form = True
-
-    def _handle_script_tag_start(self, tag, attrs):
-        self._inside_script = True
-    
     def _handle_base_tag_start(self, tag, attrs):
         # Override base url
         self._baseUrl = self._baseUrl.urlJoin(attrs.get('href', ''))
@@ -263,15 +257,27 @@ class SGMLParser(BaseParser):
                 url = url_object(self._decode_URL(url), encoding=self._encoding) 
                 self._parsed_urls.add(url)
                 self._tag_and_url.add(('meta', url))
+
+    def _handle_form_tag_start(self, tag, attrs):
+        self._inside_form = True
+
+    def _handle_form_tag_end(self, tag):
+        self._inside_form = False
+
+    def _handle_script_tag_start(self, tag, attrs):
+        self._inside_script = True
     
     def _handle_script_tag_end(self, tag):
         self._inside_script = False
     
-    def _handle_form_tag_end(self, tag):
-        self._inside_form = False
+    def _handle_select_tag_start(self, tag, attrs):
+        self._inside_select = True
     
     def _handle_select_tag_end(self, tag):
         self._inside_select = False
+    
+    def _handle_textarea_tag_start(self, tag, attrs):
+        self._inside_textarea = True
     
     def _handle_textarea_tag_end(self, tag):
         self._inside_textarea = False

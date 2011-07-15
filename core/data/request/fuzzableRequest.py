@@ -22,9 +22,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from urllib import unquote
 import copy
 
+from core.data.constants.encodings import DEFAULT_ENCODING
 from core.controllers.w3afException import w3afException
 from core.data.dc.cookie import cookie as cookie
-from core.data.dc.dataContainer import dataContainer, DEFAULT_ENCODING
+from core.data.dc.dataContainer import dataContainer
 from core.data.parsers.urlParser import url_object
 import core.controllers.outputManager as om
 

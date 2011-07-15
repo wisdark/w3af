@@ -140,11 +140,3 @@ class TestHTTPResponse(unittest.TestCase):
             resp = self.create_resp(headers, html)
             self.assertEquals(html.decode(DEFAULT_CHARSET, 'default'), resp.body)
     
-    def test_type_normalized_body(self):
-        # The normalized body's type also must be unicode
-        for body, charset in TEST_RESPONSES.values():
-            hvalue = 'text/html; charset=%s' % charset
-            htmlbody = '%s' % body.encode(charset)
-            resp = self.create_resp({'content-type': hvalue}, htmlbody)
-            self.assertTrue(type(resp.getNormalizedBody()) is unicode)
-       

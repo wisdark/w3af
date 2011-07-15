@@ -81,18 +81,14 @@ class HTMLParser(SGMLParser):
         This method also looks if there are "pending inputs" in the 
         self._saved_inputs list and parses them.
         '''
-        SGMLParser._handle_base_tag_start(self, tag, attrs)
+        SGMLParser._handle_form_tag_start(self, tag, attrs)
         
         # Get the 'method'
-        method = attrs.get('method', None)
-        if not method:
-            method = 'GET'
-            om.out.debug('HTMLParser found a form without a method. Using GET'
-                         ' as the default.')
+        method = attrs.get('method', 'GET').upper()
 
         # Get the action
         action = attrs.get('action', None)
-        if not action:
+        if action is None:
             msg = ('HTMLParser found a form without an action attribute. '
             'Javascript may be used... but another option (mozilla does '
             'this) is that the form is expected to be  posted back to the'
@@ -127,7 +123,7 @@ class HTMLParser(SGMLParser):
         
         # We are working with the last form
         form_obj = self._forms[-1]
-        type = attrs.get('type')
+        type = attrs.get('type', '').lower()
         items = attrs.items()
         
         if type == 'file':
@@ -166,7 +162,7 @@ class HTMLParser(SGMLParser):
         # Reset data
         self._textarea_data = ""
         # Get the name
-        self._textarea_tag_name = attrs.get('name', None) or \
+        self._textarea_tag_name = attrs.get('name', '') or \
                                     attrs.get('id', '')
             
         if not self._textarea_tag_name:    
@@ -215,7 +211,7 @@ class HTMLParser(SGMLParser):
         self._option_attrs = []
         
         # Get the name
-        self._select_tag_name = attrs.get('name', None) or attrs.get('id', '')
+        self._select_tag_name = attrs.get('name', '') or attrs.get('id', '')
             
         if not self._select_tag_name:            
             om.out.debug('HTMLParser found a select tag without a '

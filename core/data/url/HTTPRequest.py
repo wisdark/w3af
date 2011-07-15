@@ -30,9 +30,9 @@ class HTTPRequest(urllib2.Request):
         '''
         This is a simple wrapper around a urllib2 request object.
         >>> from core.data.parsers.urlParser import url_object
-        >>> u = url_object('http://www.google.com')
+        >>> u = url_object('http://www.w3af.com')
         >>> req = HTTPRequest(u)
-        >>> req.get_full_url() == 'http://www.google.com'
+        >>> req.get_full_url() == 'http://www.w3af.com'
         True
         '''
         #
