@@ -20,7 +20,7 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
-from pymock import PyMockTestCase, IfTrue, override, dontcare, at_least
+from pymock import PyMockTestCase, IfTrue, override, at_least
 
 from ..htmlParser import HTMLParser
 from ..sgmlParser import SGMLParser
@@ -62,18 +62,18 @@ FORM_WITHOUT_ACTION = u'''
 
 # Textarea templates
 TEXTAREA_WITH_NAME_AND_DATA = u'''
-<textarea name="sample">
+<textarea name="sample_name">
     sample_value
 </textarea>'''
 TEXTAREA_WITH_ID_AND_DATA = u'''
-<textarea id="sample">
+<textarea id="sample_id">
     sample_value
 </textarea>'''
 TEXTAREA_WITH_NAME_ID_AND_DATA = u'''
-<textarea name="sample" id="sample_id">
+<textarea name="sample_name" id="sample_id">
     sample_value
 </textarea>'''
-TEXTAREA_WITH_NAME_EMPTY = u'<textarea name="my_textarea"></textarea>'
+TEXTAREA_WITH_NAME_EMPTY = u'<textarea name=""></textarea>'
 
 # Input templates
 INPUT_TEXT_WITH_NAME = u'<input name="foo1" type="text" value="bar">'
@@ -98,11 +98,6 @@ SELECT_WITH_ID = u'''
     <option value="car"/>
     <option value="plane"></option>
     <option value="bike"></option>
-</select>'''
-SELECT_WITHOUT_NAME_OR_ID = u'''
-<select>
-    <option value="car"/>
-    <option value="plane"></option>
 </select>'''
 
 # Anchor templates
@@ -176,8 +171,22 @@ class TestSGMLParser(PyMockTestCase):
         self.assertEquals(url_object('http://www.w3afbase.com/'), p._baseUrl)
         
     def test_regex_urls(self):
-        #self._regex_url_parse(resp)
-        self.assertTrue(1==0)
+        u1 = u'http://w3af.com/tréasure.php?id=ÓRÓª'
+        u2 = u'http://w3af.com/tésoro.php?id=GÓLD'
+        u3 = u'http://w3af.com/gold.py?típo=silvër'
+        body = '''
+        <html>
+          <body>estas s%C3%B3n las urls absolutas q te comente para llegar al tesoro<br>
+                http://w3af.com/t%C3%A9soro.php?id=G%C3%93LD http://w3af.com/tr%C3%A9asure.php?id=%C3%93R%C3%93%C2%AA
+            y las relativas son<br>
+                /gold.py?t%C3%ADpo=silv%C3%ABr
+        '''
+        resp = _build_http_response(URL, body)
+        p = _SGMLParser(resp)
+        urls = tuple(u.url_string for u in p._re_urls)
+        self.assertTrue(u1 in urls)
+        self.assertTrue(u2 in urls)
+        self.assertTrue(u3 in urls)
     
     def test_meta_tags(self):
         body = HTML_DOC % \
@@ -274,6 +283,18 @@ class TestHTMLParser(PyMockTestCase):
         p._parse(resp)
         self.assertEquals(2, len(p.forms))
     
+    def test_no_forms(self):
+        # No form should be parsed
+        body = HTML_DOC % \
+            {'head': '',
+             'body': (INPUT_TEXT_WITH_NAME + INPUT_HIDDEN + SELECT_WITH_ID +
+                      TEXTAREA_WITH_ID_AND_DATA + INPUT_FILE_WITH_NAME)
+             }
+        resp = _build_http_response(URL, body)
+        p = _HTMLParser(resp)
+        p._parse(resp)
+        self.assertEquals(0, len(p.forms))
+    
     def test_form_without_meth(self):
         '''
         When the form has no 'method' => 'GET' will be used 
@@ -300,11 +321,12 @@ class TestHTMLParser(PyMockTestCase):
         p._parse(resp)
         self.assertEquals(URL, p.forms[0].getAction())
     
-    def test_inputs_inside_form(self):
-        '''
-        We expect that the form contains all the inputs (both those declared
-        before and after)
-        '''        
+    def test_inputs_in_out_form(self):
+        # We expect that the form contains all the inputs (both those declared
+        # before and after). Also it must be equal to a form that includes 
+        # those same inputs but declared before them
+        
+        # 1st body
         body = HTML_DOC % \
             {'head': '',
              'body': (INPUT_TEXT_WITH_NAME + INPUT_TEXT_WITH_ID +
@@ -316,6 +338,22 @@ class TestHTMLParser(PyMockTestCase):
         resp = _build_http_response(URL, body)
         p = _HTMLParser(resp)
         p._parse(resp)
+        
+        # 2nd body
+        body2 = HTML_DOC % \
+            {'head': '',
+             'body': FORM_WITHOUT_METHOD % 
+                      {'form_content': 
+                        INPUT_TEXT_WITH_NAME + INPUT_TEXT_WITH_ID +
+                        INPUT_FILE_WITH_NAME + INPUT_SUBMIT_WITH_NAME +
+                        INPUT_RADIO_WITH_NAME + INPUT_CHECKBOX_WITH_NAME +
+                        INPUT_HIDDEN
+                      }
+            }
+        resp2 = _build_http_response(URL, body2)
+        p2 = _HTMLParser(resp2)
+        p2._parse(resp2)
+        
         # Only one form
         self.assertTrue(len(p.forms) == 1)
         # Ensure that parsed inputs actually belongs to the form and
@@ -329,19 +367,57 @@ class TestHTMLParser(PyMockTestCase):
         self.assertEquals(['bar'], f['foo7']) # hidden input
         self.assertEquals('', f._submitMap['foo4']) # submit input
         
+        # Finally assert that the parsed forms are equals
+        self.assertEquals(f, p2.forms[0])
     
-    def test_inputs_outside_form(self):
-        pass
-    
-    def test_textareas_inside_form(self):
-        pass
-    
-    def test_textarea_outside_form(self):
-        pass
-    
-    def test_selects_inside_form(self):
-        pass
-    
-    def test_selects_outside_form(self):
-        pass
-    
+    def test_textareas_in_out_form(self):
+        body = HTML_DOC % \
+            {'head': '',
+             'body': (
+                  TEXTAREA_WITH_ID_AND_DATA +
+                  FORM_WITHOUT_METHOD % 
+                    {'form_content': TEXTAREA_WITH_NAME_AND_DATA} +
+                  TEXTAREA_WITH_NAME_EMPTY)
+            }
+        resp = _build_http_response(URL, body)
+        p = _HTMLParser(resp)
+        p._parse(resp)
+        
+        # textarea are parsed as regular inputs
+        f = p.forms[0]
+        self.assertTrue(f.get('sample_id') == f.get('sample_name') == 
+                        ['sample_value'])
+        # Last <textarea> with empty name wasn't parsed
+        self.assertEquals(2, len(f))
+        
+    def test_selects_in_out_form(self):
+        # Both <select> are expected to be parsed inside the form. Because 
+        # they have the same name/id the same entry will be used in the form
+        # although the values will be duplicated when applies.
+        body = HTML_DOC % \
+            {'head': '',
+             'body': (
+                  SELECT_WITH_NAME +
+                  FORM_WITHOUT_METHOD % {'form_content': SELECT_WITH_ID} +
+                  '<select><option value="xxx"/><option value="yyy"/></select>')
+            }
+        resp = _build_http_response(URL, body)
+        p = _HTMLParser(resp)
+        p._parse(resp)
+        
+        # No pending parsed selects
+        self.assertEquals(0, len(p._selects))
+        
+        # Only 1 select (2 have the same name); the last one is not parsed as
+        # it has no name/id
+        f = p.forms[0]
+        self.assertEquals(1, len(f._selects))
+        vehicles = f._selects['vehicle']
+        self.assertTrue(vehicles.count("car") == vehicles.count("plane") ==
+                        vehicles.count("bike") == 2)
+        
+        # "xxx" and "yyy" options were not parsed
+        self.assertFalse("xxx" in f._selects.values())
+        self.assertFalse("yyy" in f._selects.values())
+        
+        

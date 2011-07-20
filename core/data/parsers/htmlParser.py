@@ -43,9 +43,7 @@ class HTMLParser(SGMLParser):
         self._textarea_tag_name = ""
         self._textarea_data = ""
         # For <select> elems parsing
-        self._select_tag_name = ""
-        # For <option> elems parsing
-        self._option_attrs = []
+        self._selects = []
         # Save for using in form parsing
         self._source_url = http_resp.getURL()
         # Call parent's __init__
@@ -195,30 +193,32 @@ class HTMLParser(SGMLParser):
         Handler for select end tag
         """
         SGMLParser._handle_select_tag_end(self, tag)
-        if not self._forms:
-            self._saved_inputs.append(self._option_attrs)
-        else:
+        if self._forms:
             form_obj = self._forms[-1]
-            # First convert  to list of tuples before passing it as arg
-            opt_attrs = [tuple(attrs.items()) for attrs in self._option_attrs]
-            form_obj.addSelect(self._select_tag_name, opt_attrs)
-
+            for sel_name, optvalues in self._selects:
+                # First convert  to list of tuples before passing it as arg
+                optvalues = [tuple(attrs.items()) for attrs in optvalues]
+                form_obj.addSelect(sel_name, optvalues)
+            
+            # Reset selects container
+            self._selects = []
+    
     def _handle_select_tag_inside_form(self, tag, attrs):
         """
         Handler for select tag inside a form
         """
-        # Reset container
-        self._option_attrs = []
-        
         # Get the name
-        self._select_tag_name = attrs.get('name', '') or attrs.get('id', '')
+        select_name = attrs.get('name', '') or attrs.get('id', '')
             
-        if not self._select_tag_name:            
+        if not select_name:
             om.out.debug('HTMLParser found a select tag without a '
                          'name attr, IGNORING!')
             self._inside_select = False
         else:
+            self._selects.append((select_name, []))
             self._inside_select = True
+    
+    _handle_select_tag_outside_form = _handle_select_tag_inside_form
 
     ## <option> handler methods
     _handle_option_tag_start = _form_elems_generic_handler
@@ -228,6 +228,6 @@ class HTMLParser(SGMLParser):
         Handler for option tag inside a form
         """
         if self._inside_select:
-            self._option_attrs.append(attrs)
+            self._selects[-1][1].append(attrs)
     
     _handle_option_tag_outside_form = _handle_option_tag_inside_form

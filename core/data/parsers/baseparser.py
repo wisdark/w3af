@@ -173,12 +173,10 @@ class BaseParser(object):
         >>> a._findEmails(u'header abc4def@w3af.com footer')
         [u'abc4def@w3af.com']
         '''
-        # First, we decode all chars. I have found some strange sites where
-        # they encode the @... some other sites where they encode the email,
-        # or add some %20 padding... strange stuff... so better be safe...
+        # Revert url-encoded sub-strings
         doc_str = urllib.unquote_plus(doc_str)
         
-        # Now we decode the HTML special characters...
+        # Then html-decode HTML special characters
         doc_str = htmldecode(doc_str)
         
         # Perform a fast search for the @. In w3af, if we don't have an @ we
@@ -197,7 +195,7 @@ class BaseParser(object):
                     
         return self._emails
     
-    def _regex_url_parse(self, http_resp):
+    def _regex_url_parse(self, doc_str):
         '''
         Use regular expressions to find new URLs.
         
@@ -213,42 +211,37 @@ class BaseParser(object):
         Simple, empty result
         >>> a = BaseParser(response)
         >>> response = httpResponse(200, '', {}, u, u)
-        >>> a._regex_url_parse(response)
+        >>> a._regex_url_parse(response.body)
         >>> len(a._re_urls)
         0
         
         Full URL
         >>> a = BaseParser(response)
-        >>> response = httpResponse( 200, 'header http://www.w3af.com/foo/bar/index.html footer', {}, u, u )
-        >>> a._regex_url_parse(response)
+        >>> a._regex_url_parse(u'header http://www.w3af.com/foo/bar/index.html footer')
         >>> url_object('http://www.w3af.com/foo/bar/index.html') in a._re_urls
         True
 
         One relative URL
         >>> a = BaseParser(response)
-        >>> response = httpResponse(200, 'header /foo/bar/index.html footer', {}, u, u)
-        >>> a._regex_url_parse(response)
+        >>> a._regex_url_parse(u'header /foo/bar/index.html footer')
         >>> url_object('http://www.w3af.com/foo/bar/index.html') in a._re_urls
         True
 
         Relative with initial "/" , inside an href
         >>> a = BaseParser(response)
-        >>> response = httpResponse(200, 'header <a href="/foo/bar/index.html">foo</a> footer', {}, u, u)
-        >>> a._regex_url_parse(response)
+        >>> a._regex_url_parse(u'header <a href="/foo/bar/index.html">foo</a> footer')
         >>> url_object('http://www.w3af.com/foo/bar/index.html') in a._re_urls
         True
 
         Simple index relative URL
         >>> a = BaseParser(response)
-        >>> response = httpResponse(200, 'header <a href="index">foo</a> footer', {}, u, u)
-        >>> a._regex_url_parse( response )
+        >>> a._regex_url_parse(u'header <a href="index">foo</a> footer')
         >>> len(a._re_urls)
         0
         '''
         re_urls = self._re_urls
-        resp_body = http_resp.getBody()
         
-        for url in re.findall(BaseParser.URL_RE, resp_body):
+        for url in re.findall(BaseParser.URL_RE, doc_str):
             # This try is here because the _decode_URL method raises an
             # exception whenever it fails to decode a url.
             try:
@@ -267,11 +260,10 @@ class BaseParser(object):
             
             # TODO: Also matches //foo/bar.txt and http://host.tld/foo/bar.txt
             # I'm removing those matches manually below
-            regex = '((:?[/]{1,2}[\w%\-~\.]+)+\.[A-Za-z0-9]{2,4}' \
-                    '(((\?)([a-zA-Z0-9]*=\w*)){1}((&)([a-zA-Z0-9]*=\w*))*)?)'
+            regex = '((:?[/]{1,2}[\w%\-~\.]+)+\.\w{2,4}(((\?)([\w%]*=[\w%]*)){1}((&)([\w%]*=[\w%]*))*)?)'
             relative_regex = re.compile(regex, re.U)
             
-            for match_tuple in relative_regex.findall(resp_body):
+            for match_tuple in relative_regex.findall(doc_str):
                 
                 match_str = match_tuple[0]
                 
@@ -283,7 +275,7 @@ class BaseParser(object):
                     #"PHP/5.2.4-2ubuntu5.7", "Apache/2.2.8", "mod_python/3.3.1"
                     continue
                 
-                url = http_resp.getURL().urlJoin(match_str).url_string
+                url = self._baseUrl.urlJoin(match_str).url_string
                 url = url_object(self._decode_URL(url),
                                  encoding=self._encoding)
                 res.add(url)

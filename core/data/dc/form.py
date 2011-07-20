@@ -98,10 +98,8 @@ class form(dataContainer):
         Auxiliary setter for name=value
         '''
         # added to support repeated parameter names
-        if name in self:
-            self[name].append(value)
-        else:
-            self[name] = [value, ]
+        vals = self.setdefault(name, [])
+        vals.append(value)
 
     def addFileInput( self, attrs ):
         '''
@@ -269,7 +267,7 @@ class form(dataContainer):
         if not name:
             return
         
-        self._selects[name] = []
+        self._selects.setdefault(name, [])
         self._types[name] = 'select'
         
         value = ""

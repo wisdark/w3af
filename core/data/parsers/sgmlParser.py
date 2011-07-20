@@ -115,8 +115,9 @@ class SGMLParser(BaseParser):
         '''
         Perform some initialization tasks
         '''
-        self._regex_url_parse(http_resp)
-        self._findEmails(http_resp.body)
+        body = http_resp.body
+        self._regex_url_parse(body)
+        self._findEmails(body)
     
     def _parse(self, http_resp):
         '''

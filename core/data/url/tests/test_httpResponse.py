@@ -140,3 +140,24 @@ class TestHTTPResponse(unittest.TestCase):
             resp = self.create_resp(headers, html)
             self.assertEquals(html.decode(DEFAULT_CHARSET, 'default'), resp.body)
     
+    def test_eval_xpath_in_dom(self):
+        html = """
+        <html>
+          <head>
+            <title>THE TITLE</title>
+          </head>
+          <body>
+            <input name="user" type="text">
+            <input name="pass" type="password">
+          </body>
+        </html>"""
+        headers = {'Content-Type': 'text/xml'}
+        resp = self.create_resp(headers, html)
+        self.assertEquals(2, len(resp.getDOM().xpath('.//input')))
+    
+    def test_dom_are_the_same(self):
+        resp = self.create_resp({'conten-type': 'text/html'}, "<html/>")
+        domid = id(resp.getDOM())
+        self.assertEquals(domid, id(resp.getDOM()))
+    
+    

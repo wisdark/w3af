@@ -27,6 +27,7 @@ from random import choice, randint
 import core.data.kb.config as cf
 
 # Common modules
+from StringIO import StringIO
 import copy
 import re
 import urllib

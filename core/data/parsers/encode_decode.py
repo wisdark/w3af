@@ -27,50 +27,44 @@ from htmlentitydefs import name2codepoint
 import urllib
 import sys
 
+# This pattern matches a character entity reference (a decimal numeric
+# references, a hexadecimal numeric reference, or a named reference).
+CHAR_REF_PATT = re.compile(r'&(#(\d+|x[\da-fA-F]+)|[\w.:-]+);?', re.U)
 
 def htmldecode(text, use_repr=False):
     """
     Decode HTML entities in the given text.
 
-    >>> htmldecode('hola mundo')
-    'hola mundo'
-    >>> print htmldecode(u'hólá múndó')
-    hólá múndó
-    >>> print htmldecode('hola mundo &#0443')
-    hola mundo ƻ
-    >>> htmldecode('hola mundo &#x41')
-    'hola mundo A'
-    >>> print htmldecode('&aacute;')
-    á
+    >>> htmldecode('hola mundo') == 'hola mundo'
+    True
+    >>> htmldecode(u'hólá múndó') == u'hólá múndó'
+    True
+    >>> htmldecode(u'hola &#0443') == u'hola \u01bb' ## u'hola ƻ'
+    True
+    >>> htmldecode(u'hola mundo &#x41') == u'hola mundo A'
+    True
+    >>> htmldecode(u'&aacute;') == u'\xe1' ## u'á'
+    True
     """
-    # This pattern matches a character entity reference (a decimal numeric
-    # references, a hexadecimal numeric reference, or a named reference).
-    charrefpat = re.compile(r'&(#(\d+|x[\da-fA-F]+)|[\w.:-]+);?')
-    
-    # FIXME: What if we have something like this: &aacute ?!?!
-    # I expected something like á , not a  '\xe1'
-    '''
-    >>> from encode_decode import *
-    >>> htmldecode('&aacute;')
-    '\xe1'
-    '''
-    #uchr = lambda value: value > 255 and unichr(value).encode('utf-8') or chr(value)
-    uchr = lambda value: unichr(value)
     
     # Internal function to do the work
     def entitydecode(match):
         entity = match.group(1)
+        
         if entity.startswith('#x'):
-            return uchr(int(entity[2:], 16))
+            return unichr(int(entity[2:], 16))
+        
         elif entity.startswith('#'):
-            return uchr(int(entity[1:]))
+            return unichr(int(entity[1:]))
+        
         elif entity in name2codepoint:
-            return uchr(name2codepoint[entity])
+            return unichr(name2codepoint[entity])
+        
         else:
             return match.group(0)
             
     # "main"
-    return charrefpat.sub(entitydecode, text)
+    return CHAR_REF_PATT.sub(entitydecode, text)
 
 
 def urlencode(query, encoding, safe='/<>"\'=:()'):
