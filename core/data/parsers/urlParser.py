@@ -82,7 +82,8 @@ def parse_qs(url_encoded_string, ignoreExceptions=True,
     {'id': ['3', '4']}
     >>> parse_qs('id=3&ff=4&id=5')
     {'id': ['3', '5'], 'ff': ['4']}
-
+    >>> parse_qs('pname')
+    {'pname': ['']}
     '''
     parsed_qs = None
     result = QueryString(encoding=encoding)

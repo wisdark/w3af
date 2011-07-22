@@ -43,10 +43,7 @@ class swfParser(BaseParser):
                 # If the inflate fails... there is nothing else to do.
                 return
         
-        http_response_copy = httpResponse.copy()
-        http_response_copy.setBody(swf)
-        
-        self._parse(http_response_copy)
+        self._parse(swf)
     
     def _is_compressed(self, swf_document):
         '''
@@ -71,15 +68,15 @@ class swfParser(BaseParser):
         else:
             return uncompressed_data
     
-    def _parse(self, swf_response):
+    def _parse(self, swf_body):
         '''
         Parse the SWF bytecode.
         
         For now... don't decompile anything, just apply regular expressions to it.
         
-        @parameter swf_response: An httpResponse containing the SWF
+        @parameter swf_body: SWF bytecode string
         '''
-        self._regex_url_parse(swf_response)
+        self._regex_url_parse(swf_body)
     
     def getReferences(self):
         '''
