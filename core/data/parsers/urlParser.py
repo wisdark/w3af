@@ -144,11 +144,23 @@ class url_object(object):
         >>> u.getExtension()
         'txt'
         >>> 
+
+        #
+        # http is the default protocol, we can provide URLs with no proto
+        #
         >>> u = url_object('www.google.com')
         >>> u.getDomain()
         'www.google.com'
         >>> u.getProtocol()
         'http'
+
+        #
+        # But we can't specify a URL without a domain!
+        #
+        >>> u = url_object('http://')
+        Traceback (most recent call last):
+          File "<stdin>", line 1, in ?
+        ValueError: Invalid URL "http://"
         '''
         self._already_calculated_url = None
         self._changed = True
@@ -175,6 +187,9 @@ class url_object(object):
         self.params = params or ''
         self.qs = qs or ''
         self.fragment = fragment or ''
+
+        if not self.netloc:
+            raise ValueError, 'Invalid URL "%s"' % data
 
     @classmethod
     def from_parts(cls, scheme, netloc, path, params,
@@ -256,8 +271,13 @@ class url_object(object):
         if self._changed or calc is None:
             data = (self.scheme, self.netloc, self.path,
                     self.params, self.qs, self.fragment)
-            calc = self._already_calculated_url = \
-                                            unicode(urlparse.urlunparse(data))
+            dataurl = urlparse.urlunparse(data)
+            try:
+                calc = unicode(dataurl)
+            except UnicodeDecodeError:
+                calc = unicode(dataurl, self.encoding, 'replace')
+            
+            self._already_calculated_url = calc
             self._changed = False
         
         return calc
@@ -590,12 +610,17 @@ class url_object(object):
         >>> u.setDomain('foobar:443')
         Traceback (most recent call last):
           File "<stdin>", line 1, in ?
-        TypeError: 'foobar:443' is an invalid domain
+        ValueError: 'foobar:443' is an invalid domain
 
         >>> u.setDomain('foo*bar')
         Traceback (most recent call last):
           File "<stdin>", line 1, in ?
-        TypeError: 'foo*bar' is an invalid domain
+        ValueError: 'foo*bar' is an invalid domain
+
+        >>> u.setDomain('')
+        Traceback (most recent call last):
+          File "<stdin>", line 1, in ?
+        ValueError: '' is an invalid domain
 
         >>> u = url_object('http://w3af.com:443/def/jkl/')
         >>> u.getDomain()
@@ -606,11 +631,11 @@ class url_object(object):
     
         @return: Returns the domain name for the url.
         '''
-        if re.match('[a-z0-9-\.]+([a-z0-9-]+)*$', new_domain ) is None:
-            raise TypeError( "'%s' is an invalid domain" % (new_domain) )
-        else:
-            domain = self.netloc.split(':')[0]
-            self.netloc = self.netloc.replace(domain, new_domain)
+        if not re.match('[a-z0-9-\.]+([a-z0-9-]+)*$', new_domain):
+            raise ValueError("'%s' is an invalid domain" % (new_domain))
+        
+        domain = self.netloc.split(':')[0]
+        self.netloc = self.netloc.replace(domain, new_domain)
     
     def is_valid_domain( self ):
         '''
@@ -1239,24 +1264,10 @@ class url_object(object):
         '''
         @return: True if the URL has a domain and a protocol.
         
-        >>> u = url_object('http://www.w3af.com/')
-        >>> if u:
-        ...    True
-        ...
+        >>> bool(url_object('http://www.w3af.com'))
         True
-        >>>
-
-        >>> u = url_object('http:///')
-        >>> if not u:
-        ...    True
-        ...
-        True
-        >>>
         '''
-        if self.scheme and self.netloc:
-            return True
-        
-        return False
+        return True
         
     def __radd__(self, other):
         '''

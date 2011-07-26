@@ -86,17 +86,25 @@ class HTMLParser(SGMLParser):
 
         # Get the action
         action = attrs.get('action', None)
-        if action is None:
+        missing_or_invalid_action = action is None
+        
+        if not missing_or_invalid_action:
+            try:
+                action = self._baseUrl.urlJoin(action)
+            except ValueError:
+                missing_or_invalid_action = True
+            else:
+                action = self._decode_URL(unicode(action))
+                action = url_object(action, encoding=self._encoding)
+        
+        if missing_or_invalid_action:
             msg = ('HTMLParser found a form without an action attribute. '
             'Javascript may be used... but another option (mozilla does '
             'this) is that the form is expected to be  posted back to the'
             ' same URL (the one that returned the HTML that we are  parsing).')
             om.out.debug(msg)
             action = self._source_url
-        else:
-            action = self._decode_URL(unicode(self._baseUrl.urlJoin(action)))
-            action = url_object(action, encoding=self._encoding)        
-
+        
         # Create the form object and store everything for later use
         form_obj = form.form(encoding=self._encoding)
         form_obj.setMethod(method)

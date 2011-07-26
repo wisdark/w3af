@@ -33,8 +33,8 @@ import core.controllers.outputManager as om
 
 class SGMLParser(BaseParser):
     '''
-    The target SAX-like SGML parser. Methods 'start', 'end', 'data' and
-    'close' will be called during the parsing process. 
+    The target SAX-like SGML parser. Methods 'start', 'end', 'data', 'comment'
+    and 'close' will be called during the parsing process. 
     
     @author: Javier Andalia (jandalia =at= gmail.com)
              Andres Riancho (andres.riancho@gmail.com)
@@ -78,7 +78,8 @@ class SGMLParser(BaseParser):
         '''
         try:
             # Call start_tag handler method
-            meth = getattr(self, '_handle_'+ tag +'_tag_start', lambda *args: None)
+            meth = getattr(self, '_handle_'+ tag +'_tag_start',
+                           lambda *args: None)
             meth(tag, attrs)
             
             if tag in self.TAGS_WITH_URLS:
@@ -145,14 +146,18 @@ class SGMLParser(BaseParser):
                                     not attr[1].startswith('#')
         
         for _, attr_val in ifilter(filter_ref, attrs.iteritems()):
-            url = unicode(self._baseUrl.urlJoin(attr_val))
-            url = url_object(self._decode_URL(url),
-                             encoding=self._encoding)
-            url.normalizeURL()
-            
-            # Save url
-            self._parsed_urls.add(url)
-            self._tag_and_url.add((tag, url))
+            try:
+                url = unicode(self._baseUrl.urlJoin(attr_val))
+                url = url_object(self._decode_URL(url),
+                                 encoding=self._encoding)
+            except ValueError:
+                # Just ignore it
+                pass
+            else:
+                url.normalizeURL()
+                # Save url
+                self._parsed_urls.add(url)
+                self._tag_and_url.add((tag, url))
         
     def _fill_forms(self, tag, attrs):
         raise NotImplementedError('This method must be overriden by a subclass')
@@ -237,8 +242,11 @@ class SGMLParser(BaseParser):
 
     def _handle_base_tag_start(self, tag, attrs):
         # Override base url
-        self._baseUrl = self._baseUrl.urlJoin(attrs.get('href', ''))
-        
+        try:
+            self._baseUrl = self._baseUrl.urlJoin(attrs.get('href', ''))
+        except ValueError:
+            pass
+    
     def _handle_meta_tag_start(self, tag, attrs):
         self._meta_tags.append(attrs.items())
         

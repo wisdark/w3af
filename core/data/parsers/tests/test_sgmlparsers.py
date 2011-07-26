@@ -251,6 +251,23 @@ class TestSGMLParser(PyMockTestCase):
                   u'name_with_ñ@w3af.it']
         self.assertEquals(emails, p.getEmails())
 
+    def test_parsed_references(self):
+        # The *parsed* urls *must* come both from valid tags and tag attributes
+        # Also invalid urls like must be ignored (like javascript instructions)
+        body = '''
+        <html>
+            <a href="/x.py?a=1" Invalid_Attr="/invalid_url.php">
+            <form action="javascript:history.back(1)">
+                <tagX href="/py.py"/>
+            </form>
+        </html>'''
+        r = _build_http_response(URL, body)
+        p = _SGMLParser(r)
+        p._parse(r)
+        parsed_refs = p.references[0]
+        self.assertEquals(1, len(parsed_refs))
+        self.assertEquals('http://w3af.com/x.py?a=1', parsed_refs[0].url_string)
+        
 
 # We subclass HTMLParser to prevent that the parsing process
 # while init'ing the parser instance
@@ -319,6 +336,20 @@ class TestHTMLParser(PyMockTestCase):
         resp = _build_http_response(URL, body)
         p = _HTMLParser(resp)
         p._parse(resp)
+        self.assertEquals(URL, p.forms[0].getAction())
+    
+    def test_form_with_invalid_url_in_action(self):
+        '''
+        If an invalid url is detected in the form's action then use baseUrl
+        '''
+        body = '''
+        <html>
+            <form action="javascript:history.back(1)">
+            </form>
+        </html>'''
+        r = _build_http_response(URL, body)
+        p = _HTMLParser(r)
+        p._parse(r)
         self.assertEquals(URL, p.forms[0].getAction())
     
     def test_inputs_in_out_form(self):

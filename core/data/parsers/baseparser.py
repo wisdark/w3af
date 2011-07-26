@@ -39,7 +39,7 @@ class BaseParser(object):
     #URL_RE = ('((http|https):[A-Za-z0-9/](([A-Za-z0-9$_.+!*(),;/?:@&~=-])|%'
     #    '[A-Fa-f0-9]{2})+(#([a-zA-Z0-9][a-zA-Z0-9$_.+!*(),;/?:@&~=%-]*))?)')
     URL_RE = re.compile(
-                    '((http|https)://([\w:@\-\./]*?)/[^ \n\r\t"\'<>]*)', re.U)
+                    '((http|https)://([\w:@\-\./]*?)[^ \n\r\t"\'<>]*)', re.U)
     SAFE_CHARS = (('\x00', '%00'),)
     
     def __init__(self, httpResponse):
@@ -247,7 +247,7 @@ class BaseParser(object):
             try:
                 decoded_url = url_object(self._decode_URL(url[0]),
                                          encoding=self._encoding)
-            except w3afException:
+            except Exception:
                 pass
             else:
                 re_urls.add(decoded_url)
