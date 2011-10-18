@@ -349,7 +349,8 @@ class w3afCore(object):
         self._time_limit_reported = False
 
         for plugin in self._plugins['auth']:
-            plugin.login( self.uriOpener )
+            if not plugin.isLogged():
+                plugin.login( self.uriOpener )
         
         while go:
             discovered_fr_list = self._discover( tmp_list )
