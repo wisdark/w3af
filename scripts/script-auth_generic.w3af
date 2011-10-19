@@ -1,0 +1,32 @@
+# This is a simple xss detection demo:
+
+plugins
+output console,textFile
+output config textFile
+set fileName output-w3af.txt
+set verbose True
+back
+output config console
+set verbose False
+back
+
+audit xss
+discovery webSpider
+auth generic
+auth config generic
+set username admin
+set password admin
+set username_field username
+set password_field password
+set auth_url http://target/auth.php
+set check_url http://target/home.php
+
+back
+back
+
+target
+set target http://target
+back
+start
+
+exit
