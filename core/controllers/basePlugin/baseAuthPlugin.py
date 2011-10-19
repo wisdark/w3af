@@ -12,23 +12,23 @@ class baseAuthPlugin(basePlugin):
 
     def __init__(self):
         basePlugin.__init__( self )
-        self._testOption = False
+        self._urlOpener = None
 
-    def login(self, uriOpener):
+    def login(self):
         '''
         Login user
         
         '''
         raise NotImplementedError('Plugin is not implementing required method login' )
 
-    def logout(self, uriOpener):
+    def logout(self):
         '''
         Logout user
         
         '''
         raise NotImplementedError('Plugin is not implementing required method logout' )
         
-    def isLogged(self, uriOpener):
+    def is_logged(self):
         '''
         User logged checking
         
