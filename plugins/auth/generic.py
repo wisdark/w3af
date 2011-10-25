@@ -1,6 +1,23 @@
 '''
 generic.py
 
+Copyright 2011 Andres Riancho
+
+This file is part of w3af, w3af.sourceforge.net .
+
+w3af is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation version 2 of the License.
+
+w3af is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with w3af; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
 '''
 from urllib import urlencode
 
@@ -8,8 +25,6 @@ from core.data.options.option import option
 from core.data.options.optionList import optionList
 from core.controllers.basePlugin.baseAuthPlugin import baseAuthPlugin
 from core.controllers.w3afException import w3afException
-from core.data.parsers.urlParser import url_object
-
 
 class generic(baseAuthPlugin):
     '''Generic auth plugin.'''
@@ -65,10 +80,10 @@ class generic(baseAuthPlugin):
         o4 = option('password_field', self.password_field, d4, 'string')
                
         d5 = 'Auth URL - URL for POSTing auth information'
-        o5 = option('auth_url', self.auth_url, d5, 'string')
+        o5 = option('auth_url', self.auth_url, d5, 'url')
 
         d6 = 'Check session URL - URL in which response body username will be searched'
-        o6 = option('check_url', self.check_url, d6, 'string')
+        o6 = option('check_url', self.check_url, d6, 'url')
 
         ol = optionList()
         ol.add(o1)
@@ -92,12 +107,8 @@ class generic(baseAuthPlugin):
         self.password = optionsMap['password'].getValue()
         self.username_field = optionsMap['username_field'].getValue()
         self.password_field = optionsMap['password_field'].getValue()
-        try:
-            self.auth_url = url_object(optionsMap['auth_url'].getValue())
-            self.check_url = url_object(optionsMap['check_url'].getValue())
-        except:
-            msg = 'Please enter a valid auth_url/check_url values'
-            raise w3afException(msg)
+        self.auth_url = optionsMap['auth_url'].getValue()
+        self.check_url = optionsMap['check_url'].getValue()
 
     def getPluginDeps(self):
         '''
