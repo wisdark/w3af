@@ -19,7 +19,7 @@ set password admin
 set username_field username
 set password_field password
 set auth_url http://target/auth.php
-set check_url http://target/home.php
+set check_url http://target/status.php
 
 back
 back
