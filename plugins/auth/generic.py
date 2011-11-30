@@ -31,12 +31,12 @@ class generic(baseAuthPlugin):
 
     def __init__(self):
         baseAuthPlugin.__init__(self)
-        self.username = None
-        self.password = None
-        self.username_field = None
-        self.password_field = None
-        self.auth_url = None
-        self.check_url = None
+        self.username = "admin"
+        self.password = "admin"
+        self.username_field = "username"
+        self.password_field = "password"
+        self.auth_url = "http://localhost/auth"
+        self.check_url = "http://localhost/check"
         
     def login(self):
         '''User login.'''
@@ -110,6 +110,13 @@ class generic(baseAuthPlugin):
         self.auth_url = optionsMap['auth_url'].getValue()
         self.check_url = optionsMap['check_url'].getValue()
 
+        if not self.username_field \
+            or not self.password_field \
+            or not self.auth_url \
+            or not self.check_url:
+            raise w3afException(
+                    'username_field, password_field, auth_url or check_url can\'t be empty.')
+
     def getPluginDeps(self):
         '''
         @return: A list with the names of the plugins that should be runned 
@@ -122,7 +129,7 @@ class generic(baseAuthPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This auth plugin can logging in to generic-passport
+        This auth plugin can logging in to web application with generic authentication schema
         
         Three configurable parameters exist:
             - username
