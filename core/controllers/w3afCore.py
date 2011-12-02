@@ -335,7 +335,15 @@ class w3afCore(object):
         uriList.extend( [ fr.getURI() for fr in fuzzableRequestList] )
         uriList = list( set( uriList ) )
         kb.kb.save( 'urls', 'uriList' ,  uriList )
-    
+
+    def _auth_login(self):
+        '''
+        Make login to the web app when it is needed.
+        '''
+        for plugin in self._plugins['auth']:
+            if not plugin.is_logged():
+                plugin.login()
+
     def _discover_and_bruteforce( self ):
         '''
         Discovery and bruteforce phases are related, so I have joined them
@@ -347,10 +355,7 @@ class w3afCore(object):
         discovered_fr_list = []
         
         self._time_limit_reported = False
-
-        for plugin in self._plugins['auth']:
-            if not plugin.is_logged():
-                plugin.login()
+        self._auth_login()
         
         while go:
             discovered_fr_list = self._discover( tmp_list )
@@ -817,7 +822,7 @@ class w3afCore(object):
             fuzzableRequestList = []
             
             for plugin in self._plugins['discovery']:
-                
+                self._auth_login()
                 #
                 #   I use the self._time_limit_reported variable to break out of two loops
                 #
