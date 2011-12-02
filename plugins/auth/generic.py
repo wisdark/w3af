@@ -57,7 +57,7 @@ class generic(baseAuthPlugin):
     def is_logged(self):
         '''Check user session.'''
         try:
-            body = self._urlOpener.GET(self.check_url).body
+            body = self._urlOpener.GET(self.check_url, grepResult=False).body
             return self.username in body
         except Exception:
             return False
@@ -67,19 +67,19 @@ class generic(baseAuthPlugin):
         @return: A list of option objects for this plugin.
         '''
 
-        d1 = 'Username'
+        d1 = 'Username for using in the authentication'
         o1 = option('username', self.username, d1, 'string')
         
-        d2 = 'Password'
+        d2 = 'Password for using in the authentication'
         o2 = option('password', self.password, d2, 'string')
  
-        d3 = 'Username field'
+        d3 = 'Username HTML field name'
         o3 = option('username_field', self.username_field, d3, 'string')
         
-        d4 = 'Password field'
+        d4 = 'Password HTML field name'
         o4 = option('password_field', self.password_field, d4, 'string')
                
-        d5 = 'Auth URL - URL for POSTing auth information'
+        d5 = 'Auth URL - URL for POSTing the authentication information'
         o5 = option('auth_url', self.auth_url, d5, 'url')
 
         d6 = 'Check session URL - URL in which response body username will be searched'
