@@ -355,7 +355,6 @@ class w3afCore(object):
         discovered_fr_list = []
         
         self._time_limit_reported = False
-        self._auth_login()
         
         while go:
             discovered_fr_list = self._discover( tmp_list )
@@ -1007,6 +1006,9 @@ class w3afCore(object):
             
             # For status
             self._setRunningPlugin( plugin.getName() )
+
+            # Before running each plugin let's make sure we're logged in
+            self._auth_login()
 
             for fr in self._fuzzableRequestList:
                 # Sends each fuzzable request to the plugin
