@@ -32,12 +32,12 @@ class generic(baseAuthPlugin):
 
     def __init__(self):
         baseAuthPlugin.__init__(self)
-        self.username = "admin"
-        self.password = "admin"
-        self.username_field = "username"
-        self.password_field = "password"
-        self.auth_url = "http://localhost/auth"
-        self.check_url = "http://localhost/check"
+        self.username = ''
+        self.password = ''
+        self.username_field = ''
+        self.password_field = ''
+        self.auth_url = ''
+        self.check_url = ''
         self.check_string = ''
         self._login_error = True
         
@@ -107,18 +107,15 @@ class generic(baseAuthPlugin):
         self.password = optionsMap['password'].getValue()
         self.username_field = optionsMap['username_field'].getValue()
         self.password_field = optionsMap['password_field'].getValue()
+        self.check_string = optionsMap['check_string'].getValue()
         self.auth_url = optionsMap['auth_url'].getValue()
         self.check_url = optionsMap['check_url'].getValue()
-        self.check_string = optionsMap['check_string'].getValue()
 
-        if not self.username_field \
-            or not self.password_field \
-            or not self.auth_url \
-            or not self.check_string \
-            or not self.check_url:
-            raise w3afException(
-                    'username_field, password_field, auth_url, \
-                    check_string or check_url can\'t be empty.')
+        for o in optionsMap:
+            if not o.getValue():
+                raise w3afException(
+                        "All parameters are required and can't be empty."
+                        )
 
     def getPluginDeps(self):
         '''
