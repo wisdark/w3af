@@ -25,6 +25,7 @@ from core.data.options.option import option
 from core.data.options.optionList import optionList
 from core.controllers.basePlugin.baseAuthPlugin import baseAuthPlugin
 from core.controllers.w3afException import w3afException
+import core.controllers.outputManager as om
 
 class generic(baseAuthPlugin):
     '''Generic auth plugin.'''
@@ -46,8 +47,13 @@ class generic(baseAuthPlugin):
                 self.username_field: self.username,
                 self.password_field: self.password,
             }))
-            return self.is_logged()
+            if not self.is_logged():
+                raise Exception("Can't login into web application as %s:%s" 
+                        % (self.username, self.password))
+            else:
+                return True
         except Exception, e:
+            om.out.error(str(e))
             return False
 
     def logout(self):
