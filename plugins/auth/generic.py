@@ -38,6 +38,7 @@ class generic(baseAuthPlugin):
         self.password_field = "password"
         self.auth_url = "http://localhost/auth"
         self.check_url = "http://localhost/check"
+        self._login_error = True
         
     def login(self):
         '''User login.'''
@@ -53,7 +54,9 @@ class generic(baseAuthPlugin):
             else:
                 return True
         except Exception, e:
-            om.out.error(str(e))
+            if self._login_error:
+                om.out.error(str(e))
+                self._login_error = False
             return False
 
     def logout(self):
