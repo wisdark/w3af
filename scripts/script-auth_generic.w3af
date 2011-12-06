@@ -22,6 +22,7 @@ set username_field username
 set password_field password
 set auth_url http://moth/w3af/auth/generic/auth.php
 set check_url http://moth/w3af/auth/generic/status.php
+set check_string admin
 back
 back
 

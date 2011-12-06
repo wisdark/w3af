@@ -38,6 +38,7 @@ class generic(baseAuthPlugin):
         self.password_field = "password"
         self.auth_url = "http://localhost/auth"
         self.check_url = "http://localhost/check"
+        self.check_string = ''
         self._login_error = True
         
     def login(self):
@@ -67,7 +68,7 @@ class generic(baseAuthPlugin):
         '''Check user session.'''
         try:
             body = self._urlOpener.GET(self.check_url, grepResult=False).body
-            return self.username in body
+            return self.check_string in body
         except Exception:
             return False
    
@@ -75,32 +76,22 @@ class generic(baseAuthPlugin):
         '''
         @return: A list of option objects for this plugin.
         '''
-
-        d1 = 'Username for using in the authentication'
-        o1 = option('username', self.username, d1, 'string')
-        
-        d2 = 'Password for using in the authentication'
-        o2 = option('password', self.password, d2, 'string')
- 
-        d3 = 'Username HTML field name'
-        o3 = option('username_field', self.username_field, d3, 'string')
-        
-        d4 = 'Password HTML field name'
-        o4 = option('password_field', self.password_field, d4, 'string')
-               
-        d5 = 'Auth URL - URL for POSTing the authentication information'
-        o5 = option('auth_url', self.auth_url, d5, 'url')
-
-        d6 = 'Check session URL - URL in which response body username will be searched'
-        o6 = option('check_url', self.check_url, d6, 'url')
-
+        options = [ 
+                ('username', self.username, 'string', 'Username for using in the authentication'),
+                ('password', self.password, 'string', 'Password for using in the authentication'),
+                ('username_field', self.username_field, 'string', 'Username HTML field name'),
+                ('password_field', self.password_field, 'string', 'Password HTML field name'),
+                ('auth_url', self.auth_url, 'url', 
+                    'Auth URL - URL for POSTing the authentication information'),
+                ('check_url', self.check_url, 'url', 
+                    'Check session URL - URL in which response body check_string will be searched'),
+                ('check_string', self.check_string, 'string', 
+                    'String for searching on check_url page to determine if user\
+                    is logged in the web application'),
+                ]
         ol = optionList()
-        ol.add(o1)
-        ol.add(o2)
-        ol.add(o3)
-        ol.add(o4)
-        ol.add(o5)
-        ol.add(o6)
+        for o in options:
+            ol.add(option(o[0], o[1], o[3], o[2]))
         return ol
 
     def setOptions(self, optionsMap):
@@ -118,13 +109,16 @@ class generic(baseAuthPlugin):
         self.password_field = optionsMap['password_field'].getValue()
         self.auth_url = optionsMap['auth_url'].getValue()
         self.check_url = optionsMap['check_url'].getValue()
+        self.check_string = optionsMap['check_string'].getValue()
 
         if not self.username_field \
             or not self.password_field \
             or not self.auth_url \
+            or not self.check_string \
             or not self.check_url:
             raise w3afException(
-                    'username_field, password_field, auth_url or check_url can\'t be empty.')
+                    'username_field, password_field, auth_url, \
+                    check_string or check_url can\'t be empty.')
 
     def getPluginDeps(self):
         '''
@@ -147,6 +141,7 @@ class generic(baseAuthPlugin):
             - password_field
             - auth_url
             - check_url
+            - check_string
         '''
 
 
