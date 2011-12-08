@@ -46,6 +46,7 @@ from core.data.fuzzer.formFiller import smartFill
 from core.data.fuzzer.mutantQs import mutantQs
 from core.data.fuzzer.mutantPostData import mutantPostData
 from core.data.fuzzer.mutantFileName import mutantFileName
+from core.data.fuzzer.mutantUrlParts import mutantUrlParts
 from core.data.fuzzer.mutantHeaders import mutantHeaders
 from core.data.fuzzer.mutantJSON import mutantJSON
 from core.data.fuzzer.mutantCookie import mutantCookie
@@ -95,6 +96,12 @@ def createMutants(freq, mutant_str_list, append=False,
             om.out.debug('Fuzzing file name')
             result.extend(_createFileNameMutants(freq, mutantFileName, 
                                  mutant_str_list, fuzzableParamList, append))
+
+        if 'fuzzedUrlParts' in _fuzzable:
+            om.out.debug('Fuzzing URL parts')
+            result.extend(_createUrlPartsMutants(freq, mutantUrlParts, 
+                                 mutant_str_list, fuzzableParamList, append))
+ 
     # POST-data parameters
     if isinstance(freq, httpPostDataRequest):
         # If this is a POST request, it could be a JSON request, and I want
@@ -488,6 +495,54 @@ def _createMutantsWorker(freq, mutantClass, mutant_str_list,
 
     return result
     
+def _createUrlPartsMutants(freq, mutantClass, mutant_str_list, fuzzableParamList, append ):
+    '''
+    @parameter freq: A fuzzable request with a dataContainer inside.
+    @parameter mutantClass: The class to use to create the mutants
+    @parameter fuzzableParamList: What parameters should be fuzzed
+    @parameter append: True/False, if we should append the value or replace it.
+    @parameter mutant_str_list: a list with mutant strings to use
+    
+    @return: Mutants that have the filename URL changed with the strings at mutant_str_list
+    '''
+    res = []
+    fname = freq.getURL().getPath()
+    fname_chunks = [x for x in re.split(r'([a-zA-Z0-9]+)', fname) if x] 
+    
+    for idx, fn_chunk in enumerate(fname_chunks):
+        for mutant_str in mutant_str_list:
+            if re.match('[a-zA-Z0-9]', fn_chunk):
+                divided_fname = dc()
+                divided_fname['start'] = ''.join(fname_chunks[:idx])
+                divided_fname['end'] = ''.join(fname_chunks[idx+1:])
+                divided_fname['fuzzedUrlParts'] = \
+                    (fn_chunk if append else '') + urllib.quote_plus(mutant_str)
+                
+                freq_copy = freq.copy()
+                freq_copy.setURL(freq.getURL())
+                
+                # Create the mutant
+                m = mutantClass(freq_copy) 
+                m.setOriginalValue(fn_chunk)
+                m.setVar('fuzzedUrlParts')
+                m._mutant_dc = divided_fname
+                m.setModValue(mutant_str)
+                # Special for filename fuzzing and some configurations
+                # of mod_rewrite
+                m.setDoubleEncoding(False)
+                res.append(m)
+                
+                # The same but with a different type of encoding! (mod_rewrite)
+                m2 = m.copy()
+                m2.setSafeEncodeChars('/')
+                
+                if m2.getURL() != m.getURL():
+                    res.append(m2)
+    return res
+ 
+
+
+
 def createRandAlpha(length=0):
     '''
     Create a random string ONLY with letters
@@ -588,6 +643,9 @@ def _createFuzzable( freq ):
         
     if cf.cf.getData('fuzzFileContent' ):
         _fuzzable['fuzzFileContent'] = None
+
+    if cf.cf.getData('fuzzURLParts'):
+        _fuzzable['fuzzedUrlParts'] = None
     
     return _fuzzable
 
