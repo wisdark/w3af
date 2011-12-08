@@ -244,6 +244,7 @@ class xss(baseAuditPlugin):
         xss_tests.append(("<ScRIpT>alert(String.fromCharCode(RANDOMIZE))</SCriPT>",
                 [browsers.ALL, ]))
         xss_tests.append(("'';!--\"<RANDOMIZE>=&{()}", [browsers.ALL, ]))
+        xss_tests.append(("<RANDOMIZE>\"'", [browsers.ALL, ]))
         xss_tests.append(("<ScRIPt SrC=http://RANDOMIZE/x.js></ScRIPt>", [browsers.ALL, ]))
         xss_tests.append(("<ScRIPt/XSS SrC=http://RANDOMIZE/x.js></ScRIPt>", [browsers.ALL, ]))
         xss_tests.append(("<ScRIPt/SrC=http://RANDOMIZE/x.js></ScRIPt>", 
