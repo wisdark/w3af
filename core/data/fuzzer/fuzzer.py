@@ -495,7 +495,7 @@ def _createMutantsWorker(freq, mutantClass, mutant_str_list,
 
     return result
     
-def _createUrlPartsMutants(freq, mutantClass, mutant_str_list, fuzzableParamList, append ):
+def _createUrlPartsMutants(freq, mutantClass, mutant_str_list, fuzzableParamList, append):
     '''
     @parameter freq: A fuzzable request with a dataContainer inside.
     @parameter mutantClass: The class to use to create the mutants
@@ -506,43 +506,34 @@ def _createUrlPartsMutants(freq, mutantClass, mutant_str_list, fuzzableParamList
     @return: Mutants that have the filename URL changed with the strings at mutant_str_list
     '''
     res = []
-    fname = freq.getURL().getPath()
-    fname_chunks = [x for x in re.split(r'([a-zA-Z0-9]+)', fname) if x] 
-    
-    for idx, fn_chunk in enumerate(fname_chunks):
+    path_sep = '/'
+    path = freq.getURL().getPath()
+    path_chunks = path.split(path_sep)
+    for idx, p_chunk in enumerate(path_chunks):
+        if not p_chunk:
+            continue
         for mutant_str in mutant_str_list:
-            if re.match('[a-zA-Z0-9]', fn_chunk):
-                divided_fname = dc()
-                divided_fname['start'] = ''.join(fname_chunks[:idx])
-                divided_fname['end'] = ''.join(fname_chunks[idx+1:])
-                divided_fname['fuzzedUrlParts'] = \
-                    (fn_chunk if append else '') + urllib.quote_plus(mutant_str)
-                
-                freq_copy = freq.copy()
-                freq_copy.setURL(freq.getURL())
-                
-                # Create the mutant
-                m = mutantClass(freq_copy) 
-                m.setOriginalValue(fn_chunk)
-                m.setVar('fuzzedUrlParts')
-                m._mutant_dc = divided_fname
-                m.setModValue(mutant_str)
-                # Special for filename fuzzing and some configurations
-                # of mod_rewrite
-                m.setDoubleEncoding(False)
-                res.append(m)
-                
-                # The same but with a different type of encoding! (mod_rewrite)
-                m2 = m.copy()
-                m2.setSafeEncodeChars('/')
-                
-                if m2.getURL() != m.getURL():
-                    res.append(m2)
+            divided_path = dc()
+            divided_path['start'] = path_sep.join(path_chunks[:idx] + [''])
+            divided_path['end'] = path_sep.join([''] + path_chunks[idx+1:])
+            divided_path['fuzzedUrlParts'] = \
+                (p_chunk if append else '') + urllib.quote_plus(mutant_str)
+            freq_copy = freq.copy()
+            freq_copy.setURL(freq.getURL())
+            m = mutantClass(freq_copy) 
+            m.setOriginalValue(p_chunk)
+            m.setVar('fuzzedUrlParts')
+            m._mutant_dc = divided_path
+            m.setModValue(mutant_str)
+            # Special for some configurations of mod_rewrite
+            m.setDoubleEncoding(False)
+            res.append(m)
+            # The same but with a different type of encoding! (mod_rewrite)
+            m2 = m.copy()
+            if m2.getURL() != m.getURL():
+                res.append(m2)
     return res
  
-
-
-
 def createRandAlpha(length=0):
     '''
     Create a random string ONLY with letters
