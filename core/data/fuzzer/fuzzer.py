@@ -97,7 +97,7 @@ def createMutants(freq, mutant_str_list, append=False,
             result.extend(_createFileNameMutants(freq, mutantFileName, 
                                  mutant_str_list, fuzzableParamList, append))
 
-        if 'fuzzedUrlParts' in _fuzzable:
+        if 'fuzzURLParts' in _fuzzable:
             om.out.debug('Fuzzing URL parts')
             result.extend(_createUrlPartsMutants(freq, mutantUrlParts, 
                                  mutant_str_list, fuzzableParamList, append))
@@ -636,7 +636,7 @@ def _createFuzzable( freq ):
         _fuzzable['fuzzFileContent'] = None
 
     if cf.cf.getData('fuzzURLParts'):
-        _fuzzable['fuzzedUrlParts'] = None
+        _fuzzable['fuzzURLParts'] = None
     
     return _fuzzable
 
