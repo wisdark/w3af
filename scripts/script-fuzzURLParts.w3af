@@ -16,7 +16,7 @@ back
 audit xss
 back
 target
-set target http://news/article/1
+set target http://moth/w3af/core/fuzzURLParts/article/1
 back
 start
 assert len( kb.kb.getData('xss', 'xss') ) == 1
