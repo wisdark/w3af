@@ -525,13 +525,8 @@ def _createUrlPartsMutants(freq, mutantClass, mutant_str_list, fuzzableParamList
             m.setVar('fuzzedUrlParts')
             m._mutant_dc = divided_path
             m.setModValue(mutant_str)
-            # Special for some configurations of mod_rewrite
-            m.setDoubleEncoding(False)
+            m.setDoubleEncoding(True)
             res.append(m)
-            # The same but with a different type of encoding! (mod_rewrite)
-            m2 = m.copy()
-            if m2.getURL() != m.getURL():
-                res.append(m2)
     return res
  
 def createRandAlpha(length=0):
