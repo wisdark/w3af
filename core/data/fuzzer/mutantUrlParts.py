@@ -26,7 +26,7 @@ import urllib
 
 class mutantUrlParts(mutant):
     '''
-    This class is a urlpars mutant.
+    This class is a urlparts mutant.
     '''
     def __init__( self, freq ):
         mutant.__init__(self, freq)
@@ -36,14 +36,14 @@ class mutantUrlParts(mutant):
         self._mutant_dc = {}
 
     def getMutantType( self ):
-        return 'urlpars'
+        return 'urlparts'
 
     def setDoubleEncoding( self, trueFalse ):
         self._doubleEncoding = trueFalse
     
     def setSafeEncodeChars( self, safeChars ):
         '''
-        @parameter safeChars: A string with characters we don't want to URL encode in the urlpars. Example:
+        @parameter safeChars: A string with characters we don't want to URL encode in the urlparts. Example:
             - '/&!'
             - '/'
         '''
