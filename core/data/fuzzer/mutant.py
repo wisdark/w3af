@@ -120,13 +120,6 @@ class mutant(object):
     def __repr__( self ):
         return '<'+ self.getMutantType() +' mutant | '+ self.getMethod() +' | '+ self.getURI() +' >'
     
-    def dynamicURL( self ):
-        '''
-        @return: True if the URL is going to change from one mutant to another (when both mutants were created
-        in the same call to the createMutants call.) This was added mostly because of mutantFileName.py
-        '''
-        return False
-    
     def copy( self ):
         return copy.deepcopy( self )
     

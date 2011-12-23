@@ -96,12 +96,6 @@ class mutantUrlParts(mutant):
     def setURL( self, u ):
         raise w3afException('You can\'t change the value of the URL in a mutantUrlParts instance.')
 
-    def dynamicURL( self ):
-        '''
-        The URL will change, don't try to use it to avoid reporting something more than once.
-        '''
-        return True
-
     def foundAt(self):
         '''
         @return: A string representing WHAT was fuzzed. This string is used like this:
