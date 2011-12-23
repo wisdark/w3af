@@ -504,6 +504,15 @@ def _createUrlPartsMutants(freq, mutantClass, mutant_str_list, fuzzableParamList
     @parameter mutant_str_list: a list with mutant strings to use
     
     @return: Mutants that have the filename URL changed with the strings at mutant_str_list
+    
+    >>> from core.data.parsers.urlParser import url_object
+    >>> from core.data.request.fuzzableRequest import fuzzableRequest
+    >>> url = url_object('http://www.w3af.com/abc/def')
+    >>> fr = fuzzableRequest(url)
+    >>> mutant_list = _createUrlPartsMutants(fr, mutantUrlParts, ['ping!','pong-'], [], False)
+    >>> [m.getURL().url_string for m in mutant_list]
+    [u'http://www.w3af.com/ping%2521/def', u'http://www.w3af.com/pong-/def', u'http://www.w3af.com/abc/ping%2521', u'http://www.w3af.com/abc/pong-']
+    
     '''
     res = []
     path_sep = '/'

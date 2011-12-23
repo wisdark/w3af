@@ -57,14 +57,14 @@ class mutantUrlParts(mutant):
         >>> from core.data.request.fuzzableRequest import fuzzableRequest
         >>> from core.data.dc.dataContainer import dataContainer as dc
         >>> divided_path = dc()
-        >>> divided_path['start'] = ''
+        >>> divided_path['start'] = '/'
         >>> divided_path['fuzzedUrlParts'] = 'ping!'
-        >>> divided_path['end'] = 'def'
+        >>> divided_path['end'] = '/def'
         
         >>> fr = fuzzableRequest(url_object('http://www.w3af.com/abc/def'))        
         >>> m = mutantUrlParts( fr )
         >>> m._mutant_dc = divided_path
-        >>> m.setVar( 'fuzzedUrlParts' )
+        >>> m.setVar('fuzzedUrlParts')
         >>> m.getURL().url_string
         u'http://www.w3af.com/ping%21/def'
         '''
