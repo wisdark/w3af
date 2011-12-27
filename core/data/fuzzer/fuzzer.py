@@ -348,7 +348,7 @@ def _createFileNameMutants(freq, mutantClass, mutant_str_list, fuzzableParamList
                 m = mutantClass(freq_copy) 
                 m.setOriginalValue(fn_chunk)
                 m.setVar('fuzzedFname')
-                m._mutant_dc = divided_fname
+                m.setMutantDc(divided_fname)
                 m.setModValue(mutant_str)
                 # Special for filename fuzzing and some configurations
                 # of mod_rewrite
@@ -532,7 +532,7 @@ def _createUrlPartsMutants(freq, mutantClass, mutant_str_list, fuzzableParamList
             m = mutantClass(freq_copy) 
             m.setOriginalValue(p_chunk)
             m.setVar('fuzzedUrlParts')
-            m._mutant_dc = divided_path
+            m.setMutantDc(divided_path)
             m.setModValue(mutant_str)
             m.setDoubleEncoding(True)
             res.append(m)

@@ -19,10 +19,10 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
+import urllib
 
 from core.data.fuzzer.mutant import mutant
 from core.controllers.w3afException import w3afException
-import urllib
 
 class mutantUrlParts(mutant):
     '''
@@ -30,10 +30,8 @@ class mutantUrlParts(mutant):
     '''
     def __init__( self, freq ):
         mutant.__init__(self, freq)
-        
         self._doubleEncoding = False
         self._safeEncodeChars = ''
-        self._mutant_dc = {}
 
     def getMutantType( self ):
         return 'urlparts'
@@ -63,7 +61,7 @@ class mutantUrlParts(mutant):
         
         >>> fr = fuzzableRequest(url_object('http://www.w3af.com/abc/def'))        
         >>> m = mutantUrlParts( fr )
-        >>> m._mutant_dc = divided_path
+        >>> m.setMutantDc(divided_path)
         >>> m.setVar('fuzzedUrlParts')
         >>> m.getURL().url_string
         u'http://www.w3af.com/ping%21/def'

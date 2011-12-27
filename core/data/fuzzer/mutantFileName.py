@@ -19,11 +19,10 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
+import urllib
 
 from core.data.fuzzer.mutant import mutant
 from core.controllers.w3afException import w3afException
-import urllib
-
 
 class mutantFileName(mutant):
     '''
@@ -31,10 +30,8 @@ class mutantFileName(mutant):
     '''
     def __init__( self, freq ):
         mutant.__init__(self, freq)
-        
         self._doubleEncoding = False
         self._safeEncodeChars = ''
-        self._mutant_dc = {}
 
     def getMutantType( self ):
         return 'filename'
@@ -64,7 +61,7 @@ class mutantFileName(mutant):
         
         >>> fr = fuzzableRequest(url_object('http://www.w3af.com/abc/def.html'))        
         >>> m = mutantFileName( fr )
-        >>> m._mutant_dc = divided_file_name
+        >>> m.setMutantDc(divided_file_name)
         >>> m.setVar( 'fuzzedFname' )
         >>> m.getURL().url_string
         u'http://www.w3af.com/abc/ping%21.html'
