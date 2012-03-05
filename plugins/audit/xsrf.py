@@ -19,130 +19,123 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
+from math import log, floor
 
 import core.controllers.outputManager as om
-
-# options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
-
 from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
 from core.controllers.w3afException import w3afException
 from core.data.exchangableMethods import isExchangable
-
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
 
+COMMON_CSRF_NAMES = [
+        'csrf_token',
+        'token'
+        ]
 
 class xsrf(baseAuditPlugin):
     '''
     Find the easiest to exploit xsrf vulnerabilities.
-    @author: Andres Riancho ( andres.riancho@gmail.com )
+    @author: Taras oxdef@oxdef.info
     '''
     
-    '''
-    By easiest i mean, someone sending a victim a link like this one:
-        https://bank.com/homeBanking/transferMoney.aspx?amount=1000&dstAccount=attackerAccount
-    
-    AND the web application at bank.com sends a cookie that is persistent.
-    
-    Note: I do realize that xsrf can be exploited using javascript to do POSTS's impersonating the user.
-    '''
-
     def __init__(self):
         baseAuditPlugin.__init__(self)
-        
-        # Internal variables
-        self._vuln_simple = []
-        self._vuln_complex = []
-        self._already_reported = False
+        self._strict_mode = False
 
-    def audit(self, freq ):
+    def audit(self, freq):
         '''
         Tests an URL for xsrf vulnerabilities.
+        Ckecks from simple to smart
         
         @param freq: A fuzzableRequest
         '''
-        om.out.debug( 'xsrf plugin is testing: ' + freq.getURL() )
+        om.out.debug( 'XSRF plugin is testing: ' + freq.getURL() )
+        # 
+        # CSRF attack exists in case of requests with persistant/session cookies
+        #
+        auth_cookie = bool(len(kb.kb.getData('collectCookies', 'cookies')))
+        if not auth_cookie:
+            return
+        # 
+        # Strict mode on/off - do we need to audit GET requests? Not always...
+        #
+        if freq.getMethod() == 'GET' and not self._strict_mode:
+            return
+        # 
+        # Referer/Origin check 
+        #
+        if self._is_origin_checked(freq):
+            om.out.debug('Origin for %s is checked' % freq.getURL())
+            return
+        # 
+        # Does request has CSRF token in query string or POST payload?
+        #
+        if self._contains_csrf_token(freq) and self._is_token_checked(freq):
+            om.out.debug('Token for %s is exist and checked' % freq.getURL())
+            return
+        om.out.debug('%s is vulnerable for CSRF attack!!!' % freq.getURL())
 
-        # Vulnerable by definition
-        if freq.getMethod() == 'GET' and freq.getURI().hasQueryString():
-            
-            # Now check if we already added this target URL to the list
-            already_added = [ v.getURL() for v in self._vuln_simple ]
-            if freq.getURL() not in already_added:
-                
-                # Vulnerable and not in list, add:
-                v = vuln.vuln()
-                v.setPluginName(self.getName())
-                v.setURL( freq.getURL() )
-                v.setDc( freq.getDc() )
-                v.setName( 'Cross site request forgery vulnerability' )
-                v.setSeverity(severity.LOW)
-                v.setMethod( freq.getMethod() )
-                v.setDesc( 'The URL: ' + freq.getURL() + ' is vulnerable to cross site request forgery.' )
-                self._vuln_simple.append( v )
-        
-        # This is a POST request that can be sent using a GET and querystring
-        # Vulnerable by definition
-        elif freq.getMethod() =='POST' and len ( freq.getDc() ) and isExchangable( self, freq ):
-            
-            # Now check if we already added this target URL to the list
-            already_added = [ v.getURL() for v in self._vuln_complex ]
-            if freq.getURL() not in already_added:
-                
-                # Vulnerable and not in list, add:
-                v = vuln.vuln()
-                v.setPluginName(self.getName())
-                v.setURL( freq.getURL() )
-                v.setSeverity(severity.LOW)
-                v.setDc( freq.getDc() )
-                v.setName( 'Cross site request forgery vulnerability' )
-                v.setMethod( freq.getMethod() )
-                msg = 'The URL: ' + freq.getURL() + ' is vulnerable to cross site request forgery.'
-                msg += ' It allows the attacker to exchange the method from POST to GET when sending'
-                msg += ' data to the server.'
-                v.setDesc( msg )
-                self._vuln_complex.append( v )
-    
+    def _is_origin_checked(self, freq):
+        om.out.debug('Testing for Referer/Origin %s' % freq.getURL())
+
+    def _contains_csrf_token(self, freq):
+        om.out.debug('Testing for token in %s' % freq.getURL())
+        return True
+
+    def _is_token_checked(self, freq):
+        om.out.debug('Testing for checks of token in %s' % freq.getURL())
+        return True
+
+    def is_csrf_token(self, key, value):
+        # 
+        # Entropy based algoritm
+        # http://en.wikipedia.org/wiki/Password_strength
+        #
+        min_length = 4
+        min_entropy = 36
+        # Check for common CSRF token names
+        if key in COMMON_CSRF_NAMES and value:
+            return True
+        # Check length
+        if len(value) < min_length:
+            return False
+        # Calculate entropy
+        total = 0
+        total_digit = False
+        total_lower = False
+        total_upper = False
+        total_spaces = False
+
+        for i in value:
+            if i.isdigit():
+                total_digit = True
+                continue
+            if i.islower():
+                total_lower = True
+                continue
+            if i.isupper():
+                total_upper = True
+                continue
+            if i == ' ':
+                total_spaces = True
+                continue
+        total = int(total_digit) * 10 + int(total_upper) * 26 + int(total_lower) * 26
+        entropy = floor(log(total)*(len(value)/log(2)))
+        if entropy >= min_entropy:
+            if not total_spaces and total_digit:
+                return True
+        return False
+
     def end( self ):
         '''
         This method is called at the end, when w3afCore aint going to use this plugin anymore.
         '''
-        has_persistent_cookie = False
-        cookies = kb.kb.getData( 'collectCookies', 'cookies' )
-        for cookie in cookies:
-            if cookie.has_key('persistent'):
-                if not self._already_reported:
-                    om.out.information('The web application sent a persistent cookie.')
-                    has_persistent_cookie = True
-                    self._already_reported = True
-                    break
-        
-        # If there is at least one persistent cookie
-        if has_persistent_cookie:
-            if len( self._vuln_simple ):
-                om.out.vulnerability('The following scripts are vulnerable to a trivial form of XSRF:',
-                        severity=severity.LOW)
-                
-                fr_str = list(set([ str(v.getURL()) for v in self._vuln_simple ]))
-                kb.kb.save( self, 'get_xsrf', self._vuln_simple )
-                
-                for i in fr_str:
-                    om.out.vulnerability( '- ' + i, severity=severity.LOW )
-            
-            if len( self._vuln_complex ):
-                msg = 'The following scripts allow an attacker to send POST data as query string'
-                msg +=' data (this makes XSRF easier to exploit):'
-                om.out.vulnerability(msg, severity=severity.LOW)
-                
-                fr_str = list(set([ str(fr) for fr in self._vuln_complex ]))
-                kb.kb.save( self, 'post_xsrf', self._vuln_complex )
-                
-                for i in fr_str:
-                    om.out.vulnerability( '- ' + i, severity=severity.LOW )
-                
+        pass
+
     def getOptions( self ):
         '''
         @return: A list of option objects for this plugin.
@@ -172,8 +165,8 @@ class xsrf(baseAuditPlugin):
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
-        This plugin finds Cross Site Request Forgeries (XSRF) vulnerabilities.
+        This plugin finds Cross Site Request Forgeries (xsrf) vulnerabilities.
         
-        The simplest type of XSRF is checked, to be vulnerable, the web application must have sent a permanent
+        The simplest type of xsrf is checked, to be vulnerable, the web application must have sent a permanent
         cookie, and the aplicacion must have query string parameters.
         '''
