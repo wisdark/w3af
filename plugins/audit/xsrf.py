@@ -48,36 +48,38 @@ class xsrf(baseAuditPlugin):
 
     def audit(self, freq):
         '''
-        Tests an URL for xsrf vulnerabilities.
-        Ckecks from simple to smart
-        
+        Tests an URL for csrf vulnerabilities.
+
         @param freq: A fuzzableRequest
         '''
         om.out.debug( 'XSRF plugin is testing: ' + freq.getURL() )
-        # 
-        # CSRF attack exists in case of requests with persistant/session cookies
-        #
-        auth_cookie = bool(len(kb.kb.getData('collectCookies', 'cookies')))
-        if not auth_cookie:
+        if not self._is_suitable(freq):
             return
-        # 
-        # Strict mode on/off - do we need to audit GET requests? Not always...
-        #
-        if freq.getMethod() == 'GET' and not self._strict_mode:
-            return
-        # 
         # Referer/Origin check 
-        #
         if self._is_origin_checked(freq):
             om.out.debug('Origin for %s is checked' % freq.getURL())
             return
-        # 
         # Does request has CSRF token in query string or POST payload?
-        #
         if self._contains_csrf_token(freq) and self._is_token_checked(freq):
             om.out.debug('Token for %s is exist and checked' % freq.getURL())
             return
         om.out.debug('%s is vulnerable for CSRF attack!!!' % freq.getURL())
+
+    def _is_suitable(self, freq):
+        # For CSRF attack we need request with payload 
+        # and with persistant/session cookies
+        auth_cookie = bool(len(kb.kb.getData('collectCookies', 'cookies')))
+        if not auth_cookie:
+            return False
+        # Strict mode on/off - do we need to audit GET requests? Not always...
+        if freq.getMethod() == 'GET' and not self._strict_mode:
+            return False
+        # Payload? 
+        if (freq.getMethod() == 'GET' and freq.getURI().hasQueryString())
+            or (freq.getMethod() =='POST' and len(freq.getDc())):
+                om.out.debug('%s is suitable for CSRF attack' % freq.getURL())
+                return True
+        return False
 
     def _is_origin_checked(self, freq):
         om.out.debug('Testing for Referer/Origin %s' % freq.getURL())
