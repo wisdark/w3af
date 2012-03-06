@@ -30,6 +30,8 @@ from core.data.exchangableMethods import isExchangable
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
+from core.controllers.sql_tools.blind_sqli_response_diff import blind_sqli_response_diff
+from core.data.fuzzer.fuzzer import createMutants
 
 COMMON_CSRF_NAMES = [
         'csrf_token',
@@ -45,6 +47,10 @@ class xsrf(baseAuditPlugin):
     def __init__(self):
         baseAuditPlugin.__init__(self)
         self._strict_mode = False
+        self._bsqli_response_diff = blind_sqli_response_diff()
+        # User configured variables
+        self._equalLimit = 0.9
+        self._equAlgorithm = 'setIntersection'
 
     def audit(self, freq):
         '''
@@ -75,13 +81,36 @@ class xsrf(baseAuditPlugin):
         if freq.getMethod() == 'GET' and not self._strict_mode:
             return False
         # Payload? 
-        if (freq.getMethod() == 'GET' and freq.getURI().hasQueryString())
+        if (freq.getMethod() == 'GET' and freq.getURI().hasQueryString()) \
             or (freq.getMethod() =='POST' and len(freq.getDc())):
                 om.out.debug('%s is suitable for CSRF attack' % freq.getURL())
                 return True
         return False
 
     def _is_origin_checked(self, freq):
+        result = False
+        fake_ref = 'http://w3af.org/'
+        response1 = self._sendMutant(freq, analyze=False)
+        response2 = self._sendMutant(freq, analyze=False)
+        
+        bsqli_resp_diff = self._bsqli_response_diff
+        bsqli_resp_diff.setUrlOpener(self._urlOpener)
+        bsqli_resp_diff.setEqualLimit(self._equalLimit)
+        bsqli_resp_diff.setEquAlgorithm(self._equAlgorithm)
+
+        if (response1.getCode() != response2.getCode()) \
+                or not bsqli_resp_diff.equal(response1.getBody(), response2.getBody()):
+            return result
+        # Ok 2 same requests have 2 same responses
+        # let's play with headers
+        tmp_ref = freq.getReferer()
+        freq.setReferer(fake_ref)
+        response_with_fake_ref = self._sendMutant(freq, analyze=False)
+
+        if (response1.getCode() != response_with_fake_ref.getCode()) \
+                or not bsqli_resp_diff.equal(response1.getBody(), response_with_fake_ref.getBody()):
+            return True
+
         om.out.debug('Testing for Referer/Origin %s' % freq.getURL())
 
     def _contains_csrf_token(self, freq):
