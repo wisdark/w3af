@@ -37,7 +37,22 @@ class mutantHeaders(mutant):
         
     def setDc( self, dc ):
         self._headers = dc
-    
+
+    def setModValue( self, val ):
+        '''
+        Set the value of the variable that this mutant modifies.
+        '''
+        try:
+            self._freq._headers[self.getVar()] = val
+        except Exception, e:
+            raise w3afException('The headers mutant object wasn\'t correctly initialized.')
+        
+    def getModValue( self ): 
+        try:
+            return self._freq._headers[self.getVar()]
+        except:
+            raise w3afException('The headers mutant object was\'nt correctly initialized.')
+ 
     def foundAt(self):
         '''
         @return: A string representing WHAT was fuzzed. This string is used like this:
