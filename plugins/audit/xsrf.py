@@ -32,6 +32,7 @@ import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
 from core.controllers.sql_tools.blind_sqli_response_diff import blind_sqli_response_diff
 from core.data.fuzzer.fuzzer import createMutants
+from core.data.fuzzer.mutantHeaders import mutantHeaders
 
 COMMON_CSRF_NAMES = [
         'csrf_token',
@@ -47,10 +48,12 @@ class xsrf(baseAuditPlugin):
     def __init__(self):
         baseAuditPlugin.__init__(self)
         self._strict_mode = False
-        self._bsqli_response_diff = blind_sqli_response_diff()
-        # User configured variables
-        self._equalLimit = 0.9
+        self._equalLimit = 0.95
         self._equAlgorithm = 'setIntersection'
+        self.resp_diff = blind_sqli_response_diff()
+        self.resp_diff.setUrlOpener(self._urlOpener)
+        self.resp_diff.setEqualLimit(self._equalLimit)
+        self.resp_diff.setEquAlgorithm(self._equAlgorithm)
 
     def audit(self, freq):
         '''
@@ -59,6 +62,7 @@ class xsrf(baseAuditPlugin):
         @param freq: A fuzzableRequest
         '''
         om.out.debug( 'XSRF plugin is testing: ' + freq.getURL() )
+        self._orig_response = None
         if not self._is_suitable(freq):
             return
         # Referer/Origin check 
@@ -69,6 +73,15 @@ class xsrf(baseAuditPlugin):
         if self._contains_csrf_token(freq) and self._is_token_checked(freq):
             om.out.debug('Token for %s is exist and checked' % freq.getURL())
             return
+
+        v = vuln.vuln(freq)
+        v.setPluginName(self.getName())
+        v.setId(self._orig_response.id)
+        v.setName('CSRF vulnerability has been found')
+        v.setSeverity(severity.MEDIUM)
+        msg = 'Cross Site Request Forgery has been found at: ' + freq.getURL()
+        v.setDesc(msg)
+        kb.kb.append(self, 'xsrf', v)
         om.out.debug('%s is vulnerable for CSRF attack!!!' % freq.getURL())
 
     def _is_suitable(self, freq):
@@ -81,45 +94,40 @@ class xsrf(baseAuditPlugin):
         if freq.getMethod() == 'GET' and not self._strict_mode:
             return False
         # Payload? 
-        if (freq.getMethod() == 'GET' and freq.getURI().hasQueryString()) \
-            or (freq.getMethod() =='POST' and len(freq.getDc())):
-                om.out.debug('%s is suitable for CSRF attack' % freq.getURL())
-                return True
-        return False
-
-    def _is_origin_checked(self, freq):
-        result = False
-        fake_ref = 'http://w3af.org/'
+        if not ((freq.getMethod() == 'GET' and freq.getURI().hasQueryString()) \
+            or (freq.getMethod() =='POST' and len(freq.getDc()))):
+                return False
+        # When sending 2 same request we get 2 "same" responses?
         response1 = self._sendMutant(freq, analyze=False)
         response2 = self._sendMutant(freq, analyze=False)
-        
-        bsqli_resp_diff = self._bsqli_response_diff
-        bsqli_resp_diff.setUrlOpener(self._urlOpener)
-        bsqli_resp_diff.setEqualLimit(self._equalLimit)
-        bsqli_resp_diff.setEquAlgorithm(self._equAlgorithm)
-
         if (response1.getCode() != response2.getCode()) \
-                or not bsqli_resp_diff.equal(response1.getBody(), response2.getBody()):
-            return result
-        # Ok 2 same requests have 2 same responses
-        # let's play with headers
-        tmp_ref = freq.getReferer()
-        freq.setReferer(fake_ref)
-        response_with_fake_ref = self._sendMutant(freq, analyze=False)
+                or not self.resp_diff.equal(response1.getBody(), response2.getBody()):
+            return False
+        self._orig_response = response1
+        om.out.debug('%s is suitable for CSRF attack' % freq.getURL())
+        return True
 
-        if (response1.getCode() != response_with_fake_ref.getCode()) \
-                or not bsqli_resp_diff.equal(response1.getBody(), response_with_fake_ref.getBody()):
-            return True
-
+    def _is_origin_checked(self, freq):
         om.out.debug('Testing for Referer/Origin %s' % freq.getURL())
+        fake_ref = 'http://w3af.org/'
+        mutant = mutantHeaders(freq.copy())
+        mutant.setVar('Referer')
+        mutant.setOriginalValue(freq.getReferer())
+        mutant.setModValue(fake_ref)
+        mutant_response = self._sendMutant(mutant, analyze=False)
+        if (self._orig_response.getCode() != mutant_response.getCode()) \
+                or not self.resp_diff.equal(self._orig_response.getBody(),
+                        mutant_response.getBody()):
+            return True
+        return False
 
     def _contains_csrf_token(self, freq):
         om.out.debug('Testing for token in %s' % freq.getURL())
-        return True
+        return False
 
     def _is_token_checked(self, freq):
         om.out.debug('Testing for checks of token in %s' % freq.getURL())
-        return True
+        return False
 
     def is_csrf_token(self, key, value):
         # 
