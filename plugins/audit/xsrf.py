@@ -26,13 +26,13 @@ from core.data.options.option import option
 from core.data.options.optionList import optionList
 from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
 from core.controllers.w3afException import w3afException
-from core.data.exchangableMethods import isExchangable
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
 from core.controllers.sql_tools.blind_sqli_response_diff import blind_sqli_response_diff
 from core.data.fuzzer.fuzzer import createMutants
 from core.data.fuzzer.mutantHeaders import mutantHeaders
+from core.data.dc.dataContainer import DataContainer
 
 COMMON_CSRF_NAMES = [
         'csrf_token',
@@ -70,19 +70,19 @@ class xsrf(baseAuditPlugin):
             om.out.debug('Origin for %s is checked' % freq.getURL())
             return
         # Does request has CSRF token in query string or POST payload?
-        if self._contains_csrf_token(freq) and self._is_token_checked(freq):
+        token = self._find_csrf_token(freq)
+        if token and self._is_token_checked(freq, token):
             om.out.debug('Token for %s is exist and checked' % freq.getURL())
             return
-
+        # Ok, we have found vulnerable to CSRF attack request
         v = vuln.vuln(freq)
         v.setPluginName(self.getName())
         v.setId(self._orig_response.id)
         v.setName('CSRF vulnerability has been found')
-        v.setSeverity(severity.MEDIUM)
+        v.setSeverity(severity.HIGH)
         msg = 'Cross Site Request Forgery has been found at: ' + freq.getURL()
         v.setDesc(msg)
         kb.kb.append(self, 'xsrf', v)
-        om.out.debug('%s is vulnerable for CSRF attack!!!' % freq.getURL())
 
     def _is_suitable(self, freq):
         # For CSRF attack we need request with payload 
@@ -121,19 +121,31 @@ class xsrf(baseAuditPlugin):
             return True
         return False
 
-    def _contains_csrf_token(self, freq):
+    def _find_csrf_token(self, freq):
         om.out.debug('Testing for token in %s' % freq.getURL())
-        return False
+        result = DataContainer()
+        dc = freq.getDc()
+        for k in dc:
+            if self.is_csrf_token(k, dc[k][0]):
+                result[k] = dc[k]
+                om.out.debug('Found token %s for %s: ' % (freq.getURL(),str(result)))
+                break
+        return result
 
-    def _is_token_checked(self, freq):
-        om.out.debug('Testing for checks of token in %s' % freq.getURL())
+    def _is_token_checked(self, freq, token):
+        om.out.debug('Testing for validation of token in %s' % freq.getURL())
+        mutants = createMutants(freq, ['123'], False, token.keys())
+        for mutant in mutants:
+            mutant_response = self._sendMutant(mutant, analyze=False)
+            if (self._orig_response.getCode() != mutant_response.getCode()) \
+                or not self.resp_diff.equal(self._orig_response.getBody(),
+                        mutant_response.getBody()):
+                return True
         return False
 
     def is_csrf_token(self, key, value):
-        # 
         # Entropy based algoritm
         # http://en.wikipedia.org/wiki/Password_strength
-        #
         min_length = 4
         min_entropy = 36
         # Check for common CSRF token names
@@ -173,7 +185,7 @@ class xsrf(baseAuditPlugin):
         '''
         This method is called at the end, when w3afCore aint going to use this plugin anymore.
         '''
-        pass
+        self.printUniq(kb.kb.getData('xsrf', 'xsrf'), None)
 
     def getOptions( self ):
         '''
