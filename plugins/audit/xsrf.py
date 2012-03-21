@@ -38,6 +38,10 @@ COMMON_CSRF_NAMES = [
         'csrf_token',
         'token'
         ]
+# TODO:
+# 1. Use difflib instead of blind_sqli_response_diff
+# 2. Need to check cookie against current request scheme://host:port/path
+# 
 
 class xsrf(baseAuditPlugin):
     '''
@@ -87,7 +91,11 @@ class xsrf(baseAuditPlugin):
     def _is_suitable(self, freq):
         # For CSRF attack we need request with payload 
         # and with persistant/session cookies
-        auth_cookie = bool(len(kb.kb.getData('collectCookies', 'cookies')))
+        auth_cookie = False
+        # TODO dirty hack?
+        for cookie in self._urlOpener.settings._cookieHandler.cookiejar:
+            if cookie.domain == freq.getURL().getDomain():
+                auth_cookie = True
         if not auth_cookie:
             return False
         # Strict mode on/off - do we need to audit GET requests? Not always...
@@ -209,7 +217,7 @@ class xsrf(baseAuditPlugin):
         @return: A list with the names of the plugins that should be runned before the
         current one.
         '''
-        return ['grep.collectCookies']
+        return []
 
     def getLongDesc( self ):
         '''
