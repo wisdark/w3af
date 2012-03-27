@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 from math import log, floor
+from difflib import SequenceMatcher
 
 import core.controllers.outputManager as om
 from core.data.options.option import option
@@ -29,7 +30,6 @@ from core.controllers.w3afException import w3afException
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
-from core.controllers.sql_tools.blind_sqli_response_diff import blind_sqli_response_diff
 from core.data.fuzzer.fuzzer import createMutants
 from core.data.fuzzer.mutantHeaders import mutantHeaders
 from core.data.dc.dataContainer import DataContainer
@@ -38,10 +38,6 @@ COMMON_CSRF_NAMES = [
         'csrf_token',
         'token'
         ]
-# TODO:
-# 1. Use difflib instead of blind_sqli_response_diff
-# 2. Need to check cookie against current request scheme://host:port/path
-# 
 
 class xsrf(baseAuditPlugin):
     '''
@@ -52,12 +48,7 @@ class xsrf(baseAuditPlugin):
     def __init__(self):
         baseAuditPlugin.__init__(self)
         self._strict_mode = False
-        self._equalLimit = 0.95
-        self._equAlgorithm = 'setIntersection'
-        self.resp_diff = blind_sqli_response_diff()
-        self.resp_diff.setUrlOpener(self._urlOpener)
-        self.resp_diff.setEqualLimit(self._equalLimit)
-        self.resp_diff.setEquAlgorithm(self._equAlgorithm)
+        self._equal_limit = 0.95
 
     def audit(self, freq):
         '''
@@ -88,11 +79,19 @@ class xsrf(baseAuditPlugin):
         v.setDesc(msg)
         kb.kb.append(self, 'xsrf', v)
 
+    def _is_resp_equal(self, res1, res2):
+        s = SequenceMatcher(None, res1.getBody(), res2.getBody())
+        if (res1.getCode() != res2.getCode()) \
+            or (s.ratio() < self._equal_limit):
+            return False
+        return True
+
     def _is_suitable(self, freq):
         # For CSRF attack we need request with payload 
         # and with persistant/session cookies
         auth_cookie = False
         # TODO dirty hack?
+        # I need to use here something like DefaultCookiePolicy
         for cookie in self._urlOpener.settings._cookieHandler.cookiejar:
             if cookie.domain == freq.getURL().getDomain():
                 auth_cookie = True
@@ -108,8 +107,7 @@ class xsrf(baseAuditPlugin):
         # When sending 2 same request we get 2 "same" responses?
         response1 = self._sendMutant(freq, analyze=False)
         response2 = self._sendMutant(freq, analyze=False)
-        if (response1.getCode() != response2.getCode()) \
-                or not self.resp_diff.equal(response1.getBody(), response2.getBody()):
+        if not self._is_resp_equal(response1, response2):
             return False
         self._orig_response = response1
         om.out.debug('%s is suitable for CSRF attack' % freq.getURL())
@@ -123,9 +121,7 @@ class xsrf(baseAuditPlugin):
         mutant.setOriginalValue(freq.getReferer())
         mutant.setModValue(fake_ref)
         mutant_response = self._sendMutant(mutant, analyze=False)
-        if (self._orig_response.getCode() != mutant_response.getCode()) \
-                or not self.resp_diff.equal(self._orig_response.getBody(),
-                        mutant_response.getBody()):
+        if not self._is_resp_equal(self._orig_response, mutant_response):
             return True
         return False
 
@@ -145,9 +141,7 @@ class xsrf(baseAuditPlugin):
         mutants = createMutants(freq, ['123'], False, token.keys())
         for mutant in mutants:
             mutant_response = self._sendMutant(mutant, analyze=False)
-            if (self._orig_response.getCode() != mutant_response.getCode()) \
-                or not self.resp_diff.equal(self._orig_response.getBody(),
-                        mutant_response.getBody()):
+            if not self._is_resp_equal(self._orig_response, mutant_response):
                 return True
         return False
 
