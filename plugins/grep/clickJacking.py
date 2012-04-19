@@ -19,7 +19,6 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
-
 import core.controllers.outputManager as om
 from core.data.options.option import option
 from core.data.options.optionList import optionList
@@ -27,7 +26,6 @@ import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
-
 
 class clickJacking(baseGrepPlugin):
     '''
@@ -38,69 +36,62 @@ class clickJacking(baseGrepPlugin):
 
     def __init__(self):
         baseGrepPlugin.__init__(self)
+        self._total_count = 0
+        self._vuln_count = 0
+        self._vulns = []
+        self._vuln_limit = 5
 
     def grep(self, request, response):
-        '''
-        Plugin entry point, identify which requests generated a 500 error.
-
-        @parameter request: The HTTP request object.
-        @parameter response: The HTTP response object
-        @return: None
-        '''
         if not response.is_text_or_html():
             return
-        # 
-        # TODO need to check here for auth cookie!
-        #
-        headers = response.getHeaders()
+        self._total_count += 1
+        # TODO need to check here for auth cookie?!
+        headers = response.getLowerCaseHeaders()
         for header_name in headers:
-            if header_name.lower() == 'x-frame-options'\
+            if header_name == 'x-frame-options'\
                     and headers[header_name].lower() in ('deny', 'sameorigin'):
                         return
-        v = vuln.vuln()
-        v.setPluginName(self.getName())
-        v.setURL(response.getURL())
-        v.setId(response.id)
-        v.setSeverity(severity.MEDIUM)
-        v.setName('Possible ClickJacking attack' )
-        msg = 'URL: "' + v.getURL()+'"'
-        msg += ' has no protection (X-Frame-Options header) against ClickJacking attack'
-        v.setDesc(msg)
-        kb.kb.append(self, 'clickJacking', v)
+        self._vuln_count += 1
+        if len(self._vulns) <= self._vuln_limit\
+                and response.getURL() not in self._vulns:
+            self._vulns.append(response.getURL())
 
     def getOptions(self):
-        '''
-        @return: A list of option objects for this plugin.
-        '''
         ol = optionList()
         return ol
 
-    def setOptions(self , o):
-        '''
-        Do nothing, I don't have options.
-        '''
+    def setOptions(self, o):
         pass
 
     def end(self):
-        '''
-        This method is called when the plugin wont be used anymore.
-
-        The real job of this plugin is done here, where I will try to see if one
-        of the clickJacking responses were not identified as a vuln by some of my audit plugins
-        '''
+        # If all URLs implement protection, don't report anything.
+        if not self._vuln_count:
+            return
+        v = vuln.vuln()
+        v.setPluginName(self.getName())
+        v.setName('Possible ClickJacking attack' )
+        v.setSeverity(severity.MEDIUM)
+        # If none of the URLs implement protection, simply report
+        # ONE vulnerability that says that.
+        if self._total_count == self._vuln_count:
+            msg = 'The whole target '
+            msg += 'has no protection (X-Frame-Options header) against ClickJacking attack'
+            v.setDesc(msg)
+            kb.kb.append(self, 'clickJacking', v)
+        # If most of the URLs implement the protection but some
+        # don't, report ONE vulnerability saying: "Most are protected, but x, y are not.
+        if self._total_count > self._vuln_count:
+            msg = 'Some URLs has no protection (X-Frame-Options header) '
+            msg += 'against ClickJacking attack. Among them:\n '
+            msg += ' '.join([str(url) + '\n' for url in self._vulns])
+            v.setDesc(msg)
+            kb.kb.append(self, 'clickJacking', v)
         self.printUniq(kb.kb.getData( 'clickJacking', 'clickJacking' ), 'URL')
 
     def getPluginDeps(self):
-        '''
-        @return: A list with the names of the plugins that should be runned before the
-        current one.
-        '''
         return []
 
     def getLongDesc(self):
-        '''
-        @return: A DETAILED description of the plugin functions and features.
-        '''
         return '''
         This plugin greps every page for X-Frame-Options header and so
         for possible ClickJacking attack against URL.
