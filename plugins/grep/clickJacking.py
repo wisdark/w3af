@@ -25,6 +25,7 @@ from core.data.options.optionList import optionList
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
+from core.data.db.temp_persist import disk_list as DiskList
 from core.controllers.basePlugin.baseGrepPlugin import baseGrepPlugin
 
 class clickJacking(baseGrepPlugin):
@@ -38,8 +39,7 @@ class clickJacking(baseGrepPlugin):
         baseGrepPlugin.__init__(self)
         self._total_count = 0
         self._vuln_count = 0
-        self._vulns = []
-        self._vuln_limit = 5
+        self._vulns = DiskList()
 
     def grep(self, request, response):
         if not response.is_text_or_html():
@@ -47,13 +47,12 @@ class clickJacking(baseGrepPlugin):
         self._total_count += 1
         # TODO need to check here for auth cookie?!
         headers = response.getLowerCaseHeaders()
-        for header_name in headers:
-            if header_name == 'x-frame-options'\
-                    and headers[header_name].lower() in ('deny', 'sameorigin'):
-                        return
+        x_frame_options = headers.get('x-frame-options', None)
+        if x_frame_options\
+                and x_frame_options.lower() in ('deny', 'sameorigin'):
+            return
         self._vuln_count += 1
-        if len(self._vulns) <= self._vuln_limit\
-                and response.getURL() not in self._vulns:
+        if response.getURL() not in self._vulns:
             self._vulns.append(response.getURL())
 
     def getOptions(self):
