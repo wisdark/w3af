@@ -19,26 +19,24 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
+import socket
+import select
+import re
+from OpenSSL import SSL, crypto
+from datetime import date
 
 import core.controllers.outputManager as om
-
-# options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 from core.controllers.basePlugin.baseAuditPlugin import baseAuditPlugin
 from core.controllers.w3afException import w3afException
-
 from core.data.bloomfilter.bloomfilter import scalable_bloomfilter
 
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.info as info
-
-from OpenSSL import SSL, crypto
-import socket
-import select
-import re
-
+import core.data.kb.vuln as vuln
+import core.data.constants.severity as severity
 
 class sslCertificate(baseAuditPlugin):
     '''
@@ -48,11 +46,10 @@ class sslCertificate(baseAuditPlugin):
 
     def __init__(self):
         baseAuditPlugin.__init__(self)
-        
-        # Internal variables
         self._already_tested_domains = scalable_bloomfilter()
+        self._min_expire_days = 30
 
-    def audit(self, freq ):
+    def audit(self, freq):
         '''
         Get the cert and do some checks against it.
 
@@ -68,47 +65,36 @@ class sslCertificate(baseAuditPlugin):
         if domain in self._already_tested_domains:
             return
 
-        # Parse the domain:port
-        splited = url.getNetLocation().split(':')
-        port = 443
-        host = splited[0]
-
-        if len( splited ) > 1:
-            port = int(splited[1])
-
         # Create the connection
         socket_obj = socket.socket()
         try:
-            socket_obj.connect( ( host , port ) )
+            socket_obj.connect((domain , url.getPort()))
             ctx = SSL.Context(SSL.SSLv23_METHOD)
             ssl_conn = SSL.Connection(ctx, socket_obj)
-
             # Go to client mode
             ssl_conn.set_connect_state()
-
             # If I don't send something here, the "get_peer_certificate"
             # method returns None. Don't ask me why!
-            #ssl_conn.send('GET / HTTP/1.1\r\n\r\n')
-            self.ssl_wrapper( ssl_conn, ssl_conn.send, ('GET / HTTP/1.1\r\n\r\n', ), {})
+            self.ssl_wrapper(ssl_conn, ssl_conn.send, ('GET / HTTP/1.1\r\n\r\n', ), {})
         except Exception, e:
             om.out.error('Error in audit.sslCertificate: "' + repr(e)  +'".')
-        else:
-            # Get the cert
-            cert = ssl_conn.get_peer_certificate()
+            return
 
-            # Perform the analysis
-            self._analyze_cert( cert, ssl_conn, host )
-            self._already_tested_domains.add(domain)
-            # Print the SSL information to the log
-            desc = 'This is the information about the SSL certificate used in the target site:'
-            desc += '\n'
-            desc += self._dump_X509(cert)
-            om.out.information( desc )
-            i = info.info()
-            i.setPluginName(self.getName())
-            i.setName('SSL Certificate' )
-            i.setDesc( desc )
-            kb.kb.append( self, 'certificate', i )
+        # Get the cert
+        cert = ssl_conn.get_peer_certificate()
+        # Perform the analysis
+        self._analyze_cert(cert, ssl_conn, domain)
+        self._already_tested_domains.add(domain)
+
+        # Print the SSL information to the log
+        desc = 'This is the information about the SSL certificate used in the target site:\n'
+        desc += self._dump_X509(cert)
+        om.out.information(desc)
+        i = info.info()
+        i.setPluginName(self.getName())
+        i.setName('SSL Certificate')
+        i.setDesc(desc)
+        kb.kb.append(self, 'certificate', i)
 
     def ssl_wrapper(self, ssl_obj, method, args, kwargs):
         '''
@@ -131,86 +117,114 @@ class sslCertificate(baseAuditPlugin):
         @parameter cert: The cert object from pyopenssl.
         @parameter ssl_conn: The SSL connection.
         '''
-        server_digest_SHA1 = cert.digest('sha1')
-        server_digest_MD5 = cert.digest('md5')
+        self._verify_expiration(cert, ssl_conn, host)
+        self._verify_ssl_ver(cert, ssl_conn, host)
+        self._verify_name(cert, ssl_conn, host)
 
-        # Check for expired
-        if cert.has_expired():
-            i = info.info()
-            i.setPluginName(self.getName())
-            i.setName('Expired SSL certificate' )
-            i.setDesc( 'The certificate with MD5 digest: "' + server_digest_MD5 + '" has expired.' )
-            kb.kb.append( self, 'expired', i )
-
+    def _verify_ssl_ver(self, cert, ssl_conn, host):
         # Check for SSL version
         if cert.get_version() < 3:
-            i = info.info()
-            i.setPluginName(self.getName())
-            i.setName('Insecure SSL version' )
+            v = vuln.vuln()
+            v.setPluginName(self.getName())
+            v.setSeverity(severity.LOW)
+            v.setName('Insecure SSL version' )
             desc = 'The certificate is using an old version of SSL (' + str(cert.get_version())
             desc += '), which is insecure.'
-            i.setDesc( desc )
-            kb.kb.append( self, 'version', i )
+            v.setDesc(desc)
+            kb.kb.append(self, 'version', v)
 
+    def _verify_expiration(self, cert, ssl_conn, host):
+        server_digest_SHA1 = cert.digest('sha1')
+        server_digest_MD5 = cert.digest('md5')
+ 
+        # Check for expired
+        if cert.has_expired():
+            v = vuln.vuln()
+            v.setPluginName(self.getName())
+            v.setSeverity(severity.LOW)
+            v.setName('Expired SSL certificate')
+            v.setDesc('The certificate with MD5 digest: "' + server_digest_MD5 + '" has expired.')
+            kb.kb.append(self, 'expired', v)
+
+        # Check for soon expire
+        valid_date = cert.get_notAfter()
+        expire_days = (date(int(valid_date[0:4]), int(valid_date[4:6]), 
+            int(valid_date[6:8])) - date.today()).days
+        if expire_days < self._min_expire_days:
+            v = info.info()
+            v.setPluginName(self.getName())
+            v.setName('Expired SSL certificate')
+            v.setDesc('The certificate with MD5 digest: "' + server_digest_MD5 + '" will expire soon.')
+            kb.kb.append(self, 'soon_expire', v) 
+
+    def _verify_name(self, cert, ssl_conn, host):
+        server_digest_SHA1 = cert.digest('sha1')
+        server_digest_MD5 = cert.digest('md5')
         peer = cert.get_subject()
         issuer = cert.get_issuer()
         ciphers = ssl_conn.get_cipher_list()
         cn = str(peer.commonName)
 
+        # Check that the certificate is self issued
+        if peer == issuer:
+            v = vuln.vuln()
+            v.setSeverity(severity.LOW)
+            v.setPluginName(self.getName())
+            v.setName('Self issued SSL certificate')
+            desc = 'The certificate is self issued'
+            v.setDesc( desc )
+            om.out.information(desc)
+            kb.kb.append(self, 'si_cert', v)
         # Check that the name of the site and the name reported in the certificate match.
-        certinvalid=True
-        if re.match (r"\*",cn):
-            wildcardinvalid=True
+        cert_invalid = True
+        # Wildcard certificates
+        if re.match(r"\*", cn):
+            wildcard_invalid = True
             # The leftmost component should start with '*.' and CountOf(*)==1
             if re.match (r"^\*\.",cn) and (cn.count('*')==1):    
                 # there should be three components (at least two dots)
                 # but not ending with dot 
-                if (cn.count('.')>=2): # and not re.match (r"\.$",cn)):
-                    wildcardinvalid=False
-
-            if wildcardinvalid:
-                i = info.info()
-                i.setPluginName(self.getName())
-                i.setName('Potential wildcard SSL manipulation')
+                if (cn.count('.') >= 2): # and not re.match (r"\.$",cn)):
+                    wildcard_invalid=False
+            if wildcard_invalid:
+                v = vuln.vuln()
+                v.setSeverity(severity.LOW)
+                v.setPluginName(self.getName())
+                v.setName('Potential wildcard SSL manipulation')
                 desc = 'The certificate is not using wildcard(*) properly'
                 desc += 'Certificate wildcard: '
                 desc += cn
-                i.setDesc (desc)
-                kb.kb.append(self,'version', i)
+                v.setDesc(desc)
+                kb.kb.append(self,'version', v)
             else:
-                tmpstr=cn    
-                tmpstr2=tmpstr.replace("*","",1)
-                tmphostregexp=tmpstr2.join("\$")
+                tmpstr = cn    
+                tmpstr2 = tmpstr.replace("*","",1)
+                tmphostregexp = tmpstr2.join("\$")
                 if re.search(tmphostregexp,host):
-                    certinvalid=False
+                    cert_invalid = False
         else:
             if host == cn:
-                certinvalid=False
+                cert_invalid = False
 
-        if certinvalid: 
-            i = info.info()
-            i.setPluginName(self.getName())
-            i.setName('Invalid name of the certificate')
+        # Alt names
+        #for i in range(0, cert.get_extension_count()-1):
+        #    ext = cert.get_extension(i)
+        #    if ext.get_short_name() == 'subjectAltName':
+        #        print '  >', ext.get_data()
+
+        if cert_invalid: 
+            v = vuln.vuln()
+            v.setPluginName(self.getName())
+            v.setSeverity(severity.LOW)
+            v.setName('Invalid name of the certificate')
             desc = 'The certificate presented by this website ('
             desc += host
             desc += ') was issued for a different website\'s address ('
             desc += cn + ')'
-            i.setDesc( desc )
-            om.out.information( desc )
-            kb.kb.append( self, 'cn', i )
+            v.setDesc(desc)
+            om.out.information(desc)
+            kb.kb.append(self, 'cn', v)
 
-            # Check that the certificate is self issued
-            if peer == issuer:
-                i = info.info()
-                i.setPluginName(self.getName())
-                i.setName('Self issued SSL certificate')
-                desc = 'The certificate is self issued'
-                i.setDesc( desc )
-                om.out.information( desc )
-                kb.kb.append( self, 'si_cert', i )
-            # TODO
-            # 1. Self-signed
-            # 2. MD5 check like in Metasploit
 
     def _dump_X509(self, cert):
         '''
