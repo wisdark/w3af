@@ -25,6 +25,13 @@ import re
 from OpenSSL import SSL, crypto
 from datetime import date
 
+try:
+    from ndg.httpsclient.subj_alt_name import SubjectAltName
+    from pyasn1.codec.der import decoder as der_decoder
+    SUBJ_ALT_NAME_SUPPORT = True
+except ImportError, e:
+    SUBJ_ALT_NAME_SUPPORT = False
+
 import core.controllers.outputManager as om
 from core.data.options.option import option
 from core.data.options.optionList import optionList
@@ -56,15 +63,12 @@ class sslCertificate(baseAuditPlugin):
         @param freq: A fuzzableRequest
         '''
         url = freq.getURL()
-        
         if 'HTTPS' != url.getProtocol().upper():
             return
-
         domain = url.getDomain()
         # We need to check certificate only once per host
         if domain in self._already_tested_domains:
             return
-
         # Create the connection
         socket_obj = socket.socket()
         try:
@@ -79,13 +83,11 @@ class sslCertificate(baseAuditPlugin):
         except Exception, e:
             om.out.error('Error in audit.sslCertificate: "' + repr(e)  +'".')
             return
-
         # Get the cert
         cert = ssl_conn.get_peer_certificate()
         # Perform the analysis
         self._analyze_cert(cert, ssl_conn, domain)
         self._already_tested_domains.add(domain)
-
         # Print the SSL information to the log
         desc = 'This is the information about the SSL certificate used in the target site:\n'
         desc += self._dump_X509(cert)
@@ -116,27 +118,14 @@ class sslCertificate(baseAuditPlugin):
 
         @parameter cert: The cert object from pyopenssl.
         @parameter ssl_conn: The SSL connection.
+        @parameter host: target hostname.
         '''
         self._verify_expiration(cert, ssl_conn, host)
-        self._verify_ssl_ver(cert, ssl_conn, host)
         self._verify_name(cert, ssl_conn, host)
-
-    def _verify_ssl_ver(self, cert, ssl_conn, host):
-        # Check for SSL version
-        if cert.get_version() < 3:
-            v = vuln.vuln()
-            v.setPluginName(self.getName())
-            v.setSeverity(severity.LOW)
-            v.setName('Insecure SSL version' )
-            desc = 'The certificate is using an old version of SSL (' + str(cert.get_version())
-            desc += '), which is insecure.'
-            v.setDesc(desc)
-            kb.kb.append(self, 'version', v)
 
     def _verify_expiration(self, cert, ssl_conn, host):
         server_digest_SHA1 = cert.digest('sha1')
         server_digest_MD5 = cert.digest('md5')
- 
         # Check for expired
         if cert.has_expired():
             v = vuln.vuln()
@@ -145,9 +134,10 @@ class sslCertificate(baseAuditPlugin):
             v.setName('Expired SSL certificate')
             v.setDesc('The certificate with MD5 digest: "' + server_digest_MD5 + '" has expired.')
             kb.kb.append(self, 'expired', v)
-
         # Check for soon expire
         valid_date = cert.get_notAfter()
+        # valid_date is ASN1 GENERALIZEDTIME string
+        # YYYYMMDDhhmmssZ
         expire_days = (date(int(valid_date[0:4]), int(valid_date[4:6]), 
             int(valid_date[6:8])) - date.today()).days
         if expire_days < self._min_expire_days:
@@ -157,6 +147,23 @@ class sslCertificate(baseAuditPlugin):
             v.setDesc('The certificate with MD5 digest: "' + server_digest_MD5 + '" will expire soon.')
             kb.kb.append(self, 'soon_expire', v) 
 
+    def _verify_alt_names(self, cert, ssl_conn, host):
+        dns_names = []
+        general_names = SubjectAltName()
+        for i in range(cert.get_extension_count()):
+            ext = cert.get_extension(i)
+            if ext.get_short_name() == 'subjectAltName':
+                ext_data = ext.get_data()
+                decoded_data = der_decoder.decode(ext_data, asn1Spec=general_names)
+                for name in decoded_data:
+                    if isinstance(name, SubjectAltName):
+                        for entry in range(len(name)):
+                            component = name.getComponentByPosition(entry)
+                            dns_names.append(str(component.getComponent()))
+        if host in dns_names:
+            return True
+        return False
+
     def _verify_name(self, cert, ssl_conn, host):
         server_digest_SHA1 = cert.digest('sha1')
         server_digest_MD5 = cert.digest('md5')
@@ -164,7 +171,6 @@ class sslCertificate(baseAuditPlugin):
         issuer = cert.get_issuer()
         ciphers = ssl_conn.get_cipher_list()
         cn = str(peer.commonName)
-
         # Check that the certificate is self issued
         if peer == issuer:
             v = vuln.vuln()
@@ -175,17 +181,24 @@ class sslCertificate(baseAuditPlugin):
             v.setDesc( desc )
             om.out.information(desc)
             kb.kb.append(self, 'si_cert', v)
-        # Check that the name of the site and the name reported in the certificate match.
+        # hostname == subject/CN
+        if host == cn:
+            return
+        # hostname is in subjectAltName/dNSName
+        if SUBJ_ALT_NAME_SUPPORT\
+                and self._verify_alt_names(cert, ssl_conn, host):
+            return
         cert_invalid = True
         # Wildcard certificates
+        # TODO Strange code...
         if re.match(r"\*", cn):
             wildcard_invalid = True
             # The leftmost component should start with '*.' and CountOf(*)==1
-            if re.match (r"^\*\.",cn) and (cn.count('*')==1):    
+            if re.match (r"^\*\.", cn) and (cn.count('*') == 1):    
                 # there should be three components (at least two dots)
                 # but not ending with dot 
                 if (cn.count('.') >= 2): # and not re.match (r"\.$",cn)):
-                    wildcard_invalid=False
+                    wildcard_invalid = False
             if wildcard_invalid:
                 v = vuln.vuln()
                 v.setSeverity(severity.LOW)
@@ -195,23 +208,13 @@ class sslCertificate(baseAuditPlugin):
                 desc += 'Certificate wildcard: '
                 desc += cn
                 v.setDesc(desc)
-                kb.kb.append(self,'version', v)
+                kb.kb.append(self, 'version', v)
             else:
-                tmpstr = cn    
+                tmpstr = cn
                 tmpstr2 = tmpstr.replace("*","",1)
                 tmphostregexp = tmpstr2.join("\$")
-                if re.search(tmphostregexp,host):
+                if re.search(tmphostregexp, host):
                     cert_invalid = False
-        else:
-            if host == cn:
-                cert_invalid = False
-
-        # Alt names
-        #for i in range(0, cert.get_extension_count()-1):
-        #    ext = cert.get_extension(i)
-        #    if ext.get_short_name() == 'subjectAltName':
-        #        print '  >', ext.get_data()
-
         if cert_invalid: 
             v = vuln.vuln()
             v.setPluginName(self.getName())
@@ -224,7 +227,6 @@ class sslCertificate(baseAuditPlugin):
             v.setDesc(desc)
             om.out.information(desc)
             kb.kb.append(self, 'cn', v)
-
 
     def _dump_X509(self, cert):
         '''
@@ -254,14 +256,18 @@ class sslCertificate(baseAuditPlugin):
         res = '    ' + res
         return res
 
-    def getOptions( self ):
+    def getOptions(self):
         '''
         @return: A list of option objects for this plugin.
         '''
+        d1 = 'Set minimal amount of days before expiration of the certificate for alerting'
+        h1 = 'If the certificate will expire in period of minExpireDays w3af will show alert about it'
+        o1 = option('minExpireDays', self._min_expire_days, d1, 'integer', help=h1)
         ol = optionList()
+        ol.add(o1)
         return ol
 
-    def setOptions( self, OptionList ):
+    def setOptions(self, optionsMap):
         '''
         This method sets all the options that are configured using the user interface 
         generated by the framework using the result of getOptions().
@@ -269,21 +275,24 @@ class sslCertificate(baseAuditPlugin):
         @parameter OptionList: A dictionary with the options for the plugin.
         @return: No value is returned.
         '''
-        pass
+        self._min_expire_days = optionsMap['minExpireDays'].getValue()
 
-    def getPluginDeps( self ):
+    def getPluginDeps(self):
         '''
         @return: A list with the names of the plugins that should be run before the
         current one.
         '''
         return []
 
-    def getLongDesc( self ):
+    def getLongDesc(self):
         '''
         @return: A DETAILED description of the plugin functions and features.
         '''
         return '''
         This plugin audits SSL certificate parameters.
-
+        
+        One configurable parameter exists:
+            - minExpireDays
+         
         Note: It's only usefull when testing HTTPS sites.
         '''
