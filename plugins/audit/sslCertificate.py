@@ -20,17 +20,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 import socket
-import select
+import ssl
 import re
-from OpenSSL import SSL, crypto
+import time
 from datetime import date
-
-try:
-    from ndg.httpsclient.subj_alt_name import SubjectAltName
-    from pyasn1.codec.der import decoder as der_decoder
-    SUBJ_ALT_NAME_SUPPORT = True
-except ImportError, e:
-    SUBJ_ALT_NAME_SUPPORT = False
 
 import core.controllers.outputManager as om
 from core.data.options.option import option
@@ -45,7 +38,7 @@ import core.data.kb.info as info
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
 
-class sslCertificate(baseAuditPlugin):
+class sslCertificate2(baseAuditPlugin):
     '''
     Check the SSL certificate validity( if https is being used ).
     @author: Andres Riancho ( andres.riancho@gmail.com )
@@ -55,6 +48,7 @@ class sslCertificate(baseAuditPlugin):
         baseAuditPlugin.__init__(self)
         self._already_tested_domains = scalable_bloomfilter()
         self._min_expire_days = 30
+        self._ca_file = 'plugins/audit/ca.pem'
 
     def audit(self, freq):
         '''
@@ -62,199 +56,52 @@ class sslCertificate(baseAuditPlugin):
 
         @param freq: A fuzzableRequest
         '''
+        # TODO
+        # SSLSocket.cipher() for used ciphers 
         url = freq.getURL()
         if 'HTTPS' != url.getProtocol().upper():
             return
+
         domain = url.getDomain()
         # We need to check certificate only once per host
         if domain in self._already_tested_domains:
             return
-        # Create the connection
-        socket_obj = socket.socket()
+        else:
+            self._already_tested_domains.add(domain)
+
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
         try:
-            socket_obj.connect((domain , url.getPort()))
-            ctx = SSL.Context(SSL.SSLv23_METHOD)
-            ssl_conn = SSL.Connection(ctx, socket_obj)
-            # Go to client mode
-            ssl_conn.set_connect_state()
-            # If I don't send something here, the "get_peer_certificate"
-            # method returns None. Don't ask me why!
-            self.ssl_wrapper(ssl_conn, ssl_conn.send, ('GET / HTTP/1.1\r\n\r\n', ), {})
+            #wrap_socket() may raise SSLError
+            ssl_sock = ssl.wrap_socket(s,
+                                   ca_certs=self._ca_file,
+                                   cert_reqs=ssl.CERT_REQUIRED,
+                                   ssl_version=ssl.PROTOCOL_SSLv23)
+            ssl_sock.connect((domain, url.getPort()))
+            match_hostname(ssl_sock.getpeercert(), domain)
         except Exception, e:
-            om.out.error('Error in audit.sslCertificate: "' + repr(e)  +'".')
-            return
-        # Get the cert
-        cert = ssl_conn.get_peer_certificate()
-        # Perform the analysis
-        self._analyze_cert(cert, ssl_conn, domain)
-        self._already_tested_domains.add(domain)
-        # Print the SSL information to the log
-        desc = 'This is the information about the SSL certificate used in the target site:\n'
-        desc += self._dump_X509(cert)
-        om.out.information(desc)
-        i = info.info()
-        i.setPluginName(self.getName())
-        i.setName('SSL Certificate')
-        i.setDesc(desc)
-        kb.kb.append(self, 'certificate', i)
-
-    def ssl_wrapper(self, ssl_obj, method, args, kwargs):
-        '''
-        This is a method that calls SSL functions, wrapping them around
-        try/except and handling WantRead and WantWrite errors.
-        '''
-        while True:
-            try:
-                return apply( method, args, kwargs )
-                break
-            except SSL.WantReadError:
-                select.select([ssl_obj],[],[],10.0)
-            except SSL.WantWriteError:
-                select.select([],[ssl_obj],[],10.0)
-
-    def _analyze_cert(self, cert, ssl_conn, host):
-        '''
-        Analyze the cert.
-
-        @parameter cert: The cert object from pyopenssl.
-        @parameter ssl_conn: The SSL connection.
-        @parameter host: target hostname.
-        '''
-        self._verify_expiration(cert, ssl_conn, host)
-        self._verify_name(cert, ssl_conn, host)
-
-    def _verify_expiration(self, cert, ssl_conn, host):
-        server_digest_SHA1 = cert.digest('sha1')
-        server_digest_MD5 = cert.digest('md5')
-        # Check for expired
-        if cert.has_expired():
             v = vuln.vuln()
             v.setPluginName(self.getName())
+            v.setURL(url)
             v.setSeverity(severity.LOW)
-            v.setName('Expired SSL certificate')
-            v.setDesc('The certificate with MD5 digest: "' + server_digest_MD5 + '" has expired.')
-            kb.kb.append(self, 'expired', v)
-        # Check for soon expire
-        valid_date = cert.get_notAfter()
-        # valid_date is ASN1 GENERALIZEDTIME string
-        # YYYYMMDDhhmmssZ
-        expire_days = (date(int(valid_date[0:4]), int(valid_date[4:6]), 
-            int(valid_date[6:8])) - date.today()).days
+            v.setName('Invalid SSL certificate/connection')
+            v.setDesc(str(e))
+            kb.kb.append(self, 'invalid_ssl_cert', v)
+            om.out.vulnerability(v.getName() + ':' + v.getDesc())
+            return
+        cert = ssl_sock.getpeercert()
+        ssl_sock.write("""GET / HTTP/1.0\r\n\r\n""")
+        data = ssl_sock.read()
+        ssl_sock.close()
+        exp_date = time.gmtime(ssl.cert_time_to_seconds(cert['notAfter']))
+        expire_days = (date(exp_date.tm_year, exp_date.tm_mon, exp_date.tm_mday) - date.today()).days
         if expire_days < self._min_expire_days:
             v = info.info()
             v.setPluginName(self.getName())
-            v.setName('Expired SSL certificate')
-            v.setDesc('The certificate with MD5 digest: "' + server_digest_MD5 + '" will expire soon.')
-            kb.kb.append(self, 'soon_expire', v) 
-
-    def _verify_alt_names(self, cert, ssl_conn, host):
-        dns_names = []
-        general_names = SubjectAltName()
-        for i in range(cert.get_extension_count()):
-            ext = cert.get_extension(i)
-            if ext.get_short_name() == 'subjectAltName':
-                ext_data = ext.get_data()
-                decoded_data = der_decoder.decode(ext_data, asn1Spec=general_names)
-                for name in decoded_data:
-                    if isinstance(name, SubjectAltName):
-                        for entry in range(len(name)):
-                            component = name.getComponentByPosition(entry)
-                            dns_names.append(str(component.getComponent()))
-        if host in dns_names:
-            return True
-        return False
-
-    def _verify_name(self, cert, ssl_conn, host):
-        server_digest_SHA1 = cert.digest('sha1')
-        server_digest_MD5 = cert.digest('md5')
-        peer = cert.get_subject()
-        issuer = cert.get_issuer()
-        ciphers = ssl_conn.get_cipher_list()
-        cn = str(peer.commonName)
-        # Check that the certificate is self issued
-        if peer == issuer:
-            v = vuln.vuln()
-            v.setSeverity(severity.LOW)
-            v.setPluginName(self.getName())
-            v.setName('Self issued SSL certificate')
-            desc = 'The certificate is self issued'
-            v.setDesc( desc )
-            om.out.information(desc)
-            kb.kb.append(self, 'si_cert', v)
-        # hostname == subject/CN
-        if host == cn:
-            return
-        # hostname is in subjectAltName/dNSName
-        if SUBJ_ALT_NAME_SUPPORT\
-                and self._verify_alt_names(cert, ssl_conn, host):
-            return
-        cert_invalid = True
-        # Wildcard certificates
-        # TODO Strange code...
-        if re.match(r"\*", cn):
-            wildcard_invalid = True
-            # The leftmost component should start with '*.' and CountOf(*)==1
-            if re.match (r"^\*\.", cn) and (cn.count('*') == 1):    
-                # there should be three components (at least two dots)
-                # but not ending with dot 
-                if (cn.count('.') >= 2): # and not re.match (r"\.$",cn)):
-                    wildcard_invalid = False
-            if wildcard_invalid:
-                v = vuln.vuln()
-                v.setSeverity(severity.LOW)
-                v.setPluginName(self.getName())
-                v.setName('Potential wildcard SSL manipulation')
-                desc = 'The certificate is not using wildcard(*) properly'
-                desc += 'Certificate wildcard: '
-                desc += cn
-                v.setDesc(desc)
-                kb.kb.append(self, 'version', v)
-            else:
-                tmpstr = cn
-                tmpstr2 = tmpstr.replace("*","",1)
-                tmphostregexp = tmpstr2.join("\$")
-                if re.search(tmphostregexp, host):
-                    cert_invalid = False
-        if cert_invalid: 
-            v = vuln.vuln()
-            v.setPluginName(self.getName())
-            v.setSeverity(severity.LOW)
-            v.setName('Invalid name of the certificate')
-            desc = 'The certificate presented by this website ('
-            desc += host
-            desc += ') was issued for a different website\'s address ('
-            desc += cn + ')'
-            v.setDesc(desc)
-            om.out.information(desc)
-            kb.kb.append(self, 'cn', v)
-
-    def _dump_X509(self, cert):
-        '''
-        Dump X509
-        '''
-        res = ''
-        res += "- Digest (SHA-1): " + cert.digest("sha1") +'\n'
-        res += "- Digest (MD5): " + cert.digest("md5") +'\n'
-        res += "- Serial#: " + str(cert.get_serial_number()) +'\n'
-        res += "- Version: " + str(cert.get_version()) +'\n'
-
-        expired = cert.has_expired() and "Yes" or "No"
-        res += "- Expired: " + expired + '\n'
-        res += "- Subject: " + str(cert.get_subject()) + '\n'
-        res += "- Issuer: " + str(cert.get_issuer()) + '\n'
-
-        # Dump public key
-        pkey = cert.get_pubkey()
-        typedict = {crypto.TYPE_RSA: "RSA", crypto.TYPE_DSA: "DSA"}
-        res += "- PKey bits: " + str(pkey.bits()) +'\n'
-        res += "- PKey type: %s (%d)" % (typedict.get(pkey.type(), "Unknown"), pkey.type()) +'\n'
-
-        res += '- Certificate dump: \n' + crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
-
-        # Indent
-        res = res.replace('\n', '\n    ')
-        res = '    ' + res
-        return res
+            v.setName('Soon expire SSL certificate')
+            v.setDesc('The certificate for "' + domain + '" will expire soon.')
+            kb.kb.append(self, 'ssl_soon_expire', v) 
+            om.out.information(v.getDesc())
 
     def getOptions(self):
         '''
@@ -263,8 +110,12 @@ class sslCertificate(baseAuditPlugin):
         d1 = 'Set minimal amount of days before expiration of the certificate for alerting'
         h1 = 'If the certificate will expire in period of minExpireDays w3af will show alert about it'
         o1 = option('minExpireDays', self._min_expire_days, d1, 'integer', help=h1)
+        d2 = 'Set minimal amount of days before expiration of the certificate for alerting'
+        h2 = 'CA PEM file path'
+        o2 = option('caFileName', self._ca_file, d2, 'string', help=h2)
         ol = optionList()
         ol.add(o1)
+        ol.add(o2)
         return ol
 
     def setOptions(self, optionsMap):
@@ -276,6 +127,7 @@ class sslCertificate(baseAuditPlugin):
         @return: No value is returned.
         '''
         self._min_expire_days = optionsMap['minExpireDays'].getValue()
+        self._ca_file = optionsMap['caFileName'].getValue()
 
     def getPluginDeps(self):
         '''
@@ -293,6 +145,63 @@ class sslCertificate(baseAuditPlugin):
         
         One configurable parameter exists:
             - minExpireDays
+            - CA PEM file path
          
         Note: It's only usefull when testing HTTPS sites.
         '''
+
+class CertificateError(ValueError):
+    pass
+
+def _dnsname_to_pat(dn):
+    pats = []
+    for frag in dn.split(r'.'):
+        if frag == '*':
+            # When '*' is a fragment by itself, it matches a non-empty dotless
+            # fragment.
+            pats.append('[^.]+')
+        else:
+            # Otherwise, '*' matches any dotless fragment.
+            frag = re.escape(frag)
+            pats.append(frag.replace(r'\*', '[^.]*'))
+    return re.compile(r'\A' + r'\.'.join(pats) + r'\Z', re.IGNORECASE)
+
+def match_hostname(cert, hostname):
+    """Verify that *cert* (in decoded format as returned by
+    SSLSocket.getpeercert()) matches the *hostname*.  RFC 2818 rules
+    are mostly followed, but IP addresses are not accepted for *hostname*.
+
+    CertificateError is raised on failure. On success, the function
+    returns nothing.
+    """
+    if not cert:
+        raise ValueError("empty or no certificate")
+    dnsnames = []
+    san = cert.get('subjectAltName', ())
+    for key, value in san:
+        if key == 'DNS':
+            if _dnsname_to_pat(value).match(hostname):
+                return
+            dnsnames.append(value)
+    if not dnsnames:
+        # The subject is only checked when there is no dNSName entry
+        # in subjectAltName
+        for sub in cert.get('subject', ()):
+            for key, value in sub:
+                # XXX according to RFC 2818, the most specific Common Name
+                # must be used.
+                if key == 'commonName':
+                    if _dnsname_to_pat(value).match(hostname):
+                        return
+                    dnsnames.append(value)
+    if len(dnsnames) > 1:
+        raise CertificateError("hostname %r "
+            "doesn't match either of %s"
+            % (hostname, ', '.join(map(repr, dnsnames))))
+    elif len(dnsnames) == 1:
+        raise CertificateError("hostname %r "
+            "doesn't match %r"
+            % (hostname, dnsnames[0]))
+    else:
+        raise CertificateError("no appropriate commonName or "
+            "subjectAltName fields were found")

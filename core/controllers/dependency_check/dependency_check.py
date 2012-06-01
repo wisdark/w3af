@@ -138,23 +138,7 @@ def dependency_check():
         packages_mac_ports.extend(['py26-openssl'])
         reasonForExit = True
     #mem_test('after ssl import')
-    try:
-        import pyasn1
-    except:
-        packages.append('PyASN1')
-        packages_debian.append('python-pyasn1')
-        msg = ' PyASN1 is needed for correct SSL certificate parsing.\n'
-        additional_information.append(msg)
-        #mem_test('after asn1 import')
-    try:
-        import ndg.httpsclient
-    except:
-        packages.append('ndg_httpsclient')
-        msg = ' ndg-httpsclient is needed for correct SSL certificate parsing.\n'
-        msg += 'You can install it from PyPI by easy_install ndg_httpsclient\n\n'
-        additional_information.append(msg)
-        reasonForExit = False
-    #mem_test('after ndg_httpsclient import')
+
     try:
         from lxml import etree
     except:
