@@ -38,7 +38,7 @@ import core.data.kb.info as info
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
 
-class sslCertificate2(baseAuditPlugin):
+class sslCertificate(baseAuditPlugin):
     '''
     Check the SSL certificate validity( if https is being used ).
     @author: Andres Riancho ( andres.riancho@gmail.com )
