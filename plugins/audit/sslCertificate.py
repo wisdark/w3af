@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import socket
 import ssl
 import re
+import os
 from time import gmtime
 from datetime import date
 from pprint import pformat
@@ -39,17 +40,20 @@ import core.data.kb.info as info
 import core.data.kb.vuln as vuln
 import core.data.constants.severity as severity
 
+
 class sslCertificate(baseAuditPlugin):
     '''
-    Check the SSL certificate validity( if https is being used ).
+    Check the SSL certificate validity (if https is being used).
+
     @author: Andres Riancho ( andres.riancho@gmail.com )
+    @author: Taras ( oxdef@oxdef.info )
     '''
 
     def __init__(self):
         baseAuditPlugin.__init__(self)
         self._already_tested = scalable_bloomfilter()
         self._min_expire_days = 30
-        self._ca_file = 'plugins/audit/sslCertificate/ca.pem'
+        self._ca_file = os.path.join('plugins','audit','sslCertificate','ca.pem')
 
     def audit(self, freq):
         '''
@@ -73,8 +77,8 @@ class sslCertificate(baseAuditPlugin):
         # NB! From OpenSSL lib ver >= 1.0 there is no support for SSLv2
         try:
             ssl_sock = ssl.wrap_socket(s,
-                    cert_reqs=ssl.CERT_NONE,
-                    ssl_version=ssl.PROTOCOL_SSLv2)
+                                       cert_reqs=ssl.CERT_NONE,
+                                       ssl_version=ssl.PROTOCOL_SSLv2)
             ssl_sock.connect((domain, url.getPort()))
         except Exception, e:
             pass
@@ -84,16 +88,18 @@ class sslCertificate(baseAuditPlugin):
             v.setURL(url)
             v.setSeverity(severity.LOW)
             v.setName('Insecure SSL version')
-            v.setDesc('SSL version 2 is insecure.')
+            desc = 'The target host "%s" has SSL version 2 enabled which is known to be insecure.'
+            v.setDesc(desc % domain)
             kb.kb.append(self, 'ssl_v2', v)
-            om.out.vulnerability(v.getName() + ':' + v.getDesc())
+
+            om.out.vulnerability(desc % domain)
 
         try:
             #wrap_socket() may raise SSLError
             ssl_sock = ssl.wrap_socket(s,
-                                   ca_certs=self._ca_file,
-                                   cert_reqs=ssl.CERT_REQUIRED,
-                                   ssl_version=ssl.PROTOCOL_SSLv23)
+                                       ca_certs=self._ca_file,
+                                       cert_reqs=ssl.CERT_REQUIRED,
+                                       ssl_version=ssl.PROTOCOL_SSLv23)
             ssl_sock.connect((domain, url.getPort()))
             match_hostname(ssl_sock.getpeercert(), domain)
         except ssl.SSLError, e:
@@ -110,6 +116,7 @@ class sslCertificate(baseAuditPlugin):
             kb.kb.append(self, 'invalid_ssl_connect', v)
             om.out.vulnerability(v.getName() + ':' + v.getDesc())
             return
+
         except CertificateError, e:
             v = vuln.vuln()
             v.setPluginName(self.getName())
@@ -120,6 +127,7 @@ class sslCertificate(baseAuditPlugin):
             kb.kb.append(self, 'invalid_ssl_cert', v)
             om.out.vulnerability(v.getName() + ':' + v.getDesc())
             return
+
         except Exception, e:
             om.out.debug(str(e))
             return
@@ -136,7 +144,7 @@ class sslCertificate(baseAuditPlugin):
             i.setURL(url)
             i.setPluginName(self.getName())
             i.setName('Soon expire SSL certificate')
-            i.setDesc('The certificate for "' + domain + '" will expire soon.')
+            i.setDesc('The certificate for "%s" will expire soon.' % domain)
             kb.kb.append(self, 'ssl_soon_expire', i) 
             om.out.information(i.getDesc())
 
@@ -168,15 +176,18 @@ class sslCertificate(baseAuditPlugin):
         '''
         @return: A list of option objects for this plugin.
         '''
-        d1 = 'Set minimal amount of days before expiration of the certificate for alerting'
-        h1 = 'If the certificate will expire in period of minExpireDays w3af will show alert about it'
-        o1 = option('minExpireDays', self._min_expire_days, d1, 'integer', help=h1)
-        d2 = 'Set minimal amount of days before expiration of the certificate for alerting'
-        h2 = 'CA PEM file path'
-        o2 = option('caFileName', self._ca_file, d2, 'string', help=h2)
         ol = optionList()
-        ol.add(o1)
-        ol.add(o2)
+
+        d = 'Set minimal amount of days before expiration of the certificate for alerting'
+        h = 'If the certificate will expire in period of minExpireDays w3af will show alert about it'
+        o = option('minExpireDays', self._min_expire_days, d, 'integer', help=h)
+        ol.add(o)
+
+        d = 'Set minimal amount of days before expiration of the certificate for alerting'
+        h = 'CA PEM file path'
+        o = option('caFileName', self._ca_file, d, 'string', help=h)
+        ol.add(o)
+
         return ol
 
     def setOptions(self, optionsMap):
