@@ -121,7 +121,6 @@ class sslCertificate(baseAuditPlugin):
             om.out.vulnerability(v.getName() + ':' + v.getDesc())
             return
         except Exception, e:
-            print '>>>>>>>', type(e), str(e)
             om.out.debug(str(e))
             return
         
