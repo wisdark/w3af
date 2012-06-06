@@ -22,8 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import socket
 import ssl
 import re
-import time
+from time import gmtime
 from datetime import date
+from pprint import pformat
 
 import core.controllers.outputManager as om
 from core.data.options.option import option
@@ -46,9 +47,9 @@ class sslCertificate(baseAuditPlugin):
 
     def __init__(self):
         baseAuditPlugin.__init__(self)
-        self._already_tested_domains = scalable_bloomfilter()
+        self._already_tested = scalable_bloomfilter()
         self._min_expire_days = 30
-        self._ca_file = 'plugins/audit/ca.pem'
+        self._ca_file = 'plugins/audit/sslCertificate/ca.pem'
 
     def audit(self, freq):
         '''
@@ -56,20 +57,36 @@ class sslCertificate(baseAuditPlugin):
 
         @param freq: A fuzzableRequest
         '''
-        # TODO
-        # SSLSocket.cipher() for used ciphers 
         url = freq.getURL()
         if 'HTTPS' != url.getProtocol().upper():
             return
 
         domain = url.getDomain()
         # We need to check certificate only once per host
-        if domain in self._already_tested_domains:
+        if domain in self._already_tested:
             return
         else:
-            self._already_tested_domains.add(domain)
+            self._already_tested.add(domain)
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # SSLv2 check
+        # NB! From OpenSSL lib ver >= 1.0 there is no support for SSLv2
+        try:
+            ssl_sock = ssl.wrap_socket(s,
+                    cert_reqs=ssl.CERT_NONE,
+                    ssl_version=ssl.PROTOCOL_SSLv2)
+            ssl_sock.connect((domain, url.getPort()))
+        except Exception, e:
+            pass
+        else:
+            v = vuln.vuln()
+            v.setPluginName(self.getName())
+            v.setURL(url)
+            v.setSeverity(severity.LOW)
+            v.setName('Insecure SSL version')
+            v.setDesc('SSL version 2 is insecure.')
+            kb.kb.append(self, 'ssl_v2', v)
+            om.out.vulnerability(v.getName() + ':' + v.getDesc())
 
         try:
             #wrap_socket() may raise SSLError
@@ -79,29 +96,74 @@ class sslCertificate(baseAuditPlugin):
                                    ssl_version=ssl.PROTOCOL_SSLv23)
             ssl_sock.connect((domain, url.getPort()))
             match_hostname(ssl_sock.getpeercert(), domain)
-        except Exception, e:
+        except ssl.SSLError, e:
             v = vuln.vuln()
             v.setPluginName(self.getName())
             v.setURL(url)
             v.setSeverity(severity.LOW)
-            v.setName('Invalid SSL certificate/connection')
+            v.setName('Invalid SSL connection')
+            desc = str(e)
+            err_chunks = desc.split(':')
+            if len(err_chunks) == 7:
+                desc = err_chunks[5] + ':' + err_chunks[6]
+            v.setDesc(desc)
+            kb.kb.append(self, 'invalid_ssl_connect', v)
+            om.out.vulnerability(v.getName() + ':' + v.getDesc())
+            return
+        except CertificateError, e:
+            v = vuln.vuln()
+            v.setPluginName(self.getName())
+            v.setURL(url)
+            v.setSeverity(severity.LOW)
+            v.setName('Invalid SSL certificate')
             v.setDesc(str(e))
             kb.kb.append(self, 'invalid_ssl_cert', v)
             om.out.vulnerability(v.getName() + ':' + v.getDesc())
             return
+        except Exception, e:
+            print '>>>>>>>', type(e), str(e)
+            om.out.debug(str(e))
+            return
+        
         cert = ssl_sock.getpeercert()
-        ssl_sock.write("""GET / HTTP/1.0\r\n\r\n""")
-        data = ssl_sock.read()
+        cert_der = ssl_sock.getpeercert(binary_form=True)
+        cipher = ssl_sock.cipher()
         ssl_sock.close()
-        exp_date = time.gmtime(ssl.cert_time_to_seconds(cert['notAfter']))
+
+        exp_date = gmtime(ssl.cert_time_to_seconds(cert['notAfter']))
         expire_days = (date(exp_date.tm_year, exp_date.tm_mon, exp_date.tm_mday) - date.today()).days
         if expire_days < self._min_expire_days:
-            v = info.info()
-            v.setPluginName(self.getName())
-            v.setName('Soon expire SSL certificate')
-            v.setDesc('The certificate for "' + domain + '" will expire soon.')
-            kb.kb.append(self, 'ssl_soon_expire', v) 
-            om.out.information(v.getDesc())
+            i = info.info()
+            i.setURL(url)
+            i.setPluginName(self.getName())
+            i.setName('Soon expire SSL certificate')
+            i.setDesc('The certificate for "' + domain + '" will expire soon.')
+            kb.kb.append(self, 'ssl_soon_expire', i) 
+            om.out.information(i.getDesc())
+
+        # Print the SSL information to the log
+        desc = 'This is the information about the SSL certificate used in the target site:\n'
+        desc += self._dump_ssl_info(cert, cert_der, cipher)
+        om.out.information(desc)
+        i = info.info()
+        i.setURL(url)
+        i.setPluginName(self.getName())
+        i.setName('SSL Certificate')
+        i.setDesc(desc)
+        kb.kb.append(self, 'certificate', i)
+
+
+    def _dump_ssl_info(self, cert, cert_der, cipher):
+        '''Dump X509 certificate.'''
+
+        res = '\n== Certificate information ==\n'
+        res += pformat(cert)
+        res += '\n\n== Used cipher ==\n' + pformat(cipher)
+        res += '\n\n== Certificate dump ==\n' + ssl.DER_cert_to_PEM_cert(cert_der)
+        # Indent
+        res = res.replace('\n', '\n    ')
+        res = '    ' + res
+        return res
 
     def getOptions(self):
         '''
@@ -150,6 +212,10 @@ class sslCertificate(baseAuditPlugin):
         Note: It's only usefull when testing HTTPS sites.
         '''
 
+# 
+# This code taken from
+# http://pypi.python.org/pypi/backports.ssl_match_hostname/
+#
 class CertificateError(ValueError):
     pass
 
