@@ -91,40 +91,44 @@ class sslCertificate(baseAuditPlugin):
             desc = 'The target host "%s" has SSL version 2 enabled which is known to be insecure.'
             v.setDesc(desc % domain)
             kb.kb.append(self, 'ssl_v2', v)
-
             om.out.vulnerability(desc % domain)
 
         try:
-            #wrap_socket() may raise SSLError
             ssl_sock = ssl.wrap_socket(s,
                                        ca_certs=self._ca_file,
                                        cert_reqs=ssl.CERT_REQUIRED,
                                        ssl_version=ssl.PROTOCOL_SSLv23)
             ssl_sock.connect((domain, url.getPort()))
             match_hostname(ssl_sock.getpeercert(), domain)
-        except ssl.SSLError, e:
-            v = vuln.vuln()
-            v.setPluginName(self.getName())
-            v.setURL(url)
-            v.setSeverity(severity.LOW)
-            v.setName('Invalid SSL connection')
-            desc = str(e)
-            err_chunks = desc.split(':')
-            if len(err_chunks) == 7:
-                desc = err_chunks[5] + ':' + err_chunks[6]
-            v.setDesc(desc)
-            kb.kb.append(self, 'invalid_ssl_connect', v)
-            om.out.vulnerability(v.getName() + ':' + v.getDesc())
-            return
+        except (ssl.SSLError, CertificateError), e:
+            invalid_cert = isinstance(e, CertificateError)
+            details = str(e)
 
-        except CertificateError, e:
-            v = vuln.vuln()
+            if isinstance(e, ssl.SSLError):
+                err_chunks = details.split(':')
+                if len(err_chunks) == 7:
+                    details = err_chunks[5] + ':' + err_chunks[6]
+                if 'CERTIFICATE' in details:
+                    invalid_cert = True
+           
+            if invalid_cert:
+                v = vuln.vuln()
+                v.setName('Invalid SSL certificate')
+                desc = '"%s" uses an invalid security certificate.'
+                desc += 'The certificate is not trusted because: %s.'
+                tag = 'invalid_ssl_cert'
+            else:
+                # We use here info() instead of vuln() because it is too common case
+                v = info.info()
+                v.setName('Invalid SSL connection')
+                desc = '"%s" has an invalid SSL configuration. Technical details: %s'
+                tag = 'invalid_ssl_connect'
+
+            v.setDesc(desc % (domain, details))
             v.setPluginName(self.getName())
             v.setURL(url)
             v.setSeverity(severity.LOW)
-            v.setName('Invalid SSL certificate')
-            v.setDesc(str(e))
-            kb.kb.append(self, 'invalid_ssl_cert', v)
+            kb.kb.append(self, tag, v)
             om.out.vulnerability(v.getName() + ':' + v.getDesc())
             return
 
@@ -226,7 +230,7 @@ class sslCertificate(baseAuditPlugin):
 # This code taken from
 # http://pypi.python.org/pypi/backports.ssl_match_hostname/
 #
-class CertificateError(ValueError):
+class CertificateError(Exception):
     pass
 
 def _dnsname_to_pat(dn):
