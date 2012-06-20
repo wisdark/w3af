@@ -27,7 +27,6 @@ from core.data.fuzzer.fuzzer import createRandAlNum
 
 import core.controllers.outputManager as om
 from core.controllers.w3afException import w3afException, w3afMustStopException
-from core.controllers.threads.threadManager import threadManagerObj as tm
 
 from core.controllers.misc.levenshtein import relative_distance_ge
 from core.controllers.misc.lru import LRU
@@ -50,12 +49,13 @@ class fingerprint_404:
 
     _instance = None
     
-    def __init__( self, test_db=[] ):
+    def __init__( self, threadpool, uri_opener, test_db=[] ):
         #
         #   Set the opener, I need it to perform some tests and gain 
         #   the knowledge about the server's 404 response bodies.
         #
-        self._uri_opener =  None
+        self._uri_opener =  uri_opener
+        self._threadpool = threadpool
 
         #
         #   Internal variables
@@ -70,9 +70,6 @@ class fingerprint_404:
         
         self._test_db = test_db
         self._test_db_index = 0
-
-    def set_urlopener(self, urlopener):
-        self._uri_opener = urlopener
             
     def generate_404_knowledge( self, url ):
         '''
@@ -100,26 +97,24 @@ class fingerprint_404:
             #   This is a list of the most common handlers, in some configurations, the 404
             #   depends on the handler, so I want to make sure that I catch the 404 for each one
             #
-            handlers = ['py', 'php', 'asp', 'aspx', 'do', 'jsp', 'rb', 'do', 'gif', 'htm', extension]
-            handlers += ['pl', 'cgi', 'xhtml', 'htmls']
+            handlers = ['py', 'php', 'asp', 'aspx', 'do', 'jsp', 'rb']
+            handlers.extend( ['pl', 'cgi', 'xhtml', 'htmls', 'do', 'gif'] )
+            handlers.extend( ['htm', extension] )
             handlers = list(set(handlers))
-            
+
+            url_404_list = []            
             for extension in handlers:
-    
                 rand_alnum_file = createRandAlNum( 8 ) + '.' + extension
-                    
-                url404 = domain_path.urlJoin( rand_alnum_file )
-    
-                #   Send the requests using threads:
-                targs = ( url404,  )
-                tm.startFunction( target=self._send_404, args=targs , ownerObj=self )
-                
-            # Wait for all threads to finish sending the requests.
-            tm.join( self )
+                url_404 = domain_path.urlJoin( rand_alnum_file )
+                url_404_list.append( url_404 )
+
+            #    Send the requests, remember that map blocks until all requests 
+            #    are sent 
+            self.threadpool.map( self._send_404, url_404 )
             
             #
-            #   I have the bodies in self._response_body_list , but maybe they all look the same, so I'll
-            #   filter the ones that look alike.
+            #    I have the bodies in self._response_body_list , but maybe they 
+            #    all look the same, so I'll filter the ones that look alike.
             #
             result = [ self._response_body_list[0], ]
             for i in self._response_body_list:
@@ -150,7 +145,9 @@ class fingerprint_404:
     @retry(tries=2, delay=0.5, backoff=2)
     def _send_404(self, url404, store=True):
         '''
-        Sends a GET request to url404 and saves the response in self._response_body_list .
+        Sends a GET request to url404 and saves the responses in 
+        self._response_body_list .
+        
         @return: The HTTP response body.
         '''
         try:
@@ -334,9 +331,10 @@ class fingerprint_404:
         
         return relative_distance_ge(clean_response_404_body, html_body, IS_EQUAL_RATIO)
         
-def fingerprint_404_singleton( test_db=[] ):
+def fingerprint_404_singleton( threadpool, uri_opener, test_db=[] ):
     if not fingerprint_404._instance:
-        fingerprint_404._instance = fingerprint_404( test_db )
+        fingerprint_404._instance = fingerprint_404( threadpool, uri_opener, 
+                                                     test_db )
     return fingerprint_404._instance
 
 

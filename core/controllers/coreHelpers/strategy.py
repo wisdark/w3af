@@ -34,8 +34,8 @@ from core.controllers.coreHelpers.exception_handler import exception_handler
 from core.controllers.coreHelpers.consumers.grep import grep
 from core.controllers.coreHelpers.consumers.auth import auth
 from core.controllers.coreHelpers.consumers.audit import audit
+from core.controllers.coreHelpers.consumers.constants import FINISH_CONSUMER
 from core.controllers.exception_handling.helpers import pprint_plugins
-from core.controllers.threads.threadManager import threadManagerObj as tm
 from core.controllers.w3afException import (w3afException, w3afRunOnce,
     w3afMustStopException, w3afMustStopOnUrlError)
 
@@ -463,11 +463,7 @@ class w3af_core_strategy(object):
                     status.set_current_fuzzable_request(fr)
                     
                     try:
-                        try:
-                            # Perform the actual work
-                            plugin_result = plugin.discover_wrapper(fr)
-                        finally:
-                            tm.join(plugin)
+                        plugin_result = plugin.discover_wrapper(fr)
                     except KeyboardInterrupt:
                         om.out.information('The user interrupted the discovery phase, '
                                            'continuing with audit.')
@@ -586,6 +582,26 @@ class w3af_core_strategy(object):
             #      no time to solve them.
             for fr in set(self._fuzzable_request_set):
                 audit_in_queue.put(fr)
+        
+        while True:
+            result = self._audit_consumer.out_queue.get()
+
+            if result == FINISH_CONSUMER:
+                break
+            else:    
+                try:
+                    result.get()
+                except Exception, e:
+                    # Smart error handling, much better than just crashing.
+                    # Doing this here and not with something similar to:
+                    # sys.excepthook = handle_crash because we want to handle
+                    # plugin exceptions in this way, and not framework 
+                    # exceptions                    
+                    exec_info = sys.exc_info()
+                    enabled_plugins = pprint_plugins(self._w3af_core)
+                    exception_handler.handle( self._w3af_core.status, e , 
+                                              exec_info, enabled_plugins )
+            
                 
             
     def _bruteforce(self, fr_list):
@@ -616,11 +632,7 @@ class w3af_core_strategy(object):
                 
                 # Sends each URL to the bruteforce plugin
                 try:
-                    try:
-                        new_frs = plugin.bruteforce_wrapper( fr )
-                        
-                    finally:
-                        tm.join( plugin )
+                    new_frs = plugin.bruteforce_wrapper( fr )
                 except w3afException, e:
                     om.out.error( str(e) )
                 

@@ -28,7 +28,6 @@ from .constants import FINISH_CONSUMER, FORCE_LOGIN
 
 from core.controllers.coreHelpers.exception_handler import exception_handler
 from core.controllers.exception_handling.helpers import pprint_plugins
-from core.controllers.threads.threadManager import threadManagerObj as tm
 
 
 
@@ -83,11 +82,8 @@ class auth(threading.Thread):
         '''
         for plugin in self._auth_plugins:
             try:
-                try:
-                    if not plugin.is_logged():
-                        plugin.login()
-                finally:
-                    tm.join(plugin)
+                if not plugin.is_logged():
+                    plugin.login()
             except Exception, e:
                 # Smart error handling, much better than just crashing.
                 # Doing this here and not with something similar to:

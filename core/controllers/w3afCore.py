@@ -35,7 +35,7 @@ from core.controllers.coreHelpers.plugins import w3af_core_plugins
 from core.controllers.coreHelpers.target import w3af_core_target
 from core.controllers.coreHelpers.strategy import w3af_core_strategy
 from core.controllers.coreHelpers.fingerprint_404 import fingerprint_404_singleton
-from core.controllers.threads.threadManager import threadManagerObj as tm
+from core.controllers.threads.threadpool import Pool
 
 from core.controllers.misc.epoch_to_string import epoch_to_string
 from core.controllers.misc.dns_cache import enable_dns_cache
@@ -67,6 +67,10 @@ class w3afCore(object):
         # Create some directories
         self._home_directory()
         self._tmp_directory()
+
+        # Create the main thread pool, doing this in order to avoid the use
+        # of singletons (see blogs MSDN: Why Singletons are Evil)
+        self.threadpool = Pool(20)
         
         # These are some of the most important moving parts in the w3afCore
         # they basically handle every aspect of the w3af framework:
@@ -83,8 +87,7 @@ class w3afCore(object):
         
         # I init the 404 detection for the whole framework
         self.uriOpener = xUrllib()
-        fp_404_db = fingerprint_404_singleton()
-        fp_404_db.set_urlopener( self.uriOpener )
+        fp_404_db = fingerprint_404_singleton( self.threadpool, self.uriOpener)
         
     def start(self):
         '''
