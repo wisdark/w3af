@@ -20,31 +20,33 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
+import os
+import time
+import threading
+import socket
+
+
 import core.controllers.outputManager as om
-from core.controllers.threads.w3afThread import w3afThread
+import core.data.kb.config as cf
+
 from core.controllers.w3afException import w3afException
 from core.controllers.w3afAgent.server.w3afAgentServer import w3afAgentServer
 from core.controllers.payloadTransfer.payloadTransferFactory import payloadTransferFactory
 from core.controllers.extrusionScanning.extrusionScanner import extrusionScanner
 from core.controllers.intrusionTools.delayedExecutionFactory import delayedExecutionFactory
 from core.controllers.intrusionTools.execMethodHelpers import *
-import core.data.kb.config as cf
-
-import os
-import time
-import socket
 
 
-class w3afAgentManager( w3afThread ):
+class w3afAgentManager( threading.Thread ):
     '''
     Start a w3afAgent, to do this, I must transfer the agent client to the
     remote end and start the w3afServer in this local machine.
     
-    This is a w3afThread, so the entry point is start() , which will
+    This is a Thread, so the entry point is start() , which will
     internally call the run() method.
     '''
     def __init__( self, exec_method, ip_address, socks_port=1080 ):
-        w3afThread.__init__(self)
+        threading.Thread.__init__(self)
         
         #    Configuration
         self._exec_method = exec_method
@@ -84,9 +86,11 @@ class w3afAgentManager( w3afThread ):
             #
             #    Start the w3afAgentServer on this machine
             #
-            agent_server = w3afAgentServer( self._ip_address, socks_port=self._socks_port, listen_port=inbound_port )
+            agent_server = w3afAgentServer( self._ip_address,
+                                            socks_port=self._socks_port,
+                                            listen_port=inbound_port )
             self._agent_server = agent_server
-            agent_server.start2()
+            agent_server.start()
             # Wait for it to start.
             time.sleep(0.5)
             

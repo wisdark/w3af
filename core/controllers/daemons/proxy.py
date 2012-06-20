@@ -22,23 +22,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import cStringIO
 import traceback
+import threading
 import time
 import socket
 import select
 import httplib
 import SocketServer
+
 from OpenSSL import SSL
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
-from core.controllers.threads.w3afThread import w3afThread
-from core.controllers.threads.threadManager import threadManagerObj as tm
-from core.controllers.w3afException import w3afException, w3afProxyException
 import core.controllers.outputManager as om
+
+from core.controllers.w3afException import w3afException, w3afProxyException
 from core.data.parsers.urlParser import url_object
 from core.data.request.fuzzableRequest import fuzzableRequest
 
 
-class proxy(w3afThread):
+class proxy(threading.Thread):
     '''
     This class defines a simple HTTP proxy, it is mainly used for "complex" plugins.
     
@@ -50,23 +51,26 @@ class proxy(w3afThread):
     
     If the IP:Port is already in use, an exception will be raised while creating the ws instance.
     
-    To start the proxy, and given that this is a w3afThread class, you can do this:
-        ws.start2()
+    To start the proxy, and given that this is a threading.Thread class, you can do this:
+        ws.start()
         
     Or if you don't want a different thread, you can simply call the run method:
         ws.run()
     
-    The proxy handler class is the place where you'll perform all the magic stuff, like intercepting requests, modifying
-    them, etc. A good idea if you want to code your own proxy handler is to inherit from the proxy handler that 
-    is already defined in this file (see: w3afProxyHandler).
+    The proxy handler class is the place where you'll perform all the magic stuff,
+    like intercepting requests, modifying them, etc. A good idea if you want to code
+    your own proxy handler is to inherit from the proxy handler that is already
+    defined in this file (see: w3afProxyHandler).
     
     What you basically have to do is to inherit from it:
         class myProxyHandler(w3afProxyHandler):
         
     And redefine the following methods:
         def do_ALL( self )
-            Which originally receives a request from the browser, sends it to the remote site, receives the response
-            and returns the response to the browser. This method is called every time the browser sends a new request.
+            Which originally receives a request from the browser, sends it to 
+            the remote site, receives the response and returns the response to
+            the browser. This method is called every time the browser sends a
+            new request.
     
     Things that work:
         - http requests like GET, HEAD, POST, CONNECT
@@ -87,7 +91,7 @@ class proxy(w3afThread):
         @parameter proxyCert: Proxy certificate to use, this is needed
             for proxying SSL connections.
         '''
-        w3afThread.__init__(self)
+        threading.Thread.__init__(self)
 
         # Internal vars
         self._server = None
@@ -148,7 +152,8 @@ class proxy(w3afThread):
     
     def run(self):
         """
-        Starts the proxy daemon; usually this method isn't called directly. In most cases you'll call start2()
+        Starts the proxy daemon; usually this method isn't called directly. 
+        In most cases you'll call start()
         """
         if self._proxyHandler is None:
             self._proxyHandler = w3afProxyHandler

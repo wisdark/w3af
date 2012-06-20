@@ -42,8 +42,8 @@ class baseAttackPlugin(basePlugin, commonAttackMethods):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        basePlugin.__init__( self )
+    def __init__(self, uri_opener, threadpool):
+        basePlugin.__init__( self, uri_opener, threadpool )
         commonAttackMethods.__init__( self )
         
         self._uri_opener = None

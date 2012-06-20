@@ -38,8 +38,8 @@ class read_shell(shell):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self, v):
-        shell.__init__(self, v)
+    def __init__(self, v, threadpool):
+        shell.__init__(self, v, threadpool)
                 
     def help( self, command ):
         '''

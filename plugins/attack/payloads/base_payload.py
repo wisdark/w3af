@@ -27,8 +27,9 @@ SYSCALL_LIST = ['read', 'write', 'execute', 'unlink', 'is_open_port']
 
 class base_payload(object):
 
-    def __init__(self, shell_obj):
+    def __init__(self, shell_obj, threadpool):
         self.shell = shell_obj
+        self.threadpool = threadpool
         
     def can_run(self):
         '''
@@ -55,7 +56,9 @@ class base_payload(object):
         @return: The payload result.
         '''
         try:
-            return payload_handler.exec_payload(self.shell, payload_name, parameters, use_api=True)
+            return payload_handler.exec_payload(self.shell, payload_name,
+                                                self.threadpool, parameters,
+                                                use_api=True)
         except:
             #
             #    Run the payload name with any shell that has the capabilities we need,
@@ -63,7 +66,9 @@ class base_payload(object):
             #    the capabilities).
             #
             try:
-                return payload_handler.exec_payload(None, payload_name, parameters, use_api=True)
+                return payload_handler.exec_payload(None, payload_name,
+                                                    self.threadpool, parameters,
+                                                    use_api=True)
             except:
                 msg = 'The payload you are trying to run ("%s") can not be run with the current' % self
                 msg += ' is trying to call another payload ("%s") which is failing because' % payload_name

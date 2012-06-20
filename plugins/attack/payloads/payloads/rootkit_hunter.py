@@ -7,9 +7,10 @@ from core.ui.consoleUi.tables import table
 #    Rootkit Hunter Shell Script by Michael Boelen
 
 
-class rootkit_hunter(base_payload ):
+class rootkit_hunter( base_payload ):
     '''
-    This payload checks for current rootkits, trojans, backdoors and local exploits installed on system.
+    This payload checks for current rootkits, trojans, backdoors and local
+    exploits installed on system.
     '''
     def _thread_read( self, file):
         #   "progress bar"  
@@ -1200,10 +1201,8 @@ class rootkit_hunter(base_payload ):
         bad_kernel_modules.append('spapem_core')
         bad_kernel_modules.append('spapem_genr00t')
         
-        for file in files:
-                targs = (file, )
-                tm.startFunction( target=self._thread_read, args=targs, ownerObj=self )
-        tm.join( self )
+        # Run in the threadpool, block until done.
+        self.threadpool.map(self._thread_read, files)
         
         kernel_modules = self.exec_payload('list_kernel_modules')
         for module in bad_kernel_modules:

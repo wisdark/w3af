@@ -25,27 +25,26 @@ if __name__ == '__main__':
     import os
     sys.path.append( os.getcwd() )
     
-
-import core.controllers.outputManager as om
-from core.controllers.threads.w3afThread import w3afThread
-from core.controllers.w3afException import w3afException
-import core.data.kb.config as cf
-
 import sys
-from socket import *
-from threading import Thread
 import threading
 import time
 
+from socket import *
 
-class connectionManager( w3afThread ):
+import core.controllers.outputManager as om
+import core.data.kb.config as cf
+
+from core.controllers.w3afException import w3afException
+
+
+class connectionManager( threading.Thread ):
     '''
     This is a service that listens on some port and waits for the w3afAgentClient to connect.
     It keeps the connections alive so they can be used by a tcprelay object in order to relay
     the data between the w3afAgentServer and the w3afAgentClient.
     '''
     def __init__( self, ip_address, port ):
-        w3afThread.__init__(self)
+        threading.Thread.__init__(self)
         
         #    Configuration
         self._ip_address = ip_address
@@ -125,10 +124,11 @@ class connectionManager( w3afThread ):
             raise w3afException('[connectionManager] No available connections.')
             
             
-class PipeThread( w3afThread ):
+class PipeThread( threading.Thread ):
     pipes = []
+    
     def __init__( self, source, sink ):
-        w3afThread.__init__(self)
+        threading.Thread.__init__(self)
         self.source = source
         self.sink = sink
         
@@ -159,9 +159,9 @@ class PipeThread( w3afThread ):
         PipeThread.pipes.remove( self )
         om.out.debug('[PipeThread] Terminated one connection, active forwardings: %s' % len(PipeThread.pipes) )
         
-class tcprelay( w3afThread ):
+class tcprelay( threading.Thread ):
     def __init__( self, ip_address, port, cm ):
-        w3afThread.__init__(self)
+        threading.Thread.__init__(self)
         # save the connection manager
         self._cm = cm
         self._ip_address = ip_address
@@ -225,9 +225,9 @@ class tcprelay( w3afThread ):
                     pt2.start()
             
 
-class w3afAgentServer( w3afThread ):
+class w3afAgentServer( threading.Thread ):
     def __init__( self, ip_address, socks_port=1080, listen_port=9092 ):
-        w3afThread.__init__(self)
+        threading.Thread.__init__(self)
         
         #    Configuration
         self._ip_address = ip_address

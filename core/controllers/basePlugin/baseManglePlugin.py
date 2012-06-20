@@ -36,11 +36,11 @@ class baseManglePlugin(basePlugin):
 
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
+    def __init__(self, uri_opener, threadpool):
+        basePlugin.__init__( self, uri_opener, threadpool )
+
     def getType( self ):
         return 'mangle'
-
-    def __init__(self):
-        pass
 
     def mangleRequest(self, request ):
         '''

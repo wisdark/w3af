@@ -39,7 +39,7 @@ def is_payload( function_name ):
     '''
     return function_name in get_payload_list()
     
-def exec_payload(shell_obj, payload_name, parameters=[], use_api=False):
+def exec_payload(shell_obj, payload_name, threadpool, parameters=[], use_api=False):
     '''
     Now I execute the payload, by providing the shell_obj.
     
@@ -47,6 +47,7 @@ def exec_payload(shell_obj, payload_name, parameters=[], use_api=False):
                       If this is set to None, the handler will choose a shell from
                       the KB that provide the necessary syscalls. 
     @param payload_name: The name of the payload I want to run.
+    @param threadpool: The threadpool to pass to the payloads
     @param parameters: A list with the parameters (strings) the user typed. 
     @use_api: Indicates if I need to use the API or not in this run. This is True when
                     exec_payload is called from base_payload.exec_payload()
@@ -65,21 +66,21 @@ def exec_payload(shell_obj, payload_name, parameters=[], use_api=False):
         available_shells = kb.kb.getAllShells()
         for shell in available_shells:
             print shell
-            if payload_name in runnable_payloads( shell ):
+            if payload_name in runnable_payloads( shell, threadpool ):
                 shell_obj = shell
                 break
     
     #
     #    Now that I have everything ready, lets run the payload
     #
-    payload_inst = get_payload_instance(payload_name, shell_obj)
+    payload_inst = get_payload_instance(payload_name, shell_obj, threadpool)
     if use_api:
         result = payload_inst.run_api(parameters)
     else:
         result = payload_inst.run(parameters)
     return result
     
-def runnable_payloads(shell_obj):
+def runnable_payloads(shell_obj, threadpool):
     '''
     The payloads that can be run using this shell object.
     
@@ -88,13 +89,13 @@ def runnable_payloads(shell_obj):
     result = []
     
     for payload_name in get_payload_list():
-        payload = get_payload_instance( payload_name, shell_obj )
+        payload = get_payload_instance( payload_name, shell_obj, threadpool )
         if payload.can_run():
             result.append( payload_name )
         
     return result
 
-def get_payload_instance( payload_name,  shell_obj):
+def get_payload_instance( payload_name, shell_obj, threadpool):
     '''
     @return: A payload instance.
     '''
@@ -102,7 +103,7 @@ def get_payload_instance( payload_name,  shell_obj):
     __import__( name )
     module = sys.modules[name]
     klass = getattr( module , payload_name )
-    return apply( klass, (shell_obj, ))
+    return apply( klass, (shell_obj, threadpool))
 
 def get_payload_list():
     '''
@@ -116,5 +117,3 @@ def get_payload_list():
     
     return result
     
-if __name__ == '__main__':
-    print get_payload_instance('hosts', 'a')

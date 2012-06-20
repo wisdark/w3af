@@ -35,9 +35,8 @@ class baseAuditPlugin(basePlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        basePlugin.__init__( self )
-        self._uri_opener = None
+    def __init__(self, uri_opener, threadpool):
+        basePlugin.__init__( self, uri_opener, threadpool )
 
     def audit_wrapper( self, fuzzable_request ):
         '''
@@ -56,9 +55,6 @@ class baseAuditPlugin(basePlugin):
         before_vuln_dict = kb.kb.getData( self )
         
         self.audit( fuzzable_request_copy )
-        
-        # The join is here just in case, because the audit method of each plugin should call it
-        self._tm.join( self )
         
         after_vuln_dict = kb.kb.getData( self )
         

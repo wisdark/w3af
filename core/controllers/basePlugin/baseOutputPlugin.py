@@ -37,13 +37,12 @@ class baseOutputPlugin(basePlugin):
 
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
+    def __init__(self, uri_opener, threadpool):
+        basePlugin.__init__( self, uri_opener, threadpool )
+        self.verbosity = 0
 
     def getType( self ):
         return 'output'
-
-    def __init__(self):
-        basePlugin.__init__( self )
-        self.verbosity = 0
         
     def logEnabledPlugins(self,  enabledPluginsDict,  pluginOptionsDict):
         '''

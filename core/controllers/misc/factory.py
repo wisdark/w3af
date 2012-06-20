@@ -27,6 +27,7 @@ This module defines a factory function that is used around the project.
 '''
 import sys
 import traceback
+
 from core.controllers.w3afException import w3afException
 
 

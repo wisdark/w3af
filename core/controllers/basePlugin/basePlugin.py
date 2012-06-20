@@ -23,11 +23,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import sys
 import threading
 
-from core.controllers.configurable import configurable
-from core.controllers.threads.threadManager import threadManagerObj as tm
-from core.controllers.w3afException import w3afException, w3afMustStopOnUrlError
 import core.controllers.outputManager as om
 import core.data.kb.vuln as vuln
+
+from core.controllers.configurable import configurable
+from core.controllers.w3afException import w3afException, w3afMustStopOnUrlError
 
 
 class basePlugin(configurable):
@@ -43,30 +43,13 @@ class basePlugin(configurable):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
+    def __init__(self, uri_opener, threadpool):
         '''
         Create some generic attributes that are going to be used by most plugins.
         '''
-        self._uri_opener = None
-        self._tm = tm
+        self._uri_opener = UrlOpenerProxy(uri_opener, self)
+        self.threadpool = threadpool
         self._plugin_lock = threading.RLock()
-
-    def setUrlOpener( self, urlOpener):
-        '''
-        This method should not be overwritten by any plugin (but you are free
-        to do it, for example a good idea is to rewrite this method to change
-        the UrlOpener to do some IDS evasion technic).
-        
-        This method takes a CustomUrllib object as parameter and assigns it 
-        to itself. Then, on the testUrl method you use 
-        self.CustomUrlOpener._custom_urlopen(...) 
-        to open a Url and you are sure that the plugin is using the user 
-        supplied settings (proxy, user agent, etc).
-        
-        @return: No value is returned.
-        '''
-        self._uri_opener = UrlOpenerProxy(urlOpener, self)
-        
 
     def setOptions( self, optionsMap ):
         '''
@@ -206,16 +189,9 @@ class basePlugin(configurable):
                      (url_error.req.get_full_url(), url_error.msg))
         return (False, None)
 
-    def _run_async(self, meth, args=(), kwds={}):
-        self._tm.startFunction(
-                           target=meth,
-                           args=args,
-                           kwds=kwds,
-                           ownerObj=self
-                           )
-    
-    def _join(self):
-        self._tm.join(self)
+    def _run_async(self, func, iterable, callback):
+        for http_response in self.pool.imap_unordered(func, iterable):
+            callback(http_response)
     
 
 class UrlOpenerProxy(object):

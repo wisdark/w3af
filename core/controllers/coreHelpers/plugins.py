@@ -254,7 +254,7 @@ class w3af_core_plugins(object):
         requestedPluginsList = []
         
         if 'all' in strReqPlugins:
-            fileList = [ f for f in os.listdir('plugins' + os.path.sep+ pluginType + os.path.sep ) ]    
+            fileList = [ f for f in os.listdir( os.path.join('plugins',pluginType) ) ]    
             allPlugins = [ os.path.splitext(f)[0] for f in fileList if os.path.splitext(f)[1] == '.py' ]
             allPlugins.remove ( '__init__' )
             

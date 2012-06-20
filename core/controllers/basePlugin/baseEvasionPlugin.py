@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from core.controllers.basePlugin.basePlugin import basePlugin
 from core.controllers.w3afException import w3afException
 
+
 class baseEvasionPlugin(basePlugin):
     '''
     This is the base class for evasion plugins, all evasion plugins should inherit from it 
@@ -34,9 +35,8 @@ class baseEvasionPlugin(basePlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        basePlugin.__init__( self )
-        self._uri_opener = None
+    def __init__(self, uri_opener, threadpool):
+        basePlugin.__init__( self, uri_opener, threadpool )
 
     def modifyRequest(self, request ):
         '''

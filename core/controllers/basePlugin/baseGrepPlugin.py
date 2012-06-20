@@ -36,9 +36,8 @@ class baseGrepPlugin(basePlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        basePlugin.__init__(self)
-        self._uri_opener = None
+    def __init__(self, uri_opener, threadpool):
+        basePlugin.__init__( self, uri_opener, threadpool )
 
     def grep_wrapper(self, fuzzableRequest, response):
         '''

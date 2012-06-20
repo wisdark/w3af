@@ -145,15 +145,9 @@ class sqli(baseAuditPlugin):
         oResponse = self._uri_opener.send_mutant(freq)
         mutants = createMutants(freq, self.SQLI_STRINGS, oResponse=oResponse)
 
-        for mutant in mutants:
-            # Only spawn a thread if the mutant has a modified variable
-            # that has no reported bugs in the kb
-            if self._has_no_bug(mutant):
-                args = (mutant,)
-                kwds = {'callback': self._analyze_result }
-                self._run_async(meth=self._uri_opener.send_mutant, args=args,
-                                                                    kwds=kwds)
-        self._join()
+        self._run_async(self._uri_opener.send_mutant, mutants, 
+                        self._analyze_result)
+
             
     def _analyze_result(self, mutant, response):
         '''

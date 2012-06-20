@@ -34,9 +34,8 @@ class baseAuthPlugin(basePlugin):
     @author: Dmitriy V. Simonov ( dsimonov@yandex-team.com )
     '''
 
-    def __init__(self):
-        basePlugin.__init__(self)
-        self._uri_opener = None
+    def __init__(self, uri_opener, threadpool):
+        basePlugin.__init__( self, uri_opener, threadpool )
 
     def login(self):
         '''

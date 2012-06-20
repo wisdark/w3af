@@ -33,8 +33,8 @@ class baseDiscoveryPlugin(basePlugin):
         
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__(self):
-        basePlugin.__init__( self )
+    def __init__(self, uri_opener, threadpool):
+        basePlugin.__init__( self, uri_opener, threadpool )
 
     def discover_wrapper(self, fuzzable_request):
         '''

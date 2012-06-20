@@ -180,4 +180,4 @@ class w3afWebHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 if __name__ == "__main__":
     # This doesnt work, I leave it here as a reminder to myself
     ws = start_webserver('', 8081 , 'webroot' + os.path.sep)
-    ws.start2()
+    ws.start()

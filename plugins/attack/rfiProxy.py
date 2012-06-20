@@ -19,30 +19,29 @@ along with w3af; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
+import os
+import socket
+import time
+import threading
+import urlparse
+import urllib
 
-from core.data.fuzzer.fuzzer import createRandAlNum
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from core.data.options.option import option
+from core.data.options.optionList import optionList
 
-import core.controllers.outputManager as om
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.config as cf
+import core.data.constants.w3afPorts as w3afPorts
+import core.controllers.daemons.webserver as webserver
+import core.controllers.outputManager as om
+
 from core.data.kb.shell import shell as shell
+from core.data.fuzzer.fuzzer import createRandAlNum
 
 from core.controllers.w3afException import w3afException
 from core.controllers.basePlugin.baseAttackPlugin import baseAttackPlugin
 
-import core.controllers.daemons.webserver as webserver
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-from core.controllers.threads.w3afThread import w3afThread
-from core.controllers.threads.threadManager import threadManagerObj as tm
-import core.data.constants.w3afPorts as w3afPorts
-
-# options
-from core.data.options.option import option
-from core.data.options.optionList import optionList
-
-import time
-import socket, urlparse, urllib
-import os
 
 #
 # TODO: I dont like globals, please see TODO below.
@@ -55,7 +54,7 @@ RFI_SEPARATOR = createRandAlNum( 25 )
 URLOPENER = None
 
 
-class rfiProxy(baseAttackPlugin, w3afThread):
+class rfiProxy(baseAttackPlugin, threading.Thread):
     '''
     Exploits remote file inclusions to create a proxy server.
     
@@ -64,7 +63,7 @@ class rfiProxy(baseAttackPlugin, w3afThread):
 
     def __init__( self ):
         baseAttackPlugin.__init__(self)
-        w3afThread.__init__( self )
+        threading.Thread.__init__(self)
         
         self._shell = None
         self._proxyAddress = '127.0.0.1'
@@ -122,7 +121,7 @@ class rfiProxy(baseAttackPlugin, w3afThread):
         self._exploitData = vuln.getDc()
         self._variable = vuln.getVar()
         
-        self.start2()
+        self.start()
         
         p = proxy_rfi_shell( self._proxyAddress + ':' + str(self._proxyPort) )
         
