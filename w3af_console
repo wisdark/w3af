@@ -15,17 +15,8 @@ def backToCurrentDir():
 gettext.install('w3af', 'locales/')
 
 # Now we can load all modules and stuff...
-import core.controllers.outputManager as om
 from core.controllers.profiling.cpu_usage import dump_cpu_usage
 from core.controllers.misc.get_w3af_version import get_w3af_version
-from core.controllers.w3afException import w3afException
-
-try:
-    om.out.setOutputPlugins( ['console'] )
-except w3afException, w3:
-    print 'Something went wrong, w3af failed to init the output manager. Exception: ', str(w3)
-    sys.exit(-9)
-
 
 usage_doc = '''
 w3af - Web Application Attack and Audit Framework
@@ -68,14 +59,14 @@ For more info visit http://w3af.sourceforge.net/
 '''
 
 def usage():
-    om.out.information(usage_doc)
+    print usage_doc
 
 def main():
     try:
         long_options = ['script=', 'help', 'version', 'test-all', 'no-update',
                         'force-update', 'profile=', 'revision=', 'profile-run']
-        opts, args = getopt.getopt(sys.argv[1:], "ehvts:nfpP:r:", long_options)
-    except getopt.GetoptError, e:
+        opts, _ = getopt.getopt(sys.argv[1:], "ehvts:nfpP:r:", long_options)
+    except getopt.GetoptError:
         # print help information and exit:
         usage()
         return -3
@@ -89,7 +80,7 @@ def main():
         if o == "-e":
             # easter egg
             import base64
-            om.out.information( base64.b64decode('R3JhY2lhcyBFdWdlIHBvciBiYW5jYXJtZSB0YW50YXMgaG9yYXMgZGUgZGVzYXJyb2xsbywgdGUgYW1vIGdvcmRhIQ=='))
+            print base64.b64decode('R3JhY2lhcyBFdWdlIHBvciBiYW5jYXJtZSB0YW50YXMgaG9yYXMgZGUgZGVzYXJyb2xsbywgdGUgYW1vIGdvcmRhIQ==')
         if o in ('-t', '--test-all'):
             # Test all scripts that have an assert call
             from core.controllers.misc.w3afTest import w3afTest
@@ -115,16 +106,16 @@ def main():
         elif o in ('-n', '--no-update'):
             doupdate = False
         if o in ('-r', '--revision'):
-        	doupdate = True
-        	a = a.upper()
-        	if a in ('HEAD', 'PREV'):
-        		rev = 0 if (a == 'HEAD') else -1
-        	else:
-	        	try:
-	        		rev = int(a)
-	        	except ValueError:
-	        		om.out.error("Invalid value for revision number. Expected int.")
-	        		return -3
+            doupdate = True
+            a = a.upper()
+            if a in ('HEAD', 'PREV'):
+                rev = 0 if (a == 'HEAD') else -1
+            else:
+                try:
+                    rev = int(a)
+                except ValueError:
+                    print "Invalid revision number. Expected an integer."
+                    return -3
     
     # console
     from core.ui.consoleUi.consoleUi import consoleUi
@@ -134,7 +125,7 @@ def main():
         try:
             fd = open( os.path.join(currentDir, scriptFile)  )
         except:
-            om.out.error('Failed to open file : ' + scriptFile )
+            print 'Failed to open file "%s".' % scriptFile 
             sys.exit(2)
         else:
             commandsToRun = []

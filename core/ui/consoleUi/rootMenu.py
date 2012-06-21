@@ -61,7 +61,7 @@ class rootMenu(menu):
             'plugins': pluginsMenu,
             'target' : (configMenu, self._w3af.target),
             'misc-settings' : (configMenu, ms.miscSettings()),
-            'http-settings' : (configMenu, self._w3af.uriOpener.settings),
+            'http-settings' : (configMenu, self._w3af.uri_opener.settings),
             'profiles' : profilesMenu,
             'bug-report' : bug_report_menu,
             'exploit' : exploit,

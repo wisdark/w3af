@@ -125,7 +125,7 @@ class w3af_core_strategy(object):
         
         if grep_plugins:
             grep_in_queue = Queue.Queue(25)
-            self._w3af_core.uriOpener.set_grep_queue( grep_in_queue )
+            self._w3af_core.uri_opener.set_grep_queue( grep_in_queue )
             self._grep_consumer = grep(grep_in_queue, grep_plugins, self._w3af_core)
             self._grep_consumer.start()
         
@@ -254,7 +254,7 @@ class w3af_core_strategy(object):
                 #    GET the initial target URLs in order to save them
                 #    in a list and use them as our bootstrap URLs
                 #
-                response = self._w3af_core.uriOpener.GET(url, cache=True)
+                response = self._w3af_core.uri_opener.GET(url, cache=True)
                 self._fuzzable_request_set.update( filter(
                     get_curr_scope_pages, createFuzzableRequests(response)) )
 
@@ -357,7 +357,7 @@ class w3af_core_strategy(object):
         Configure the main urllib with the newly found credentials.
         '''
         for v in kb.kb.getData( 'basicAuthBrute' , 'auth' ):
-            self._w3af_core.uriOpener.settings.setBasicAuth( v.getURL(),
+            self._w3af_core.uri_opener.settings.setBasicAuth( v.getURL(),
                                                              v['user'],
                                                              v['pass'] )
 

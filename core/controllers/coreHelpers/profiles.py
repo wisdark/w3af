@@ -88,7 +88,7 @@ class w3af_core_profiles(object):
         # Save the misc and http settings
         misc_settings = miscSettings.miscSettings()
         new_profile.setMiscSettings(misc_settings.getOptions())
-        new_profile.setHttpSettings(self._w3af_core.uriOpener.settings.getOptions())
+        new_profile.setHttpSettings(self._w3af_core.uri_opener.settings.getOptions())
         
         # Save the profile name and description
         new_profile.setDesc(prof_desc)
@@ -163,7 +163,7 @@ class w3af_core_profiles(object):
             
             misc_settings = miscSettings.miscSettings()
             misc_settings.setOptions( profile_misc_settings )
-            self._w3af_core.uriOpener.settings.setOptions( profileInstance.getHttpSettings() )
+            self._w3af_core.uri_opener.settings.setOptions( profileInstance.getHttpSettings() )
             
     def getProfileList( self ):
         '''

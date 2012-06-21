@@ -82,8 +82,8 @@ class baseBruteforcePlugin(baseAuditPlugin):
         
         res = []
         for v in kb.kb.getData( self.getName(), 'auth' ):
-            if v.getURL() not in self._alreadyReported:
-                self._alreadyReported.append( v.getURL() )
+            if v.getURL() not in self._already_reported:
+                self._already_reported.append( v.getURL() )
                 res.extend( createFuzzableRequests(v['response']) )
         return res
     

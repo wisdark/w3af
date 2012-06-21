@@ -738,7 +738,7 @@ class MainApp(object):
 
     def menu_config_http(self, action):
         '''Configure HTTP options.'''
-        configurable = self.w3af.uriOpener.settings
+        configurable = self.w3af.uri_opener.settings
         confpanel.ConfigDialog(_("Configure HTTP settings"), self.w3af, configurable)
 
     def menu_config_misc(self, action):

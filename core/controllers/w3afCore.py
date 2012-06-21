@@ -35,6 +35,7 @@ from core.controllers.coreHelpers.plugins import w3af_core_plugins
 from core.controllers.coreHelpers.target import w3af_core_target
 from core.controllers.coreHelpers.strategy import w3af_core_strategy
 from core.controllers.coreHelpers.fingerprint_404 import fingerprint_404_singleton
+from core.controllers.dependency_check.dependency_check import dependency_check
 from core.controllers.threads.threadpool import Pool
 
 from core.controllers.misc.epoch_to_string import epoch_to_string
@@ -64,14 +65,18 @@ class w3afCore(object):
         Init some variables and files.
         Create the URI opener.
         '''
+        # Create the main thread pool, doing this in order to avoid the use
+        # of singletons (see blogs MSDN: Why Singletons are Evil)
+        self.threadpool = Pool(20)
+
+        # Before doing anything, check if I have all needed dependencies
+        #om.output_manager_factory(self.threadpool)
+        dependency_check()
+                
         # Create some directories
         self._home_directory()
         self._tmp_directory()
 
-        # Create the main thread pool, doing this in order to avoid the use
-        # of singletons (see blogs MSDN: Why Singletons are Evil)
-        self.threadpool = Pool(20)
-        
         # These are some of the most important moving parts in the w3afCore
         # they basically handle every aspect of the w3af framework:
         self.strategy = w3af_core_strategy( self )
@@ -84,7 +89,7 @@ class w3afCore(object):
         # Init some internal variables
         self._initializeInternalVariables()
         self.plugins.zero_enabled_plugins()
-        om.output_manager_factory(self.threadpool)
+        
         
         # I init the 404 detection for the whole framework
         self.uri_opener = xUrllib()
@@ -188,7 +193,9 @@ class w3afCore(object):
         
     def stop( self ):
         '''
-        This method is called by the user interface layer, when the user "clicks" on the stop button.
+        This method is called by the user interface layer, when the user "clicks"
+        on the stop button.
+        
         @return: None. The stop method can take some seconds to return.
         '''
         om.out.debug('The user stopped the core.')

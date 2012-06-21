@@ -21,21 +21,20 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 from __future__ import with_statement
 
-import core.data.kb.config as cf
-from core.data.bloomfilter.bloomfilter import scalable_bloomfilter
-from core.data.fuzzer.fuzzer import createRandAlNum
-
-import core.controllers.outputManager as om
-from core.controllers.w3afException import w3afException, w3afMustStopException
-
-from core.controllers.misc.levenshtein import relative_distance_ge
-from core.controllers.misc.lru import LRU
-from core.controllers.misc.decorators import retry
-
-
 import urllib
 import thread
 import cgi
+
+import core.data.kb.config as cf
+import core.controllers.outputManager as om
+
+from core.data.bloomfilter.bloomfilter import scalable_bloomfilter
+from core.data.fuzzer.fuzzer import createRandAlNum
+
+from core.controllers.w3afException import w3afException, w3afMustStopException
+from core.controllers.misc.levenshtein import relative_distance_ge
+from core.controllers.misc.lru import LRU
+from core.controllers.misc.decorators import retry
 
 IS_EQUAL_RATIO = 0.90
 
@@ -50,6 +49,10 @@ class fingerprint_404:
     _instance = None
     
     def __init__( self, threadpool, uri_opener, test_db=[] ):
+        
+        assert threadpool is not None, 'threadpool can not be None'
+        assert uri_opener is not None, 'uri_opener can not be None'
+        
         #
         #   Set the opener, I need it to perform some tests and gain 
         #   the knowledge about the server's 404 response bodies.
@@ -110,7 +113,7 @@ class fingerprint_404:
 
             #    Send the requests, remember that map blocks until all requests 
             #    are sent 
-            self.threadpool.map( self._send_404, url_404 )
+            self._threadpool.map( self._send_404, url_404 )
             
             #
             #    I have the bodies in self._response_body_list , but maybe they 
@@ -344,8 +347,10 @@ def fingerprint_404_singleton( threadpool, uri_opener, test_db=[] ):
 #
 #
 def is_404(http_response):
-    #    Get an instance of the 404 database
-    fp_404_db = fingerprint_404_singleton()
+    #    Get an instance of the 404 database, I can pass None, None here
+    #    because the instance was already initialized by the w3af_core
+    #    at start
+    fp_404_db = fingerprint_404_singleton(None, None)
     return fp_404_db.is_404(http_response)
 
 def get_clean_body(response):

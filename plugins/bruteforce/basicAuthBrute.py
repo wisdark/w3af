@@ -81,10 +81,10 @@ class basicAuthBrute(baseBruteforcePlugin):
         @parameter combinations: A list of tuples with (user,pass)
         '''
         # get instance outside loop...
-        uriOpener = xUrllib()
-        uriOpener.setGrepPlugins( [] )
-        # So uriOpener._init is not called
-        uriOpener._cacheOpener = ''
+       .uri_opener = xUrllib()
+       .uri_opener.setGrepPlugins( [] )
+        # So.uri_opener._init is not called
+       .uri_opener._cacheOpener = ''
     
         for combination in combinations:
             user = combination[0]
@@ -92,21 +92,21 @@ class basicAuthBrute(baseBruteforcePlugin):
             
             om.out.debug('[basicAuthBrute] Testing ' + user + '/' + passwd)
             
-            uriOpener.settings.setBasicAuth( url, user, passwd  )
-            # The next line replaces the uriOpener opener with a new one that has
+           .uri_opener.settings.setBasicAuth( url, user, passwd  )
+            # The next line replaces the.uri_opener opener with a new one that has
             # the basic auth settings configured
             
             #IMPORTANT: This line also calls __init__ on all urllib2 handlers, to have in mind:
             # the localCache clears the cache when you call init...
             # this creates problem with multithreading
-            uriOpener.settings.buildOpeners()
-            uriOpener._opener = uriOpener.settings.getCustomUrlopen()
+           .uri_opener.settings.buildOpeners()
+           .uri_opener._opener =.uri_opener.settings.getCustomUrlopen()
             
             # This "if" is for multithreading
             if not self._found or not self._stopOnFirst:
 
                 try:
-                    response = uriOpener.GET( url, cache=False, grep=False )
+                    response =.uri_opener.GET( url, cache=False, grep=False )
                 except w3afException, w3:
                     msg = 'Exception while bruteforcing basic authentication, error message: ' 
                     msg += str(w3)

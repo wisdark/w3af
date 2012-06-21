@@ -27,12 +27,6 @@ import core.data.constants.severity as severity
 from core.controllers.misc.factory import factory
 from core.data.constants.encodings import UTF8
 
-out = None
-
-def output_manager_factory(threadpool):
-    if out is None:
-        out = OutputManager(threadpool)
-    return out
 
 class OutputManager(object):
     '''
@@ -212,3 +206,5 @@ class OutputManager(object):
                 # Append the plugin to the list
             self._output_plugin_list.append(plugin)    
 
+# FIXME THREADING: Need to transform the OM into a consumer
+out = OutputManager(None)

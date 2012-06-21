@@ -98,7 +98,6 @@ class proxy(threading.Thread):
         self._proxyHandler = proxyHandler
         self._running = False
         self._uri_opener = uri_opener
-        self._tm = tm
         
         # User configured parameters
         self._ip = ip
