@@ -1,9 +1,9 @@
-from core.controllers.threads.threadManager import threadManagerObj as tm
-from plugins.attack.payloads.base_payload import base_payload
-import core.controllers.outputManager as om
-import core.data.kb.knowledgeBase as kb
 import re
+
 from core.ui.consoleUi.tables import table
+from plugins.attack.payloads.base_payload import base_payload
+
+import core.controllers.outputManager as om
 
 
 class list_processes(base_payload ):
@@ -56,10 +56,7 @@ class list_processes(base_payload ):
         #   Remove comment to debug
         max_pid = 400
         
-        for pid in xrange(1, int(max_pid)):
-            targs = (pid, )
-            tm.startFunction( target=self._thread_read, args=targs, ownerObj=self )
-        tm.join( self )
+        self.threadpool.map(self._thread_read, xrange(1, int(max_pid)))
         
         return self.result
     
