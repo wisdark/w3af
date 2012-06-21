@@ -46,8 +46,8 @@ class htmlFile(baseOutputPlugin):
     
     @author: Juan Pablo Perez Etchegoyen ( jppereze@cybsec.com )
     '''
-    def __init__(self, uri_opener, threadpool):
-        baseOutputPlugin.__init__(self, uri_opener, threadpool)
+    def __init__(self, threadpool):
+        baseOutputPlugin.__init__(self, threadpool)
         
         # Internal variables
         self._initialized = False

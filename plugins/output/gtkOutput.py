@@ -37,8 +37,8 @@ class gtkOutput(baseOutputPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    def __init__(self, uri_opener, threadpool):
-        baseOutputPlugin.__init__(self, uri_opener, threadpool)
+    def __init__(self, threadpool):
+        baseOutputPlugin.__init__(self, threadpool)
         if not kb.kb.getData('gtkOutput', 'queue') == []:
             self.queue = kb.kb.getData('gtkOutput', 'queue')
         else:

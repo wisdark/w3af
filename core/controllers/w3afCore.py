@@ -25,8 +25,8 @@ import sys
 import time
 import traceback
 
-import core.controllers.outputManager as om
 import core.data.kb.config as cf
+import core.controllers.outputManager as om
 
 from core.controllers.coreHelpers.progress import progress
 from core.controllers.coreHelpers.status import w3af_core_status
@@ -84,6 +84,7 @@ class w3afCore(object):
         # Init some internal variables
         self._initializeInternalVariables()
         self.plugins.zero_enabled_plugins()
+        om.output_manager_factory(self.threadpool)
         
         # I init the 404 detection for the whole framework
         self.uri_opener = xUrllib()

@@ -57,8 +57,8 @@ class console(baseOutputPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    def __init__(self, uri_opener, threadpool):
-        baseOutputPlugin.__init__(self, uri_opener, threadpool)
+    def __init__(self, threadpool):
+        baseOutputPlugin.__init__(self, threadpool)
         self.verbose = False
 
     def _make_printable(self, a_string):

@@ -50,8 +50,8 @@ class xmlFile(baseOutputPlugin):
     
     @author: Kevin Denver ( muffysw@hotmail.com )
     '''
-    def __init__(self, uri_opener, threadpool):
-        baseOutputPlugin.__init__(self, uri_opener, threadpool)
+    def __init__(self, threadpool):
+        baseOutputPlugin.__init__(self, threadpool)
         
         # These attributes hold the file pointers
         self._file = None

@@ -39,8 +39,8 @@ class emailReport(baseOutputPlugin):
     '''Email report to specified addresses.
     '''
 
-    def __init__(self, uri_opener, threadpool):
-        baseOutputPlugin.__init__(self, uri_opener, threadpool)
+    def __init__(self, threadpool):
+        baseOutputPlugin.__init__(self, threadpool)
         self.targets = []
         self.tpl = MSG_TMPL
         self.smtpServer = 'localhost'

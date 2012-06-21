@@ -29,7 +29,8 @@ import core.data.constants.severity as severity
 
 class baseOutputPlugin(basePlugin):
     '''
-    This is the base class for data output, all output plugins should inherit from it and implement the following methods :
+    This is the base class for data output, all output plugins should inherit
+    from it and implement the following methods :
         1. debug( message, verbose )
         2. information( message, verbose )
         3. error( message, verbose )
@@ -37,8 +38,8 @@ class baseOutputPlugin(basePlugin):
 
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__(self, uri_opener, threadpool):
-        basePlugin.__init__( self, uri_opener, threadpool )
+    def __init__(self, threadpool):
+        basePlugin.__init__( self, None, threadpool )
         self.verbosity = 0
 
     def getType( self ):
@@ -167,10 +168,3 @@ class baseOutputPlugin(basePlugin):
         except:
             return 'unknown-caller'
 
-        
-    def getMessageCache(self):
-        '''
-        Ouput plugins with caches should implement this method.
-        Used in the webUI.
-        '''
-        return {}

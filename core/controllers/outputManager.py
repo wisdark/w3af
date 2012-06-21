@@ -22,28 +22,35 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 import os
 
-from core.controllers.misc.factory import factory
-from core.data.constants.encodings import UTF8
-# severity constants for vuln messages
 import core.data.constants.severity as severity
 
+from core.controllers.misc.factory import factory
+from core.data.constants.encodings import UTF8
 
-class outputManager:
+out = None
+
+def output_manager_factory(threadpool):
+    if out is None:
+        out = OutputManager(threadpool)
+    return out
+
+class OutputManager(object):
     '''
-    This class manages output. 
-    It has a list of output plugins and sends the events to every plugin on that list.
+    This class manages output, it has a list of output plugins and sends the
+    events to every plugin on that list.
     
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    def __init__(self):
-        self._outputPluginList = []
-        self._outputPlugins = []
-        self._pluginsOptions = {}
+    def __init__(self, threadpool):
+        self._output_plugin_list = []
+        self._output_plugins = []
+        self._plugins_options = {}
         self._echo = True
+        self._threadpool = threadpool
     
     def endOutputPlugins(self):
-        for oPlugin in self._outputPluginList:
+        for oPlugin in self._output_plugin_list:
             oPlugin.end()
 
         # This is a neat trick which basically removes all plugin references
@@ -71,7 +78,7 @@ class outputManager:
         @parameter pluginOptionsDict: As defined in the w3afCore, looks similar to: 
                    {'audit':{},'grep':{},'bruteforce':{},'discovery':{},...}
         '''
-        for oPlugin in self._outputPluginList:
+        for oPlugin in self._output_plugin_list:
             oPlugin.logEnabledPlugins(enabledPluginsDict, pluginOptionsDict)
     
     def debug(self, message, newLine=True):
@@ -122,7 +129,7 @@ class outputManager:
         @parameter request: A fuzzable request object
         @parameter response: A httpResponse object
         '''
-        for oPlugin in self._outputPluginList:
+        for oPlugin in self._output_plugin_list:
             oPlugin.logHttp(request, response)
     
     def echo(self, onOff):
@@ -133,39 +140,30 @@ class outputManager:
 
     def setOutputPlugins(self, outputPlugins):
         '''
-        @parameter outputPlugins: A list with the names of Output Plugins that will be used.
+        @parameter outputPlugins: A list with the names of Output Plugins that
+                                  will be used.
         @return: No value is returned.
         '''     
-        self._outputPluginList = []
-        self._outputPlugins = outputPlugins
+        self._output_plugin_list = []
+        self._output_plugins = outputPlugins
         
-        for pluginName in self._outputPlugins:
+        for pluginName in self._output_plugins:
             out._addOutputPlugin(pluginName)  
         
         out.debug('Exiting setOutputPlugins()')
     
     def getOutputPlugins(self):
-        return self._outputPlugins
+        return self._output_plugins
     
     def setPluginOptions(self, pluginName, PluginsOptions):
         '''
-        @parameter PluginsOptions: A tuple with a string and a dictionary with the options for a plugin. For example:\
-        { console:{'verbosity':7} }
+        @parameter PluginsOptions: A tuple with a string and a dictionary with
+                                   the options for a plugin. For example:
+                                   { console:{'verbosity':7} }
             
         @return: No value is returned.
         '''
-        self._pluginsOptions[pluginName] = PluginsOptions
-    
-    def getMessageCache(self):
-        '''
-        Used for the webUI.
-        @return: returns a list containing messages in plugins caches, only if defined.
-        '''
-        res = []
-        for oPlugin in self._outputPluginList:
-            plugCache = oPlugin.getMessageCache()
-            res.extend(plugCache)
-        return res
+        self._plugins_options[pluginName] = PluginsOptions
     
     def _call_output_plugins_action(self, actionname, message, *params):
         '''
@@ -177,13 +175,14 @@ class outputManager:
             if isinstance(message, unicode):
                 message = message.encode(UTF8, 'replace')
             
-            for oPlugin in self._outputPluginList:
-                getattr(oPlugin, actionname)(message, *params)
+            # TODO: Does it make sense to transform this into a consumer?
+            for oplugin in self._output_plugin_list:
+                getattr(oplugin, actionname)(message, *params)
     
     def _addOutputPlugin(self, OutputPluginName):
         '''
         Takes a string with the OutputPluginName, creates the object and
-        adds it to the OutputPluginName
+        adds it to the self._output_plugin_list
         
         @parameter OutputPluginName: The name of the plugin to add to the list.
         @return: No value is returned.
@@ -195,20 +194,21 @@ class outputManager:
             strReqPlugins.remove ('__init__')
             
             for pluginName in strReqPlugins:
-                plugin = factory('plugins.output.' + pluginName)
+                plugin = factory('plugins.output.%s' % pluginName, 
+                                 self._threadpool )
                 
-                if pluginName in self._pluginsOptions.keys():
-                    plugin.setOptions(self._pluginsOptions[pluginName])
+                if pluginName in self._plugins_options.keys():
+                    plugin.setOptions(self._plugins_options[pluginName])
                 
                 # Append the plugin to the list
-                self._outputPluginList.append(plugin)
+                self._output_plugin_list.append(plugin)
         
         else:
-            plugin = factory('plugins.output.' + OutputPluginName)
-            if OutputPluginName in self._pluginsOptions.keys():
-                plugin.setOptions(self._pluginsOptions[OutputPluginName])
+            plugin = factory('plugins.output.%s' % OutputPluginName, 
+                             self._threadpool )
+            if OutputPluginName in self._plugins_options.keys():
+                plugin.setOptions(self._plugins_options[OutputPluginName])
 
                 # Append the plugin to the list
-            self._outputPluginList.append(plugin)    
-        
-out = outputManager()
+            self._output_plugin_list.append(plugin)    
+
