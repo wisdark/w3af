@@ -51,9 +51,9 @@ class sql_webshell(baseAttackPlugin):
     Exploits [blind] sql injections by uploading a webshell to the target webroot.
     '''
     
-    def __init__(self):
-        baseAttackPlugin.__init__(self)
-        
+    def __init__(self, uri_opener, threadpool):
+        baseAttackPlugin.__init__(self, uri_opener, threadpool)
+                
         # Internal variables
         self._vuln = None
         self._driver = None

@@ -41,8 +41,8 @@ class dir_bruter(baseDiscoveryPlugin):
     @author: Jon Rose ( jrose@owasp.org )
     @author: Andres Riancho ( andres@bonsai-sec.com )
     '''
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         self._exec = True
         
         # User configured parameters

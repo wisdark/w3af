@@ -45,8 +45,8 @@ class xssedDotCom(baseDiscoveryPlugin):
     @author: Nicolas Crocfer (shatter@shatter-blog.net)
     @author: Fix: Set "." in front of the root domain to limit the search - Raul Siles
     '''    
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         
         # Internal variables
         self._exec = True

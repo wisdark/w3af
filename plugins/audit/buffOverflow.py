@@ -53,7 +53,7 @@ class buffOverflow(baseAuditPlugin):
 
     _multi_in = multi_in( OVERFLOW_ERRORS )
 
-    def __init__(self):
+    def __init__(self, uri_opener, threadpool):
         '''
         Some notes:
             On apache, when an overflow happends on a cgic script, this is written to the log:
@@ -81,7 +81,7 @@ class buffOverflow(baseAuditPlugin):
                 
             Note that this is  an apache error 500, not the more common PHP error 500.
         '''
-        baseAuditPlugin.__init__(self)
+        baseAuditPlugin.__init__(self, uri_opener, threadpool)
         
     def audit(self, freq ):
         '''

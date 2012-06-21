@@ -61,8 +61,8 @@ class halberd(baseDiscoveryPlugin):
     This plugin is a wrapper for  Juan M. Bello Rivas <jmbr |at| superadditive.com> halberd.
     '''
 
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         
         # Internal variables
         self._exec = True

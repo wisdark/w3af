@@ -54,13 +54,13 @@ class mxInjection(baseAuditPlugin):
     )
     _multi_in = multi_in( MX_ERRORS )
 
-    def __init__(self):
+    def __init__(self, uri_opener, threadpool):
         '''
         Plugin added just for completeness... I dont really expect to find one of this bugs
         in my life... but well.... if someone , somewhere in the planet ever finds a bug of using
         this plugin... THEN my job has been done :P
         '''
-        baseAuditPlugin.__init__(self)
+        baseAuditPlugin.__init__(self, uri_opener, threadpool)
         
         # Internal variables.
         self._errors = []

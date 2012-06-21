@@ -44,8 +44,8 @@ class allowedMethods(baseDiscoveryPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
 
         # Internal variables
         self._exec = True

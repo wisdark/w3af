@@ -36,8 +36,8 @@ class selfReference(baseEvasionPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseEvasionPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseEvasionPlugin.__init__(self, uri_opener, threadpool)
 
     def modifyRequest(self, request ):
         '''

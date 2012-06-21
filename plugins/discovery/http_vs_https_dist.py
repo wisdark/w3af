@@ -43,7 +43,8 @@ class http_vs_https_dist(baseDiscoveryPlugin):
     @author: Javier Andalia <jandalia =at= gmail.com>
     '''
 
-    def __init__(self):
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         self._http_port = 80
         self._https_port = 443
 

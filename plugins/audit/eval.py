@@ -35,8 +35,6 @@ from core.data.options.option import option
 from core.data.options.optionList import optionList
 
 
-
-
 class eval(baseAuditPlugin):
     '''
     Find insecure eval() usage.
@@ -74,8 +72,8 @@ class eval(baseAuditPlugin):
         delay("Thread.Sleep(%s);", mult=1000)
     )
 
-    def __init__(self):
-        baseAuditPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAuditPlugin.__init__(self, uri_opener, threadpool)
 
         # Create some random strings, which the plugin will use.
         # for the fuzz_with_echo

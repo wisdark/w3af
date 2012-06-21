@@ -47,7 +47,7 @@ def exec_payload(shell_obj, payload_name, threadpool, parameters=[], use_api=Fal
                       If this is set to None, the handler will choose a shell from
                       the KB that provide the necessary syscalls. 
     @param payload_name: The name of the payload I want to run.
-    @param threadpool: The threadpool to pass to the payloads
+    @param threadpool: The threadpool to pass to the payload
     @param parameters: A list with the parameters (strings) the user typed. 
     @use_api: Indicates if I need to use the API or not in this run. This is True when
                     exec_payload is called from base_payload.exec_payload()
@@ -56,8 +56,9 @@ def exec_payload(shell_obj, payload_name, threadpool, parameters=[], use_api=Fal
     '''
     if shell_obj is None:
         #
-        #    I have to go to the KB, and filter the shell objects that are available there
-        #    using the syscalls they provide and the syscalls I need.
+        #    I have to go to the KB, and filter the shell objects that are 
+        #    available there using the syscalls they provide and the syscalls
+        #    we need.
         #
         
         #    The import needs to be here, don't ask why :P

@@ -54,8 +54,8 @@ class favicon_identification(baseDiscoveryPlugin):
     @author: Vlatko Kosturjak  <kost@linux.hr> http://kost.com.hr
     '''
 
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         
         # Internal variables
         self._version = None

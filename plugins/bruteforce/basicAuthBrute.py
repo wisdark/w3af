@@ -37,8 +37,8 @@ class basicAuthBrute(baseBruteforcePlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseBruteforcePlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseBruteforcePlugin.__init__(self, uri_opener, threadpool)
 
     def audit(self, freq ):
         '''

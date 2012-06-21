@@ -45,8 +45,8 @@ class content_negotiation(baseDiscoveryPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         
         # User configured parameters
         self._wordlist = 'plugins' + os.path.sep + 'discovery' + os.path.sep + 'content_negotiation'

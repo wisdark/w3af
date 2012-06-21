@@ -61,8 +61,8 @@ class rfiProxy(baseAttackPlugin, threading.Thread):
     @author: Andres Riancho ( andres.riancho@gmail.com )    
     '''
 
-    def __init__( self ):
-        baseAttackPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAttackPlugin.__init__(self, uri_opener, threadpool)
         threading.Thread.__init__(self)
         
         self._shell = None

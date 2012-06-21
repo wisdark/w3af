@@ -37,8 +37,8 @@ class passwordProfiling(baseGrepPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         # This is nicer, but HTMLParser inherits from SGMLParser that IS NOT
         # thread safe, So i have to create an instance of HTMLParser for every
         # call to testResponse

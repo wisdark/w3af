@@ -39,8 +39,8 @@ class export_requests(baseOutputPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    def __init__(self):
-        baseOutputPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseOutputPlugin.__init__(self, uri_opener, threadpool)
         self.output_file = 'output-requests.csv'
 
     def do_nothing(self, *args, **kwds): pass

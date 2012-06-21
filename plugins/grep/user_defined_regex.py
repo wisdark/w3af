@@ -41,8 +41,8 @@ class user_defined_regex(baseGrepPlugin):
     @author: floyd fuh ( floyd_fuh@yahoo.de )
     '''
 
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         
         # User defined options
         self._single_regex = ''

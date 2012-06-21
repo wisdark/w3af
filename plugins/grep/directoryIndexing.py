@@ -62,8 +62,8 @@ class directoryIndexing(baseGrepPlugin):
     )
     _multi_in = multi_in( DIR_INDEXING )    
     
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         
         self._already_visited = scalable_bloomfilter()
         

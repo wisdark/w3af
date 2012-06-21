@@ -50,8 +50,8 @@ class phpinfo(baseDiscoveryPlugin):
         Feb/17/2009- Added PHP Settings Audit Checks by Aung Khant (aungkhant[at]yehg.net)
     '''
 
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         
         # Internal variables
         self._analyzed_dirs = []

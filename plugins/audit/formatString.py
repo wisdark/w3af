@@ -46,8 +46,8 @@ class formatString(baseAuditPlugin):
                     '<title>500 Internal Server Error</title>\n',
                     )
 
-    def __init__(self):
-        baseAuditPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAuditPlugin.__init__(self, uri_opener, threadpool)
 
     def audit(self, freq ):
         '''

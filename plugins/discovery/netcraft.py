@@ -44,8 +44,8 @@ class netcraft(baseDiscoveryPlugin):
     
     @author: ino ( guerrino.dimassa@gmail.com )
     '''    
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
 
    
     @runonce(exc_class=w3afRunOnce)

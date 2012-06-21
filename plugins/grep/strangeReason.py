@@ -37,8 +37,8 @@ class strangeReason(baseGrepPlugin):
       
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         self._w3c_reasons = {
             100: ['continue',],
             101: ['switching protocols',],

@@ -53,8 +53,8 @@ class urlFuzzer(baseDiscoveryPlugin):
         'cs', 'vb', 'phps', 'disco', 'ori', 'orig', 'original'
         )
     
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         
         self._first_time = True
         self._fuzzImages = False

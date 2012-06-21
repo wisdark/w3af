@@ -39,8 +39,8 @@ class hmap(baseDiscoveryPlugin):
     Fingerprint the server type, i.e apache, iis, tomcat, etc.
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         
         # Control flow
         self._run_hmap = False

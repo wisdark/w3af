@@ -145,8 +145,8 @@ class errorPages(baseGrepPlugin):
     _multi_re = multi_re( VERSION_REGEX )
 
     
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         
         self._already_reported_versions = []
         self._compiled_regex = []

@@ -31,8 +31,8 @@ import core.controllers.outputManager as om
 class generic(baseAuthPlugin):
     '''Generic authentication plugin.'''
 
-    def __init__(self):
-        baseAuthPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAuthPlugin.__init__(self, uri_opener, threadpool)
         self.username = ''
         self.password = ''
         self.username_field = ''

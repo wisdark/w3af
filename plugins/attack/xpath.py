@@ -39,8 +39,8 @@ THRESHOLD = 0.8
 
 class xpath(baseAttackPlugin):
 
-    def __init__(self):
-        baseAttackPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAttackPlugin.__init__(self, uri_opener, threadpool)
         
         # User configured parameter
         self._change_to_post = True
@@ -55,7 +55,8 @@ class xpath(baseAttackPlugin):
 
     def fastExploit( self ):
         '''
-        Exploits a web app with osCommanding vuln, the settings are configured using setOptions()
+        Exploits a web app with osCommanding vuln, the settings are configured
+        using setOptions()
         '''
         raise w3afException('Not implemented.')
     

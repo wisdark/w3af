@@ -83,8 +83,8 @@ class xpath(baseAuditPlugin):
     )
     _multi_in = multi_in( XPATH_PATTERNS )
 
-    def __init__(self):
-        baseAuditPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAuditPlugin.__init__(self, uri_opener, threadpool)
         
         # Internal variables
         self._errors = []

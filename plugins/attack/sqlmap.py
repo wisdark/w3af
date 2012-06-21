@@ -46,17 +46,14 @@ SQLMAPCREATORS = 'sqlmap coded by inquis <bernardo.damele@gmail.com> and belch <
 class sqlmap(baseAttackPlugin):
     '''
     Exploits [blind] sql injections using sqlmap ( http://sqlmap.sf.net ).
-    '''
-    #Plugin author:
-    #@author: Andres Riancho ( andres.riancho@gmail.com )
     
-    #sqlmap authors:
-    #@author: Bernardo Damele (inquis) - maintainer
-    #@author: Daniele Bellucci (belch) - initial author
-        
-    def __init__(self):
-        baseAttackPlugin.__init__(self)
-        
+    @author: (plugin) Andres Riancho ( andres.riancho@gmail.com )
+    @author: (sqlmap) Bernardo Damele (inquis) - maintainer
+    @author: (sqlmap) Daniele Bellucci (belch) - initial author
+    '''    
+    def __init__(self, uri_opener, threadpool):
+        baseAttackPlugin.__init__(self, uri_opener, threadpool)
+                
         # Internal variables
         self._vuln = None
         self._driver = None

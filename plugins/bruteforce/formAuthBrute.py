@@ -41,8 +41,8 @@ class formAuthBrute(baseBruteforcePlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseBruteforcePlugin.__init__(self)        
+    def __init__(self, uri_opener, threadpool):
+        baseBruteforcePlugin.__init__(self, uri_opener, threadpool)        
         # To store failed responses for later comparison
         self._login_failed_result_list = []
         

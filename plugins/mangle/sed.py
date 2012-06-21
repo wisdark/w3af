@@ -43,8 +43,8 @@ class sed(baseManglePlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
     
-    def __init__(self):
-        baseManglePlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseManglePlugin.__init__(self, uri_opener, threadpool)
         self._req_body_manglers = []
         self._req_head_manglers = []
         self._res_body_manglers = []

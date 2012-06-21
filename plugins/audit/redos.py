@@ -47,8 +47,8 @@ class redos(baseAuditPlugin):
     @author: Sebastien Duquette ( sebastien.duquette@gmail.com )
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__(self):
-        baseAuditPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAuditPlugin.__init__(self, uri_opener, threadpool)
         
         # Some internal variables
         # The wait time of the unfuzzed request

@@ -41,8 +41,8 @@ class modsecurity(baseEvasionPlugin):
     @author: Francisco Amato ( famato |at| infobyte.com.ar )
     '''
 
-    def __init__(self):
-        baseEvasionPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseEvasionPlugin.__init__(self, uri_opener, threadpool)
 
     def modifyRequest(self, request ):
         '''

@@ -40,8 +40,8 @@ class wsdlGreper(baseGrepPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
 
         # Only generate the lists once.
         # Adding 0,001% performance ;)

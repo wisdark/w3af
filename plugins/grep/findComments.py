@@ -63,8 +63,8 @@ class findComments(baseGrepPlugin):
     
     _multi_in = multi_in( INTERESTING_WORDS )
 
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
 
         # Internal variables
         self._comments = {}

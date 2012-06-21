@@ -49,8 +49,8 @@ class sslCertificate(baseAuditPlugin):
     @author: Taras ( oxdef@oxdef.info )
     '''
 
-    def __init__(self):
-        baseAuditPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAuditPlugin.__init__(self, uri_opener, threadpool)
         self._already_tested = scalable_bloomfilter()
         self._min_expire_days = 30
         self._ca_file = os.path.join('plugins','audit','sslCertificate','ca.pem')

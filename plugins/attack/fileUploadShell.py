@@ -20,28 +20,25 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-from core.data.fuzzer.fuzzer import createRandAlNum
+import os.path
+import tempfile
+
+
 import core.controllers.outputManager as om
+import core.data.kb.knowledgeBase as kb
+import core.data.kb.vuln as vuln
+import plugins.attack.payloads.shell_handler as shell_handler
 
 # options
 from core.data.options.option import option
 from core.data.options.optionList import optionList
-from core.controllers.basePlugin.baseAttackPlugin import baseAttackPlugin
-
-import core.data.kb.knowledgeBase as kb
-import core.data.kb.vuln as vuln
 from core.data.kb.exec_shell import exec_shell as exec_shell
 from core.data.parsers.urlParser import parse_qs
-
+from core.controllers.basePlugin.baseAttackPlugin import baseAttackPlugin
 from core.controllers.w3afException import w3afException
-import plugins.attack.payloads.shell_handler as shell_handler
-from plugins.attack.payloads.decorators.exec_decorator import exec_debug
-
-
-import os.path
-import urllib
-import tempfile
 from core.controllers.misc.temp_dir import get_temp_dir
+
+from plugins.attack.payloads.decorators.exec_decorator import exec_debug
 
 
 class fileUploadShell(baseAttackPlugin):
@@ -50,8 +47,8 @@ class fileUploadShell(baseAttackPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseAttackPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAttackPlugin.__init__(self, uri_opener, threadpool)
         
         # Internal variables
         self._path_name = ''

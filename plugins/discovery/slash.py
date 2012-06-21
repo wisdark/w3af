@@ -37,8 +37,8 @@ class slash(baseDiscoveryPlugin):
     @author: Nicolas Rotta ( nicolas.rotta@gmail.com )  
     '''
     
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         self._already_visited = scalable_bloomfilter()
         
     def discover(self, fuzzableRequest):

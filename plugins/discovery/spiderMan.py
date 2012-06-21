@@ -46,7 +46,7 @@ class spiderMan(baseDiscoveryPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     @author: Alexander Berezhnoy < alexander.berezhnoy |at| gmail.com >
     '''
-    def __init__(self):
+    def __init__(self, uri_opener, threadpool):
         # Internal variables
         self._run = True
         self._fuzzableRequests = []

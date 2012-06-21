@@ -37,8 +37,8 @@ class oracle(baseGrepPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         self._already_analyzed = scalable_bloomfilter()
         
     def grep(self, request, response):

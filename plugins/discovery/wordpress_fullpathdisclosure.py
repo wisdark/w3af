@@ -43,8 +43,8 @@ class wordpress_fullpathdisclosure(baseDiscoveryPlugin):
     @author: Andres Tarantini ( atarantini@gmail.com )
     '''
 
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
 
         # Internal variables
         self._exec = True

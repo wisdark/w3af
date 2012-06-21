@@ -69,8 +69,8 @@ class creditCards(baseGrepPlugin):
     '''
     
 
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         self._cardResponses = []
 
         cc_regex = '((^|[^\d])\d{4}[- ]?(\d{4}[- ]?\d{4}|\d{6})[- ]?(\d{5}|\d{4})($|[^\d]))'

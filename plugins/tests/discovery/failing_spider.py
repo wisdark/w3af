@@ -30,8 +30,8 @@ class failing_spider(webSpider):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        webSpider.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        webSpider.__init__(self, uri_opener, threadpool)
         
         self.blacklist = ('2.html',)
 

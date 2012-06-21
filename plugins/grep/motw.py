@@ -39,8 +39,8 @@ class motw (baseGrepPlugin):
     Identify whether the page is compliant to mark of the web.
     @author: Sharad Ganapathy sharadgana |at| gmail.com
     """
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
 
         # The following regex matches a valid url as well as the text about:internet.
         # Also it validates the number in the parenthesis. It should be a 4 digit number

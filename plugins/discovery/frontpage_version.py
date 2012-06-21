@@ -42,8 +42,8 @@ class frontpage_version(baseDiscoveryPlugin):
     @author: Viktor Gazdag ( woodspeed@gmail.com )
     '''
 
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         
         # Internal variables
         self._analyzed_dirs = scalable_bloomfilter()

@@ -36,8 +36,8 @@ class clickJacking(baseGrepPlugin):
     @author: Taras (oxdef@oxdef.info)
     '''
 
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         self._total_count = 0
         self._vuln_count = 0
         self._vulns = disk_list()

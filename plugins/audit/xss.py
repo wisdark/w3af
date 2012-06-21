@@ -78,8 +78,8 @@ class xss(baseAuditPlugin):
            (INTERNET_EXPLORER_6, NETSCAPE_IE))
     )
 
-    def __init__(self):
-        baseAuditPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAuditPlugin.__init__(self, uri_opener, threadpool)
         
         # Some internal variables to keep track of remote 
         # web application sanitization

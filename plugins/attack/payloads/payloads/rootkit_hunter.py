@@ -1,4 +1,3 @@
-from core.controllers.threads.threadManager import threadManagerObj as tm
 from plugins.attack.payloads.base_payload import base_payload
 import core.controllers.outputManager as om
 from core.ui.consoleUi.tables import table
@@ -12,7 +11,7 @@ class rootkit_hunter( base_payload ):
     This payload checks for current rootkits, trojans, backdoors and local
     exploits installed on system.
     '''
-    def _thread_read( self, file):
+    def _thread_read( self, fname):
         #   "progress bar"  
         self.k -= 1
         if self.k == 0:
@@ -20,9 +19,9 @@ class rootkit_hunter( base_payload ):
             self.k=400
         #   end "progress bar"
         
-        content = self.shell.read(file)
+        content = self.shell.read(fname)
         if content:
-            self.result['backdoor_files'].append( file )
+            self.result['backdoor_files'].append( fname )
         
         return self.result
     

@@ -43,8 +43,8 @@ class phpEggs(baseDiscoveryPlugin):
     Fingerprint the PHP version using documented easter eggs that exist in PHP.
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         self._exec = True
         
         # Already analyzed extensions

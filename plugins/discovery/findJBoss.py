@@ -63,8 +63,8 @@ class findJBoss(baseDiscoveryPlugin):
          'type': 'vuln'}
         )
     
-    def __init__(self):
-        baseDiscoveryPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseDiscoveryPlugin.__init__(self, uri_opener, threadpool)
         self._fuzzable_requests_to_return = []
         
     @runonce(exc_class=w3afRunOnce)

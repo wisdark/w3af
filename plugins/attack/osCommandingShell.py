@@ -41,8 +41,8 @@ class osCommandingShell(baseAttackPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseAttackPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseAttackPlugin.__init__(self, uri_opener, threadpool)
         
         # User configured parameter
         self._change_to_post = True
@@ -54,7 +54,8 @@ class osCommandingShell(baseAttackPlugin):
 
     def fastExploit( self ):
         '''
-        Exploits a web app with osCommanding vuln, the settings are configured using setOptions()
+        Exploits a web app with osCommanding vuln, the settings are configured
+        using setOptions()
         '''
         raise w3afException('Not implemented.')
     
@@ -66,13 +67,14 @@ class osCommandingShell(baseAttackPlugin):
     
     def getVulnName2Exploit( self ):
         '''
-        This method should return the vulnerability name (as saved in the kb) to exploit.
-        For example, if the audit.osCommanding plugin finds an vuln, and saves it as:
+        This method should return the vulnerability name (as saved in the kb) 
+        to exploit. For example, if the audit.osCommanding plugin finds a
+        vuln, and saves it as:
         
-        kb.kb.append( 'osCommanding' , 'osCommanding', vuln )
+            kb.kb.append( 'osCommanding' , 'osCommanding', vuln )
         
-        Then the exploit plugin that exploits osCommanding ( attack.osCommandingShell ) should
-        return 'osCommanding' in this method.
+        Then the exploit plugin that exploits osCommanding (attack.osCommandingShell)
+        should return 'osCommanding' in this method.
         '''        
         return 'osCommanding'
 

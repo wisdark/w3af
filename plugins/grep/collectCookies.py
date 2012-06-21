@@ -44,8 +44,8 @@ class collectCookies(baseGrepPlugin):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         self._already_reported_server = []
         self._cookieHeaders = ['Set-Cookie'.upper(), 'Cookie'.upper(), 'Cookie2'.upper()]
 

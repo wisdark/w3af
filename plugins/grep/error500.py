@@ -42,8 +42,8 @@ class error500(baseGrepPlugin):
     FALSE_POSITIVE_STRINGS = ('<h1>Bad Request (Invalid URL)</h1>',
                               )
     
-    def __init__(self):
-        baseGrepPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseGrepPlugin.__init__(self, uri_opener, threadpool)
         
         self._error_500_responses = set()
 

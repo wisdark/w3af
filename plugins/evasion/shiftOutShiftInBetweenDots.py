@@ -35,8 +35,8 @@ class shiftOutShiftInBetweenDots(baseEvasionPlugin):
     @author: Jose Ramon Palanco( jose.palanco@hazent.com )
     '''
 
-    def __init__(self):
-        baseEvasionPlugin.__init__(self)
+    def __init__(self, uri_opener, threadpool):
+        baseEvasionPlugin.__init__(self, uri_opener, threadpool)
 
     def modifyRequest(self, request ):
         '''
