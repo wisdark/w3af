@@ -41,11 +41,11 @@ class baseBruteforcePlugin(baseAuditPlugin):
 
     def __init__(self, uri_opener, threadpool):
         baseAuditPlugin.__init__( self, uri_opener, threadpool )
-        self._alreadyTested = []
+        self._already_tested = ()
         
         # Config params
-        self._usersFile = 'core'+os.path.sep+'controllers'+os.path.sep+'bruteforce'+os.path.sep+'users.txt'
-        self._passwdFile = 'core'+os.path.sep+'controllers'+os.path.sep+'bruteforce'+os.path.sep+'passwords.txt'
+        self._usersFile = os.path.join('core','controllers','bruteforce','users.txt')
+        self._passwdFile = os.path.join('core','controllers','bruteforce','passwords.txt')
         self._comboFile = ''
         self._comboSeparator = ":"
         self._useMailUsers = True
@@ -59,11 +59,11 @@ class baseBruteforcePlugin(baseAuditPlugin):
         
         # Internal vars
         self._found = False
-        self._alreadyReported = []
+        self._already_reported = []
         
         self._bruteforcer = bruteforcer()
 
-    def _initBruteforcer( self, url ):
+    def _init_bruteforcer( self, url ):
         self._bruteforcer.setURL( url )
         self._bruteforcer.setUseMailUsers( self._useMailUsers )
         self._bruteforcer.setUseMails( self._useMails )
@@ -76,17 +76,6 @@ class baseBruteforcePlugin(baseAuditPlugin):
         self._bruteforcer.setComboFile(self._comboFile)
         self._bruteforcer.setComboSeparator(self._comboSeparator)
         self._bruteforcer.init()
-    
-    def _fuzzRequests(self, freq ):
-        '''
-        This method is the entry point of the plugin.
-        
-        THIS METHOD MUST BE IMPLEMENTED BY EVERY BRUTEFORCE PLUGIN!
-        
-        @param freq: A fuzzable_request
-        '''
-        raise NotImplementedError, ('Bruteforce plugins MUST override '
-                                    'method _fuzzRequests.')
     
     def bruteforce_wrapper( self, fuzzable_request ):
         self.audit_wrapper( fuzzable_request.copy() )
@@ -103,13 +92,12 @@ class baseBruteforcePlugin(baseAuditPlugin):
         @parameter url: A string representation of an URL
         @parameter combinations: A list of tuples with (user,pass)
         '''
-        targs = (url,combinations)
-        self._tm.startFunction( target=self._bruteWorker, args=targs , ownerObj=self )
+        self._threadpool.apply_async(self._brute_worker, (url,combinations) )
     
     def end( self ):
         self._tm.join( self )
             
-    def _bruteWorker( self, url, combinations ):
+    def _brute_worker( self, url, combinations ):
         '''
         This is the method that sends the request to the remote server.
         
@@ -117,7 +105,7 @@ class baseBruteforcePlugin(baseAuditPlugin):
         @parameter combinations: A list of tuples with (user,pass)
         '''
         raise NotImplementedError, ('Bruteforce plugins MUST override method'
-                                    ' _bruteWorker.')
+                                    ' _brute_worker.')
         
     def getOptions( self ):
         '''

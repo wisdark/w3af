@@ -48,34 +48,36 @@ class basePlugin(configurable):
         Create some generic attributes that are going to be used by most plugins.
         '''
         self._uri_opener = UrlOpenerProxy(uri_opener, self)
-        self.threadpool = threadpool
+        self._threadpool = threadpool
         self._plugin_lock = threading.RLock()
 
     def setOptions( self, optionsMap ):
         '''
-        Sets the Options given on the OptionList to self. The options are the result of a user
-        entering some data on a window that was constructed using the options that were
-        retrieved from the plugin using getOptions()
+        Sets the Options given on the OptionList to self. The options are the
+        result of a user entering some data on a window that was constructed
+        using the options that were retrieved from the plugin using getOptions()
         
         This method MUST be implemented on every plugin. 
         
         @return: No value is returned.
         ''' 
-        raise w3afException('Plugin "'+self.getName()+'" is not implementing required method setOptions' )
+        msg = 'Plugin "%s" is not implementing required method setOptions'
+        raise w3afException( msg % self.getName() )
         
     def getOptions(self):
         '''
         @return: A list of option objects for this plugin.
         '''
-        raise w3afException('Plugin "'+self.getName()+'" is not implementing required method getOptions' )
+        msg = 'Plugin "%s" is not implementing required method getOptions'
+        raise w3afException( msg % self.getName() )
 
     def getPluginDeps( self ):
         '''
         @return: A list with the names of the plugins that should be 
         run before the current one.
         '''
-        msg = 'Plugin "%s" is not implementing required method getPluginDeps' % self.getName()
-        raise w3afException( msg )
+        msg = 'Plugin "%s" is not implementing required method getPluginDeps'
+        raise w3afException( msg % self.getName() )
 
     def getDesc( self ):
         '''
@@ -190,7 +192,7 @@ class basePlugin(configurable):
         return (False, None)
 
     def _run_async(self, func, iterable, callback):
-        for http_response in self.pool.imap_unordered(func, iterable):
+        for http_response in self._threadpool.imap_unordered(func, iterable):
             callback(http_response)
     
 

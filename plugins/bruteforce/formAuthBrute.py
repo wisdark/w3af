@@ -57,20 +57,20 @@ class formAuthBrute(baseBruteforcePlugin):
         '''
         freq_url = freq.getURL()
         
-        if self._isLoginForm(freq) and freq_url not in self._alreadyTested:
+        if self._isLoginForm(freq) and freq_url not in self._already_tested:
                 
             # Save it (we don't want dups!)
-            self._alreadyTested.append(freq_url)
+            self._already_tested.add(freq_url)
             
             try:
                 self._user_field_name, self._passwd_field_name = \
-                                            self._getLoginFieldNames(freq)
+                                            self._get_field_names(freq)
             except w3afException, w3:
                 om.out.error(str(w3))
             else:
                 # Init
-                self._initBruteforcer(freq_url)
-                self._idFailedLoginPage(freq)
+                self._init_bruteforcer(freq_url)
+                self._id_failed_login(freq)
             
                 # Let the user know what we are doing
                 om.out.information('Found a form login. The action of the '
@@ -113,17 +113,14 @@ class formAuthBrute(baseBruteforcePlugin):
                                 more_passwords = False
                                 break
 
-                    self._bruteforce(freq.copy(), combinations)                    
-                
-                # Wait for all _bruteWorker threads to finish.
-                self._join()
+                    self._bruteforce(freq.copy(), combinations)
                 
                 # Report that we've finished.
                 msg = 'Finished bruteforcing "%s".' % freq_url
                 om.out.information( msg )
 
 
-    def _idFailedLoginPage(self, freq):
+    def _id_failed_login(self, freq):
         '''
         Generate TWO different response bodies that are the result of failed
         logins.
@@ -234,7 +231,7 @@ class formAuthBrute(baseBruteforcePlugin):
                 om.out.information(freq.getURL() + ' is a password change form.')
             return False
                 
-    def _getLoginFieldNames(self, freq):
+    def _get_field_names(self, freq):
         '''
         @return: The names of the form fields where to input the user and the 
             password. Please remember that maybe user_parameter might be None,
