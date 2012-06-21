@@ -37,8 +37,8 @@ class shell(vuln, exploitResult):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self, v, threadpool):
-        vuln.__init__(self, v)
+    def __init__(self, vuln_obj, threadpool):
+        vuln.__init__(self, vuln_obj)
         exploitResult.__init__(self)
         
         self.threadpool = threadpool

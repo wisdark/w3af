@@ -41,8 +41,8 @@ class exec_shell(shell):
     @author: Andres Riancho ( andres.riancho@gmail.com )
     '''
 
-    def __init__(self, v, threadpool):
-        shell.__init__(self, v, threadpool)
+    def __init__(self, vuln_obj, threadpool):
+        shell.__init__(self, vuln_obj, threadpool)
         
         # For writing files to the remote server
         self._transfer_handler = None

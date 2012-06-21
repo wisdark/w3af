@@ -86,8 +86,8 @@ class w3afCore(object):
         self.plugins.zero_enabled_plugins()
         
         # I init the 404 detection for the whole framework
-        self.uriOpener = xUrllib()
-        fp_404_db = fingerprint_404_singleton( self.threadpool, self.uriOpener)
+        self.uri_opener = xUrllib()
+        fp_404_db = fingerprint_404_singleton( self.threadpool, self.uri_opener)
         
     def start(self):
         '''
@@ -192,7 +192,7 @@ class w3afCore(object):
         '''
         om.out.debug('The user stopped the core.')
         self.strategy.stop()
-        self.uriOpener.stop()
+        self.uri_opener.stop()
     
     def pause(self, pause_yes_no):
         '''
@@ -201,14 +201,14 @@ class w3afCore(object):
         '''
         self.status.pause( pause_yes_no )
         self.strategy.pause( pause_yes_no )
-        self.uriOpener.pause( pause_yes_no )
+        self.uri_opener.pause( pause_yes_no )
 
     def quit( self ):
         '''
         The user is in a hurry, he wants to exit w3af ASAP.
         '''
         self.strategy.quit()
-        self.uriOpener.stop()
+        self.uri_opener.stop()
         
         # Now it's safe to remove the temp_dir
         remove_temp_dir()
@@ -238,14 +238,14 @@ class w3afCore(object):
         try:
             # End the xUrllib (clear the cache) and create a new one, so it can
             # be used by exploit plugins. 
-            self.uriOpener.end()
-            self.uriOpener = xUrllib()
+            self.uri_opener.end()
+            self.uri_opener = xUrllib()
             
             if exc_inst:
                 om.out.debug(str(exc_inst))
             
-            tm.join(joinAll=True)
-            tm.stopAllDaemons()
+            self.threadpool.terminate()
+            self.threadpool.join()
                         
             # Also, close the output manager.
             om.out.endOutputPlugins()
