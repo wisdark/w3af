@@ -2,8 +2,6 @@ import unittest
 # 
 # TODO
 #
-# 1. XSS in href, src [DONE]
-# 2. SCRIPT_COMMENT VS HTML_TEXT
 # 3. expression in CSS
 # 4. CSS_DOUBLE_QUOTE
 # 5. CSS_SINGLE_QUOTE
@@ -14,18 +12,18 @@ html = '''
 <html>
     <head>
         <style>
-        
+        STYLE_TEXT
         </style>
         <script>
         var foo = '\\'SCRIPT_SINGLE_QUOTE';
-        var foo2 = "SCRIPT_DOUBLE_QUOTE";
+        var foo2 = "SCRIPT_DOUBLE_QUOTE <b>";
         SCRIPT_TEXT
         /*
 
         Some SCRIPT_MULTI_COMMENT  here
 
         */
-        // Some SCRIPT_COMMENT  here
+        // Some SCRIPT_LINE_COMMENT  here
         </script>
     </head>
     <body>
@@ -41,6 +39,9 @@ html = '''
         -->
         <img src="ATTR_DOUBLE_QUOTE" />
         <a href="ATTR_DOUBLE_QUOTE" />link</a>
+        <script>
+        var foo = '\\'SCRIPT_SINGLE_QUOTE <h1>HTML_TEXT';
+        </script>
     </body>
 </html>
 ATTR_SINGLE_QUOTE'''
@@ -51,11 +52,24 @@ class HtmlContext(object):
     def get_name(self):
         return self.name
 
-    def is_match(self, data):
-        raise 'is_match() should be implemented'
+    def _is_js(self, data):
+        if data.lower().rfind('<script') > data.lower().rfind('</script>'):
+            return True
+        return False
+
+    def _is_style(self, data):
+        if data.lower().rfind('<style') > data.lower().rfind('</style>'):
+            return True
+        return False
+
+    def _is_html(self, data):
+        return not (self._is_js(data) or self._is_style(data))
 
     def can_break(self, data):
         raise 'can_break() should be implemented'
+
+    def is_match(self, data):
+        raise 'is_match() should be implemented'
 
 class Tag(HtmlContext):
 
@@ -63,6 +77,8 @@ class Tag(HtmlContext):
         self.name = 'TAG'
 
     def is_match(self, data):
+        if not self._is_html(data):
+            return False
         if data[-1] == '<':
             return True
         return False
@@ -79,6 +95,8 @@ class Text(HtmlContext):
         self.name = 'HTML_TEXT'
 
     def is_match(self, data):
+        if not self._is_html(data):
+            return False
         if data.rfind('<') <= data.rfind('>'):
             return True
         return False
@@ -94,6 +112,8 @@ class Comment(HtmlContext):
         self.name = 'HTML_COMMENT'
 
     def is_match(self, data):
+        if not self._is_html(data):
+            return False
         # We are inside <!--...
         if data.rfind('<!--') <= data.rfind('-->'):
             return False
@@ -111,6 +131,9 @@ class AttrName(HtmlContext):
         self.name = 'ATTR_NAME'
 
     def is_match(self, data):
+        if not self._is_html(data):
+            return False
+
         quote_character = None
         open_angle_bracket = data.rfind('<')
         # We are inside <...
@@ -142,8 +165,7 @@ class ScriptMultiComment(HtmlContext):
         self.name = 'SCRIPT_MULTI_COMMENT'
 
     def is_match(self, data):
-        # We are inside <script...
-        if data.rfind('<script') <= data.rfind('</script>'):
+        if not self._is_js(data):
             return False
         # We are inside /*...
         if data.rfind('/*') <= data.rfind('*/'):
@@ -162,7 +184,9 @@ class ScriptLineComment(HtmlContext):
         self.name = 'SCRIPT_LINE_COMMENT'
 
     def is_match(self, data):
-        last_line = data.split('\n')[-1]
+        if not self._is_js(data):
+            return False
+        last_line = data.split('\n')[-1].strip()
         if last_line.find('//') == 0:
             return True
         return False
@@ -180,12 +204,14 @@ class ScriptQuote(HtmlContext):
         self.quote_character = None
 
     def is_match(self, data):
+        if not self._is_js(data):
+            return False
         data = data.replace('\\"','')
         data = data.replace("\\'",'')
         quote_character = None
-        open_angle_bracket = data.rfind('<script')
+        open_angle_bracket = data.lower().rfind('<script')
         # We are inside <...
-        if open_angle_bracket <= data.rfind('</script>'):
+        if open_angle_bracket <= data.lower().rfind('</script>'):
             return False
         for s in data[open_angle_bracket+1:]:
             if s in ['"', "'"]:
@@ -223,6 +249,8 @@ class AttrQuote(HtmlContext):
         self.quote_character = None
 
     def is_match(self, data):
+        if not self._is_html(data):
+            return False
         quote_character = None
         open_angle_bracket = data.rfind('<')
         # We are inside <...
@@ -246,7 +274,7 @@ class AttrQuote(HtmlContext):
         # 
         # For cases with src and href + javascript scheme
         #
-        data = data.replace(' ', '')
+        data = data.lower().replace(' ', '')
         if data.endswith('href=' + self.quote_character):
             return True
         if data.endswith('src=' + self.quote_character):
@@ -265,6 +293,22 @@ class AttrDoubleQuote(AttrQuote):
         self.name = 'ATTR_DOUBLE_QUOTE'
         self.quote_character = '"'
 
+class StyleText(HtmlContext):
+
+    def __init__(self):
+        self.name = 'STYLE_TEXT'
+
+    def is_match(self, data):
+        if not self._is_style(data):
+            return False
+        return True
+
+    def can_break(self, data):
+        for i in ['<', '/']:
+            if i not in data:
+                return False
+        return True
+
 AVAILABLE_CONTEXTS = []
 AVAILABLE_CONTEXTS.append(AttrSingleQuote())
 AVAILABLE_CONTEXTS.append(AttrDoubleQuote())
@@ -276,6 +320,7 @@ AVAILABLE_CONTEXTS.append(ScriptMultiComment())
 AVAILABLE_CONTEXTS.append(ScriptLineComment())
 AVAILABLE_CONTEXTS.append(ScriptSingleQuote())
 AVAILABLE_CONTEXTS.append(ScriptDoubleQuote())
+AVAILABLE_CONTEXTS.append(StyleText())
 
 def get_context(data, payload):
     '''
@@ -304,6 +349,12 @@ class TestContexts(unittest.TestCase):
             self.assertEqual(
                     get_context(html, context.get_name())[0][0].get_name(), 
                     context.get_name()
+                    )
+    
+    def test_html_inside_js(self):
+            self.assertEqual(
+                    get_context(html, Text().get_name())[1][0].get_name(), 
+                    ScriptSingleQuote().get_name()
                     )
 
 if __name__ == '__main__':
