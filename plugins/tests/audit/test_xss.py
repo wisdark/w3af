@@ -34,7 +34,7 @@ class TestXSS(PluginTest):
                     PluginConfig(
                          'xss',
                          ('checkStored', True, PluginConfig.BOOL),
-                         ('numberOfChecks', 3, PluginConfig.INT)),
+                         ),
                     ),
                 'discovery': (
                     PluginConfig(
