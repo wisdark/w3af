@@ -1,7 +1,7 @@
 import unittest
 
 from core.data.context.context import ( get_context , get_contexts, Text,
-                                        ScriptSingleQuote, ScriptText )
+                                        ScriptSingleQuote, ScriptText, Comment )
 
 
 class TestContext(unittest.TestCase):
@@ -116,4 +116,22 @@ class TestContext(unittest.TestCase):
         </html>
         '''
         self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], Text ) )
+
+    def test_payload_html_inside_comment(self):
+        html = '''
+        <html>
+            <!-- <body>PAYLOAD</body> -->
+        </html>
+        '''
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], Comment ) )
+
+    def test_payload_html_inside_script_with_comment(self):
+        html = '''
+        <html>
+            <script>
+                <!-- <body>PAYLOAD</body> -->
+            </script>
+        </html>
+        '''
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], ScriptText ) )
 
