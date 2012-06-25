@@ -154,6 +154,15 @@ class TestContext(unittest.TestCase):
             </script>
         </html>
         '''
-        print get_context(html, 'PAYLOAD')[0][0]
         self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], AttrSingleQuote ) )
+
+    def test_payload_text_can_break(self):
+        html = '''
+        <html>
+            <a>PAYLOAD<</a>
+        </html>
+        '''
+        context = get_context(html, 'PAYLOAD<')[0][0]
+        self.assertTrue( context.can_break('PAYLOAD<') )
+
 
