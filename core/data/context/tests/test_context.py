@@ -1,7 +1,8 @@
 import unittest
 
 from core.data.context.context import ( get_context , get_contexts, Text,
-                                        ScriptSingleQuote, ScriptText, Comment )
+                                        ScriptSingleQuote, ScriptText, Comment,
+                                        AttrSingleQuote )
 
 
 class TestContext(unittest.TestCase):
@@ -134,4 +135,25 @@ class TestContext(unittest.TestCase):
         </html>
         '''
         self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], ScriptText ) )
+
+    def test_payload_script_single_quote(self):
+        html = '''
+        <html>
+            <a foo='PAYLOAD'>
+                bar
+            </a>
+        </html>
+        '''
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], AttrSingleQuote ) )
+
+    def test_payload_script_single_quote(self):
+        html = '''
+        <html>
+            <script foo='PAYLOAD'>
+                bar
+            </script>
+        </html>
+        '''
+        print get_context(html, 'PAYLOAD')[0][0]
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], AttrSingleQuote ) )
 
