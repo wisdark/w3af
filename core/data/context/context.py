@@ -1,87 +1,108 @@
+'''
+context.py
 
+Copyright 2006 Andres Riancho
+
+This file is part of w3af, w3af.sourceforge.net .
+
+w3af is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation version 2 of the License.
+
+w3af is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with w3af; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
+'''
 
 class Context(object):
     name = ''
 
     def get_name(self):
         return self.name
-    # TODO parent class is not correct place for these 3 methods
-    def _is_js(self, data):
-        if data.lower().rfind('<script') > data.lower().rfind('</script>'):
-            return True
-        return False
 
-    def _is_style(self, data):
-        if data.lower().rfind('<style') > data.lower().rfind('</style>'):
-            return True
-        return False
-
-    def _is_html(self, data):
-        return not (self._is_js(data) or self._is_style(data))
-
-    def need_break(self, data):
+    def is_executable(self, data):
         return True
 
     def can_break(self, payload):
         raise 'can_break() should be implemented'
     
-    def is_match(self, data):
-        raise 'is_match() should be implemented'
+    def match(self, data):
+        raise 'match() should be implemented'
 
     def inside_comment(self, data):
         raise 'inside_comment() should be implemented'
 
+def normalize_html(meth):
+    def wrap(self, data):
+        data = data.replace("\\'",'')
+        data = data.replace('\\"','')
+        new_data = ''
+        quote_character = None
+        for s in data:
+            if s in ['"', "'"]:
+                if quote_character and s == quote_character:
+                    quote_character = None
+                elif not quote_character:
+                    quote_character = s
+            if s == '<' and quote_character:
+                s = '&lt;'
+            new_data += s
+        return meth(self, new_data)
+    return wrap
+
+
+def inside_html(meth):
+    def wrap(self, data):
+        script_index = data.lower().rfind('<script')
+        if script_index > data.lower().rfind('</script>') and data[script_index:].count('>'):
+            return False
+        style_index = data.lower().rfind('<style')
+        if style_index > data.lower().rfind('</style>') and data[style_index:].count('>'):
+            return False
+        return meth(self, data)
+    return wrap
+
+def inside_js(meth):
+    def wrap(self, data):
+        script_index = data.lower().rfind('<script')
+        if script_index > data.lower().rfind('</script>') and data[script_index:].count('>'):
+            return meth(self, data)
+        return False
+    return wrap
+
+def inside_style(meth):
+    def wrap(self, data):
+        style_index = data.lower().rfind('<style')
+        if style_index > data.lower().rfind('</style>') and data[style_index:].count('>'):
+            return meth(self, data)
+        return False
+    return wrap
 
 class HtmlContext(Context):
+
+    @normalize_html
+    @inside_html
     def inside_comment(self, data):
-        if not self._is_html(data):
-            return False
         # We are inside <!--...
         if data.rfind('<!--') <= data.rfind('-->'):
             return False
         return True
 
-class ScriptContext(Context):
-    
-    def inside_comment(self, data):
-        return (self._inside_multi_comment(data) or self._inside_line_comment(data))
-
-    def _inside_multi_comment(self, data):
-        if not self._is_js(data):
-            return False
-        # We are inside /*...
-        if data.rfind('/*') <= data.rfind('*/'):
-            return False
-        return True
-
-    def _inside_line_comment(self, data):
-        if not self._is_js(data):
-            return False
-        last_line = data.split('\n')[-1].strip()
-        if last_line.find('//') == 0:
-            return True
-        return False
-
-class StyleContext(Context):
-
-    def inside_comment(self, data):
-        if not self._is_style(data):
-            return False
-        # We are inside /*...
-        if data.rfind('/*') <= data.rfind('*/'):
-            return False
-        return True
-
-    def crop(self, data):
-        return data[data.lower().rfind('<style')+1:]
-
-class Tag(HtmlContext):
+class HtmlTag(HtmlContext):
 
     def __init__(self):
         self.name = 'TAG'
 
-    def is_match(self, data):
-        if not self._is_html(data) or self.inside_comment(data):
+    @normalize_html
+    @inside_html
+    def match(self, data):
+        if self.inside_comment(data):
             return False
         if data[-1] == '<':
             return True
@@ -93,13 +114,15 @@ class Tag(HtmlContext):
                 return True
         return False
 
-class Text(HtmlContext):
+class HtmlText(HtmlContext):
 
     def __init__(self):
         self.name = 'HTML_TEXT'
 
-    def is_match(self, data):
-        if not self._is_html(data) or self.inside_comment(data):
+    @normalize_html
+    @inside_html
+    def match(self, data):
+        if self.inside_comment(data):
             return False
         if data.rfind('<') <= data.rfind('>'):
             return True
@@ -110,13 +133,15 @@ class Text(HtmlContext):
             return True
         return False
 
-class Comment(HtmlContext):
+class HtmlComment(HtmlContext):
 
     def __init__(self):
         self.name = 'HTML_COMMENT'
 
-    def is_match(self, data):
-        if self._is_html(data) and self.inside_comment(data):
+    @normalize_html
+    @inside_html
+    def match(self, data):
+        if self.inside_comment(data):
             return True
         return False
 
@@ -126,13 +151,15 @@ class Comment(HtmlContext):
                 return False
         return True
 
-class AttrName(HtmlContext):
+class HtmlAttrName(HtmlContext):
 
     def __init__(self):
         self.name = 'ATTR_NAME'
 
-    def is_match(self, data):
-        if not self._is_html(data) or self.inside_comment(data):
+    @normalize_html
+    @inside_html
+    def match(self, data):
+        if self.inside_comment(data):
             return False
 
         quote_character = None
@@ -157,12 +184,102 @@ class AttrName(HtmlContext):
             return True
         return False
 
+class HtmlAttrQuote(HtmlContext):
+
+    def __init__(self):
+        self.name = None
+        self.quote_character = None
+
+    @normalize_html
+    @inside_html
+    def match(self, data):
+        if self.inside_comment(data):
+            return False
+        quote_character = None
+        open_angle_bracket = data.rfind('<')
+        # We are inside <...
+        if open_angle_bracket <= data.rfind('>'):
+            return False
+        for s in data[open_angle_bracket+1:]:
+            if s in ['"', "'"]:
+                if quote_character and s == quote_character:
+                    quote_character = None
+                    continue
+                elif not quote_character:
+                    quote_character = s
+                    continue
+        if quote_character == self.quote_character:
+            return True
+        return False
+
+    def can_break(self, payload):
+        if self.quote_character in payload:
+            return True
+        # 
+        # For cases with src and href + javascript scheme
+        #
+        payload = payload.lower().replace(' ', '')
+        if payload.endswith('href=' + self.quote_character):
+            return True
+        if payload.endswith('src=' + self.quote_character):
+            return True
+        return False
+
+class HtmlAttrSingleQuote(HtmlAttrQuote):
+
+    def __init__(self):
+        self.name = 'ATTR_SINGLE_QUOTE'
+        self.quote_character = "'"
+
+class HtmlAttrDoubleQuote(HtmlAttrQuote):
+
+    def __init__(self):
+        self.name = 'ATTR_DOUBLE_QUOTE'
+        self.quote_character = '"'
+
+
+class ScriptContext(Context):
+    
+    @normalize_html
+    @inside_js
+    def inside_comment(self, data):
+        return (self._inside_multi_comment(data) or self._inside_line_comment(data))
+
+    @normalize_html
+    @inside_js
+    def _inside_multi_comment(self, data):
+        # We are inside /*...
+        if data.rfind('/*') <= data.rfind('*/'):
+            return False
+        return True
+
+    @normalize_html
+    @inside_js
+    def _inside_line_comment(self, data):
+        last_line = data.split('\n')[-1].strip()
+        if last_line.find('//') == 0:
+            return True
+        return False
+
+class StyleContext(Context):
+
+    @normalize_html
+    @inside_style
+    def inside_comment(self, data):
+        # We are inside /*...
+        if data.rfind('/*') <= data.rfind('*/'):
+            return False
+        return True
+
+    def crop(self, data):
+        return data[data.lower().rfind('<style')+1:]
+
 class ScriptMultiComment(ScriptContext):
 
     def __init__(self):
         self.name = 'SCRIPT_MULTI_COMMENT'
 
-    def is_match(self, data):
+    def match(self, data):
         return self._inside_multi_comment(data)
 
     def can_break(self, payload):
@@ -176,7 +293,7 @@ class ScriptLineComment(ScriptContext):
     def __init__(self):
         self.name = 'SCRIPT_LINE_COMMENT'
 
-    def is_match(self, data):
+    def match(self, data):
         return self._inside_line_comment(data)
 
     def can_break(self, payload):
@@ -191,11 +308,11 @@ class ScriptQuote(ScriptContext):
         self.name = None
         self.quote_character = None
 
-    def is_match(self, data):
-        if not self._is_js(data) or self.inside_comment(data):
+    @normalize_html
+    @inside_js
+    def match(self, data):
+        if self.inside_comment(data):
             return False
-        data = data.replace('\\"','')
-        data = data.replace("\\'",'')
         quote_character = None
         open_angle_bracket = data.lower().rfind('<script')
         # We are inside <...
@@ -230,64 +347,15 @@ class ScriptDoubleQuote(ScriptQuote):
         self.name = 'SCRIPT_DOUBLE_QUOTE'
         self.quote_character = '"'
 
-class AttrQuote(HtmlContext):
-
-    def __init__(self):
-        self.name = None
-        self.quote_character = None
-
-    def is_match(self, data):
-        if not self._is_html(data) or self.inside_comment(data):
-            return False
-        quote_character = None
-        open_angle_bracket = data.rfind('<')
-        # We are inside <...
-        if open_angle_bracket <= data.rfind('>'):
-            return False
-        for s in data[open_angle_bracket+1:]:
-            if s in ['"', "'"]:
-                if quote_character and s == quote_character:
-                    quote_character = None
-                    continue
-                elif not quote_character:
-                    quote_character = s
-                    continue
-        if quote_character == self.quote_character:
-            return True
-        return False
-
-    def can_break(self, payload):
-        if self.quote_character in payload:
-            return True
-        # 
-        # For cases with src and href + javascript scheme
-        #
-        payload = payload.lower().replace(' ', '')
-        if payload.endswith('href=' + self.quote_character):
-            return True
-        if payload.endswith('src=' + self.quote_character):
-            return True
-        return False
-
-class AttrSingleQuote(AttrQuote):
-
-    def __init__(self):
-        self.name = 'ATTR_SINGLE_QUOTE'
-        self.quote_character = "'"
-
-class AttrDoubleQuote(AttrQuote):
-
-    def __init__(self):
-        self.name = 'ATTR_DOUBLE_QUOTE'
-        self.quote_character = '"'
-
 class StyleText(StyleContext):
 
     def __init__(self):
         self.name = 'STYLE_TEXT'
 
-    def is_match(self, data):
-        if not self._is_style(data) or self.inside_comment(data):
+    @normalize_html
+    @inside_style
+    def match(self, data):
+        if self.inside_comment(data):
             return False
         quote_character = None
         for s in self.crop(data):
@@ -313,8 +381,10 @@ class ScriptText(StyleContext):
     def __init__(self):
         self.name = 'SCRIPT_TEXT'
 
-    def is_match(self, data):
-        if not self._is_js(data) or self.inside_comment(data):
+    @normalize_html
+    @inside_js
+    def match(self, data):
+        if self.inside_comment(data):
             return False
         return True
 
@@ -337,7 +407,7 @@ class ScriptText(StyleContext):
                 return False
         return True
 
-    def need_break(self, data):
+    def is_executable(self, data):
         return False
 
 
@@ -346,7 +416,7 @@ class StyleComment(StyleContext):
     def __init__(self):
         self.name = 'STYLE_COMMENT'
 
-    def is_match(self, data):
+    def match(self, data):
         return self.inside_comment(data)
 
     def can_break(self, data):
@@ -361,11 +431,11 @@ class StyleQuote(StyleContext):
         self.name = None
         self.quote_character = None
 
-    def is_match(self, data):
-        if not self._is_style(data) or self.inside_comment(data):
+    @normalize_html
+    @inside_style
+    def match(self, data):
+        if self.inside_comment(data):
             return False
-        data = data.replace('\\"','')
-        data = data.replace("\\'",'')
         quote_character = None
         open_angle_bracket = data.lower().rfind('<style')
         # We are inside <...
@@ -403,12 +473,12 @@ class StyleDoubleQuote(StyleQuote):
 
 def get_contexts():
     contexts = []
-    contexts.append(AttrSingleQuote())
-    contexts.append(AttrDoubleQuote())
-    contexts.append(AttrName())
-    contexts.append(Tag())
-    contexts.append(Text())
-    contexts.append(Comment())
+    contexts.append(HtmlAttrSingleQuote())
+    contexts.append(HtmlAttrDoubleQuote())
+    contexts.append(HtmlAttrName())
+    contexts.append(HtmlTag())
+    contexts.append(HtmlText())
+    contexts.append(HtmlComment())
     contexts.append(ScriptMultiComment())
     contexts.append(ScriptLineComment())
     contexts.append(ScriptSingleQuote())
@@ -432,7 +502,7 @@ def get_context(data, payload):
     for chunk in chunks[:-1]:
         tmp += chunk
         for context in get_contexts():
-            if context.is_match(tmp):
+            if context.match(tmp):
                 result.append((context, counter))
         counter += 1
     return result

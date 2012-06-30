@@ -1,8 +1,8 @@
 import unittest
 
-from core.data.context.context import ( get_context , get_contexts, Text,
-                                        ScriptSingleQuote, ScriptText, Comment,
-                                        AttrSingleQuote )
+from core.data.context.context import ( get_context , get_contexts, HtmlText,
+                                        ScriptSingleQuote, ScriptText, HtmlComment,
+                                        HtmlAttrSingleQuote )
 
 
 class TestContext(unittest.TestCase):
@@ -44,7 +44,7 @@ class TestContext(unittest.TestCase):
             </script>
         </head>
         <body>
-            <h1 foo="ATTR_DOUBLE_QUOTE">HTML_TEXT</h1>
+            <h1 a='<' foo=" ssfdsf ' ATTR_DOUBLE_QUOTE">HTML_TEXT</h1>
             <TAG>123</TAG>
             <b style="='" foo='fsdfs dfATTR_SINGLE_QUOTE'>dddd</b>
             ATTR_SINGLE_QUOTE
@@ -73,7 +73,7 @@ class TestContext(unittest.TestCase):
     
     def test_html_inside_js(self):
             self.assertEqual(
-                    get_context(self.html, Text().get_name())[1][0].get_name(), 
+                    get_context(self.html, HtmlText().get_name())[1][0].get_name(), 
                     ScriptSingleQuote().get_name()
                     )
 
@@ -86,7 +86,7 @@ class TestContext(unittest.TestCase):
             </body>
         </html>
         '''
-        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], Text ) )
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], HtmlText ) )
 
     def test_payload_double_script(self):
         html = '''
@@ -96,7 +96,7 @@ class TestContext(unittest.TestCase):
             <script>bar</script>
         </html>
         '''
-        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], Text ) )
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], HtmlText ) )
 
     def test_payload_script_broken_double_open(self):
         html = '''
@@ -116,7 +116,7 @@ class TestContext(unittest.TestCase):
             </script>
         </html>
         '''
-        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], Text ) )
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], HtmlText ) )
 
     def test_payload_html_inside_comment(self):
         html = '''
@@ -124,7 +124,7 @@ class TestContext(unittest.TestCase):
             <!-- <body>PAYLOAD</body> -->
         </html>
         '''
-        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], Comment ) )
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], HtmlComment ) )
 
     def test_payload_html_inside_script_with_comment(self):
         html = '''
@@ -144,7 +144,7 @@ class TestContext(unittest.TestCase):
             </a>
         </html>
         '''
-        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], AttrSingleQuote ) )
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], HtmlAttrSingleQuote ) )
 
     def test_payload_script_single_quote(self):
         html = '''
@@ -154,7 +154,7 @@ class TestContext(unittest.TestCase):
             </script>
         </html>
         '''
-        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], AttrSingleQuote ) )
+        self.assertTrue( isinstance( get_context(html, 'PAYLOAD')[0][0], HtmlAttrSingleQuote ) )
 
     def test_payload_text_can_break(self):
         html = '''

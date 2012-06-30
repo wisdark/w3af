@@ -139,7 +139,7 @@ class xss(baseAuditPlugin):
                 return
 
             for context, i in get_context(response.getBody(), mod_value):
-                if not context.need_break(response.getBody()) or context.can_break(mod_value):
+                if context.is_executable(response.getBody()) or context.can_break(mod_value):
                     self._report_vuln(mutant, response, mod_value)
                     return
        
@@ -162,7 +162,7 @@ class xss(baseAuditPlugin):
                     # string in response                    
                     mod_value = mutant.getModValue()
                     for context, i in get_context(response.getBody(), mod_value):
-                        if not context.need_break(response.getBody()) or context.can_break(mod_value):
+                        if context.is_executable(response.getBody()) or context.can_break(mod_value):
                             v = vuln.vuln(mutant)
                             v.setPluginName(self.getName())
                             v.setURL(fuzzable_request.getURL())
