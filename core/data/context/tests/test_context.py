@@ -165,4 +165,20 @@ class TestContext(unittest.TestCase):
         context = get_context(html, 'PAYLOAD<')[0][0]
         self.assertTrue( context.can_break('PAYLOAD<') )
 
+    def test_payload_src(self):
+        html = '''
+        <html>
+            <img src="PAYLOAD" />
+        </html>
+        '''
+        context = get_context(html, 'PAYLOAD')[0][0]
+        self.assertTrue(context.is_executable())
 
+    def test_payload_href(self):
+        html = '''
+        <html>
+            <a href="PAYLOAD">foo</a>
+        </html>
+        '''
+        context = get_context(html, 'PAYLOAD')[0][0]
+        self.assertTrue(context.is_executable())

@@ -22,12 +22,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 class Context(object):
     name = ''
+    data = ''
 
     def get_name(self):
         return self.name
 
-    def is_executable(self, data):
-        return True
+    def is_executable(self):
+        return False
 
     def can_break(self, payload):
         raise 'can_break() should be implemented'
@@ -37,6 +38,9 @@ class Context(object):
 
     def inside_comment(self, data):
         raise 'inside_comment() should be implemented'
+
+    def save(self, data):
+        self.data = data
 
 def normalize_html(meth):
     def wrap(self, data):
@@ -215,14 +219,14 @@ class HtmlAttrQuote(HtmlContext):
     def can_break(self, payload):
         if self.quote_character in payload:
             return True
-        # 
-        # For cases with src and href + javascript scheme
-        #
-        payload = payload.lower().replace(' ', '')
-        if payload.endswith('href=' + self.quote_character):
+        return False
+
+    def is_executable(self):
+        data = self.data.lower().replace(' ', '')
+        if data.endswith('href=' + self.quote_character):
             return True
-        if payload.endswith('src=' + self.quote_character):
-            return True
+        if data.endswith('src=' + self.quote_character):
+            return True        
         return False
 
 class HtmlAttrSingleQuote(HtmlAttrQuote):
@@ -407,9 +411,8 @@ class ScriptText(StyleContext):
                 return False
         return True
 
-    def is_executable(self, data):
-        return False
-
+    def is_executable(self):
+        return True
 
 class StyleComment(StyleContext):
 
@@ -470,7 +473,6 @@ class StyleDoubleQuote(StyleQuote):
         self.name = 'STYLE_DOUBLE_QUOTE'
         self.quote_character = '"'
 
-
 def get_contexts():
     contexts = []
     contexts.append(HtmlAttrSingleQuote())
@@ -503,6 +505,7 @@ def get_context(data, payload):
         tmp += chunk
         for context in get_contexts():
             if context.match(tmp):
+                context.save(tmp)
                 result.append((context, counter))
         counter += 1
     return result

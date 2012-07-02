@@ -31,6 +31,7 @@ import core.controllers.outputManager as om
 import core.data.constants.severity as severity
 import core.data.kb.knowledgeBase as kb
 import core.data.kb.vuln as vuln
+from core.data.db.disk_list import disk_list
 from core.data.context.context import get_context
 
 class xss(baseAuditPlugin):
@@ -139,7 +140,7 @@ class xss(baseAuditPlugin):
                 return
 
             for context, i in get_context(response.getBody(), mod_value):
-                if context.is_executable(response.getBody()) or context.can_break(mod_value):
+                if context.is_executable() or context.can_break(mod_value):
                     self._report_vuln(mutant, response, mod_value)
                     return
        
@@ -162,7 +163,7 @@ class xss(baseAuditPlugin):
                     # string in response                    
                     mod_value = mutant.getModValue()
                     for context, i in get_context(response.getBody(), mod_value):
-                        if context.is_executable(response.getBody()) or context.can_break(mod_value):
+                        if context.is_executable() or context.can_break(mod_value):
                             v = vuln.vuln(mutant)
                             v.setPluginName(self.getName())
                             v.setURL(fuzzable_request.getURL())
