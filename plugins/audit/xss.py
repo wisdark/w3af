@@ -51,7 +51,9 @@ class xss(baseAuditPlugin):
                 'RANDOMIZE</->',
                 'RANDOMIZE/*',
                 'RANDOMIZE"',
-                "RANDOMIZE'"
+                "RANDOMIZE'",
+                "RANDOMIZE`",
+                "RANDOMIZE ="
                 ]
 
     def audit(self, freq):
