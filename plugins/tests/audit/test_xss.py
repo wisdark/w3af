@@ -80,9 +80,10 @@ class TestXSS(PluginTest):
             ('Case27-Js2ScriptTagOLCommentScope.jsp', 'userinput', ['userinput']),
             ('Case28-Js2ScriptTagMLCommentScope.jsp', 'userinput', ['userinput']),
             ('Case29-Vbs2ScriptTagOLCommentScope.jsp', 'userinput', ['userinput']),
-            ('Case30-Tag2HtmlPageScopeMultipleVulnerabilities.jsp', 'userinput', ['userinput']),
+            ('Case30-Tag2HtmlPageScopeMultipleVulnerabilities.jsp', 'userinput', ['userinput', 'userinput2']),
+            ('Case30-Tag2HtmlPageScopeMultipleVulnerabilities.jsp', 'userinput2', ['userinput', 'userinput2']),
             ('Case31-Tag2HtmlPageScopeDuringException.jsp', 'userinput', ['userinput']),
-            ('Case32-Tag2HtmlPageScopeValidViewstateRequired.jsp', 'userinput', ['userinput']),
+            ('Case32-Tag2HtmlPageScopeValidViewstateRequired.jsp', 'userinput', ['userinput', '__VIEWSTATE']),
         ]
         res = [(str(m.getURL()), m.getVar(), tuple(sorted(m.getDc().keys())))
                 for m in (xv.getMutant() for xv in xssvulns)]
