@@ -21,8 +21,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 '''
 
 # TODO
-# 1. back-quotes
-# 3. html attribute w/o quotes
 # 4. <a style="AAAAA:ddd"
 
 class Context(object):
@@ -54,13 +52,15 @@ def normalize_html(meth):
         new_data = ''
         quote_character = None
         for s in data:
-            if s in ['"', "'"]:
+            if s in ['"', "'", '`']:
                 if quote_character and s == quote_character:
                     quote_character = None
                 elif not quote_character:
                     quote_character = s
             if s == '<' and quote_character:
                 s = '&lt;'
+            if s == '>' and quote_character:
+                s = '&gt;'
             new_data += s
         return meth(self, new_data)
     return wrap
@@ -106,7 +106,7 @@ class HtmlContext(Context):
 class HtmlTag(HtmlContext):
 
     def __init__(self):
-        self.name = 'TAG'
+        self.name = 'HTML_TAG'
 
     @normalize_html
     @inside_html
@@ -160,10 +160,12 @@ class HtmlComment(HtmlContext):
                 return False
         return True
 
-class HtmlAttrName(HtmlContext):
+class HtmlAttr(HtmlContext):
+
+    delimeters = ['"', '`', "'"]
 
     def __init__(self):
-        self.name = 'ATTR_NAME'
+        self.name = 'HTML_ATTR'
 
     @normalize_html
     @inside_html
@@ -177,7 +179,7 @@ class HtmlAttrName(HtmlContext):
         if open_angle_bracket <= data.rfind('>'):
             return False
         for s in data[open_angle_bracket+1:]:
-            if s in ['"', "'"]:
+            if s in self.delimeters:
                 if quote_character and s == quote_character:
                     quote_character = None
                     continue
@@ -189,11 +191,12 @@ class HtmlAttrName(HtmlContext):
         return False
 
     def can_break(self, payload):
-        if "=" in payload:
-            return True
-        return False
+        for i in [' ', '=']:
+            if i not in payload:
+                return False
+        return True
 
-class HtmlAttrQuote(HtmlContext):
+class HtmlAttrQuote(HtmlAttr):
 
     js_event_handlers = ['onclick', 'ondblclick', 'onmousedown', 'onmousemove', 
             'onmouseout', 'onmouseover', 'onmouseup', 'onchange', 'onfocus', 
@@ -217,7 +220,7 @@ class HtmlAttrQuote(HtmlContext):
         if open_angle_bracket <= data.rfind('>'):
             return False
         for s in data[open_angle_bracket+1:]:
-            if s in ['"', "'"]:
+            if s in self.delimeters:
                 if quote_character and s == quote_character:
                     quote_character = None
                     continue
@@ -243,15 +246,20 @@ class HtmlAttrQuote(HtmlContext):
 class HtmlAttrSingleQuote(HtmlAttrQuote):
 
     def __init__(self):
-        self.name = 'ATTR_SINGLE_QUOTE'
+        self.name = 'HTML_ATTR_SINGLE_QUOTE'
         self.quote_character = "'"
 
 class HtmlAttrDoubleQuote(HtmlAttrQuote):
 
     def __init__(self):
-        self.name = 'ATTR_DOUBLE_QUOTE'
+        self.name = 'HTML_ATTR_DOUBLE_QUOTE'
         self.quote_character = '"'
 
+class HtmlAttrBackticks(HtmlAttrQuote):
+
+    def __init__(self):
+        self.name = 'HTML_ATTR_BACKTICKS'
+        self.quote_character = '`'
 
 class ScriptContext(Context):
     
@@ -488,7 +496,8 @@ def get_contexts():
     contexts = []
     contexts.append(HtmlAttrSingleQuote())
     contexts.append(HtmlAttrDoubleQuote())
-    contexts.append(HtmlAttrName())
+    contexts.append(HtmlAttrBackticks())
+    contexts.append(HtmlAttr())
     contexts.append(HtmlTag())
     contexts.append(HtmlText())
     contexts.append(HtmlComment())
