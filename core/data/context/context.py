@@ -20,6 +20,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
+# TODO
+# 1. back-quotes
+# 3. html attribute w/o quotes
+# 4. <a style="AAAAA:ddd"
+
 class Context(object):
     name = ''
     data = ''
@@ -190,6 +195,13 @@ class HtmlAttrName(HtmlContext):
 
 class HtmlAttrQuote(HtmlContext):
 
+    js_event_handlers = ['onclick', 'ondblclick', 'onmousedown', 'onmousemove', 
+            'onmouseout', 'onmouseover', 'onmouseup', 'onchange', 'onfocus', 
+            'onblur', 'onscroll', 'onselect', 'onsubmit', 'onkeydown', 
+            'onkeypress', 'onkeyup', 'onload', 'onunload']
+
+    html_url_attrs = ['href', 'src']
+
     def __init__(self):
         self.name = None
         self.quote_character = None
@@ -223,10 +235,9 @@ class HtmlAttrQuote(HtmlContext):
 
     def is_executable(self):
         data = self.data.lower().replace(' ', '')
-        if data.endswith('href=' + self.quote_character):
-            return True
-        if data.endswith('src=' + self.quote_character):
-            return True        
+        for attr_name in (self.html_url_attrs + self.js_event_handlers):
+            if data.endswith(attr_name + '=' + self.quote_character):
+                return True
         return False
 
 class HtmlAttrSingleQuote(HtmlAttrQuote):
