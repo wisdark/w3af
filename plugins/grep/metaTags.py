@@ -82,7 +82,7 @@ class metaTags(baseGrepPlugin):
             self._already_inspected.add(uri)
             
             try:
-                dp = dpCache.dpc.getDocumentParserFor( response )
+                dp = response.getDocumentParser()
             except w3afException:
                 pass
             else:

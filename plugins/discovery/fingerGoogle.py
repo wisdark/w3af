@@ -141,7 +141,7 @@ class fingerGoogle(baseDiscoveryPlugin):
         Parses the HTML and adds the mail addresses to the kb.
         '''
         try:
-            document_parser = dpCache.dpc.getDocumentParserFor( response )
+            document_parser = response.getDocumentParser()
         except w3afException:
             # Failed to find a suitable parser for the document
             pass

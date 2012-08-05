@@ -149,7 +149,7 @@ class archiveDotOrg(baseDiscoveryPlugin):
                 else:
                     # Get the references
                     try:
-                        document_parser = dpc.getDocumentParserFor( http_response )
+                        document_parser = http_response.getDocumentParser()
                     except w3afException:
                         # Failed to find a suitable document parser
                         pass

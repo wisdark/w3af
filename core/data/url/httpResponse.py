@@ -30,6 +30,7 @@ from itertools import imap
 from core.controllers.misc.encoding import smart_unicode, ESCAPED_CHAR
 from core.data.constants.encodings import DEFAULT_ENCODING
 from core.data.parsers.urlParser import url_object
+import core.data.parsers.documentParser as documentParser
 import core.controllers.outputManager as om
 
 DEFAULT_CHARSET = DEFAULT_ENCODING
@@ -115,6 +116,7 @@ class httpResponse(object):
         self._time = time
         self._alias = alias
         self._doc_type = None
+        self._document_parser = None
     
     def __contains__(self, string_to_test):
         '''
@@ -207,6 +209,11 @@ class httpResponse(object):
                 om.out.debug(msg)
         return self._dom
     
+    def getDocumentParser(self):
+        if self._document_parser is None:
+            self._document_parser = documentParser.documentParser(self)
+        return self._document_parser
+             
     @property
     def charset(self):
         if not self._charset:

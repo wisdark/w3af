@@ -99,7 +99,7 @@ class findCaptchas(baseDiscoveryPlugin):
             # Do not use dpCache here, it's no good.
             #dp = dpCache.dpc.getDocumentParserFor( response )
             try:
-                document_parser = documentParser.documentParser( response )
+                document_parser = response.getDocumentParser()
             except w3afException:
                 pass
             else:

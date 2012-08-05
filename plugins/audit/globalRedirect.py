@@ -98,7 +98,7 @@ class globalRedirect(baseAuditPlugin):
         else:
             # Test for http-equiv redirects
             try:
-                dp = dpCache.dpc.getDocumentParserFor( response )
+                dp = response.getDocumentParser()
             except w3afException:
                 # Failed to find a suitable parser for the document
                 return False

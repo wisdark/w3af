@@ -101,7 +101,7 @@ def createFuzzableRequests(resp, request=None, add_self=True):
     
     # Try to find forms in the document
     try:
-        dp = dpCache.dpc.getDocumentParserFor(resp)
+        dp = resp.getDocumentParser()
     except w3afException:
         # Failed to find a suitable parser for the document
         form_list = []

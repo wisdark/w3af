@@ -183,7 +183,7 @@ class httpAuthDetect(baseGrepPlugin):
         #
         url_list = []
         try:
-            documentParser = dpCache.dpc.getDocumentParserFor(response)
+            documentParser = response.getDocumentParser()
         except w3afException, w3:
             msg = 'Failed to find a suitable document parser. ' \
             'Exception: ' + str(w3)

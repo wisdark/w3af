@@ -62,7 +62,7 @@ class strangeParameters(baseGrepPlugin):
         @return: None, all results are saved in the kb.
         '''
         try:
-            dp = dpCache.dpc.getDocumentParserFor( response )
+            dp = response.getDocumentParser()
         except w3afException:
             pass
         else:

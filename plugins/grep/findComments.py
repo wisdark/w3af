@@ -83,7 +83,7 @@ class findComments(baseGrepPlugin):
         '''
         if response.is_text_or_html() and (not is_404( response ) or self._search404):
             try:
-                dp = dpCache.dpc.getDocumentParserFor( response )
+                dp = response.getDocumentParser()
             except w3afException:
                 return
             else:

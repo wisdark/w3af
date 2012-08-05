@@ -117,7 +117,7 @@ class findvhost(baseDiscoveryPlugin):
         base_resp_body = base_response.getBody()
         
         try:
-            dp = dpCache.dpc.getDocumentParserFor(original_response)
+            dp = response.getDocumentParser()
         except w3afException:
             # Failed to find a suitable parser for the document
             return []
