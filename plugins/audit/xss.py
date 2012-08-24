@@ -141,10 +141,11 @@ class xss(baseAuditPlugin):
             if not self._has_no_bug(mutant):
                 return
 
-            for context, i in get_context(response.getBody(), mod_value):
-                if context.is_executable() or context.can_break(mod_value):
-                    self._report_vuln(mutant, response, mod_value)
-                    return
+            for contexts in get_context(response.getBody(), mod_value):
+                for context in contexts:
+                    if context.is_executable() or context.can_break(mod_value):
+                        self._report_vuln(mutant, response, mod_value)
+                        return
        
     def end(self):
         '''
@@ -164,29 +165,30 @@ class xss(baseAuditPlugin):
                     # the one in strings; so string in response.getBody() is slower than
                     # string in response                    
                     mod_value = mutant.getModValue()
-                    for context, i in get_context(response.getBody(), mod_value):
-                        if context.is_executable() or context.can_break(mod_value):
-                            v = vuln.vuln(mutant)
-                            v.setPluginName(self.getName())
-                            v.setURL(fuzzable_request.getURL())
-                            v.setDc(fuzzable_request.getDc())
-                            v.setMethod(fuzzable_request.getMethod())
-                            
-                            v['permanent'] = True
-                            v['write_payload'] = mutant
-                            v['read_payload'] = fuzzable_request
-                            v.setName('Permanent cross site scripting vulnerability')
-                            v.setSeverity(severity.HIGH)
-                            msg = 'Permanent Cross Site Scripting was found at: ' + response.getURL()
-                            msg += ' . Using method: ' + v.getMethod() + '. The XSS was sent to the'
-                            msg += ' URL: ' + mutant.getURL() + '. ' + mutant.printModValue()
-                            v.setDesc(msg)
-                            v.setId([response.id, mutant_response_id])
-                            v.addToHighlight(mutant.getModValue())
+                    for contexts in get_context(response.getBody(), mod_value):
+                        for context in contexts:
+                            if context.is_executable() or context.can_break(mod_value):
+                                v = vuln.vuln(mutant)
+                                v.setPluginName(self.getName())
+                                v.setURL(fuzzable_request.getURL())
+                                v.setDc(fuzzable_request.getDc())
+                                v.setMethod(fuzzable_request.getMethod())
+                                
+                                v['permanent'] = True
+                                v['write_payload'] = mutant
+                                v['read_payload'] = fuzzable_request
+                                v.setName('Permanent cross site scripting vulnerability')
+                                v.setSeverity(severity.HIGH)
+                                msg = 'Permanent Cross Site Scripting was found at: ' + response.getURL()
+                                msg += ' . Using method: ' + v.getMethod() + '. The XSS was sent to the'
+                                msg += ' URL: ' + mutant.getURL() + '. ' + mutant.printModValue()
+                                v.setDesc(msg)
+                                v.setId([response.id, mutant_response_id])
+                                v.addToHighlight(mutant.getModValue())
 
-                            om.out.vulnerability(v.getDesc())
-                            kb.kb.append(self, 'xss', v)
-                            break
+                                om.out.vulnerability(v.getDesc())
+                                kb.kb.append(self, 'xss', v)
+                                break
         
         self.printUniq(kb.kb.getData('xss', 'xss'), 'VAR')
 
