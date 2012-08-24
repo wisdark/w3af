@@ -20,8 +20,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 '''
 
-# TODO
-# 4. <a style="AAAAA:ddd"
+ATTR_DELIMETERS = ['"', '`', "'"]
+JS_EVENTS = ['onclick', 'ondblclick', 'onmousedown', 'onmousemove', 
+            'onmouseout', 'onmouseover', 'onmouseup', 'onchange', 'onfocus', 
+            'onblur', 'onscroll', 'onselect', 'onsubmit', 'onkeydown', 
+            'onkeypress', 'onkeyup', 'onload', 'onunload']
 
 class Context(object):
     name = ''
@@ -65,33 +68,130 @@ def normalize_html(meth):
         return meth(self, new_data)
     return wrap
 
+def get_html_attr(data):
+    attr_name = ''
+    inside_name = False
+    inside_value = False
+    open_angle_bracket = data.rfind('<')
+    quote_character = None
+    open_context = None
+    i = open_angle_bracket - 1
 
-def inside_html(meth):
-    def wrap(self, data):
-        script_index = data.lower().rfind('<script')
-        if script_index > data.lower().rfind('</script>') and data[script_index:].count('>'):
-            return False
-        style_index = data.lower().rfind('<style')
-        if style_index > data.lower().rfind('</style>') and data[style_index:].count('>'):
-            return False
-        return meth(self, data)
-    return wrap
+    if open_angle_bracket <= data.rfind('>'):
+        return False
+
+    for s in data[open_angle_bracket:]:
+        i += 1
+
+        if s in ATTR_DELIMETERS and not quote_character:
+            quote_character = s
+            if inside_value and open_context:
+                open_context = i + 1
+            continue
+        elif s in ATTR_DELIMETERS and quote_character:
+            quote_character = None
+            inside_value = False
+            open_context = None
+            continue
+
+        if quote_character:
+            continue
+
+        if s == ' ':
+            inside_name = True
+            inside_value = False
+            attr_name = ''
+            continue
+
+        if s == '=':
+            inside_name = False
+            inside_value = True
+            open_context = i + 1
+            continue
+
+        if inside_name:
+            attr_name += s
+    attr_name = attr_name.lower()
+    return (attr_name, quote_character, open_context)
+
+def _inside_js(data):
+    script_index = data.lower().rfind('<script')
+    if script_index > data.lower().rfind('</script>') and data[script_index:].count('>'):
+        return True
+    return False
+
+def _inside_style(data):
+    script_index = data.lower().rfind('<style')
+    if script_index > data.lower().rfind('</style>') and data[script_index:].count('>'):
+        return True
+    return False
+
+def _inside_html_attr(data, attrs):
+    attr_data = get_html_attr(data)
+    if not attr_data:
+        return False
+    for attr in attrs:
+        if attr == attr_data[0]:
+            return True
+    return False
+
+def _inside_event_attr(data):
+    if _inside_html_attr(data, JS_EVENTS):
+        return True
+    return False
+
+def _inside_style_attr(data):
+    if _inside_html_attr(data, ['style']):
+        return True
+    return False
+
+
+def crop_js(data, context='tag'):
+    if context == 'tag':
+        return data[data.lower().rfind('<script')+1:]
+    else:
+        attr_data = get_html_attr(data)
+        if attr_data:
+            return data[attr_data[2]:]
+    return data
+
+def crop_style(data, context='tag'):
+    if context == 'tag':
+        return data[data.lower().rfind('<style')+1:]
+    else:
+        attr_data = get_html_attr(data)
+        if attr_data:
+            return data[attr_data[2]:]
 
 def inside_js(meth):
     def wrap(self, data):
-        script_index = data.lower().rfind('<script')
-        if script_index > data.lower().rfind('</script>') and data[script_index:].count('>'):
+        if _inside_js(data):
+            data = crop_js(data)
+            return meth(self, data)
+        if _inside_event_attr(data):
+            data = crop_js(data, 'attr')
             return meth(self, data)
         return False
     return wrap
 
 def inside_style(meth):
     def wrap(self, data):
-        style_index = data.lower().rfind('<style')
-        if style_index > data.lower().rfind('</style>') and data[style_index:].count('>'):
+        if _inside_style(data):
+            data = crop_style(data)
+            return meth(self, data)
+        if _inside_style_attr(data):
+            data = crop_style(data, 'attr')
             return meth(self, data)
         return False
     return wrap
+
+def inside_html(meth):
+    def wrap(self, data):
+        if _inside_js(data) or _inside_style(data):
+            return False
+        return meth(self, data)
+    return wrap
+
 
 class HtmlContext(Context):
 
@@ -162,8 +262,6 @@ class HtmlComment(HtmlContext):
 
 class HtmlAttr(HtmlContext):
 
-    delimeters = ['"', '`', "'"]
-
     def __init__(self):
         self.name = 'HTML_ATTR'
 
@@ -179,7 +277,7 @@ class HtmlAttr(HtmlContext):
         if open_angle_bracket <= data.rfind('>'):
             return False
         for s in data[open_angle_bracket+1:]:
-            if s in self.delimeters:
+            if s in ATTR_DELIMETERS:
                 if quote_character and s == quote_character:
                     quote_character = None
                     continue
@@ -198,11 +296,6 @@ class HtmlAttr(HtmlContext):
 
 class HtmlAttrQuote(HtmlAttr):
 
-    js_event_handlers = ['onclick', 'ondblclick', 'onmousedown', 'onmousemove', 
-            'onmouseout', 'onmouseover', 'onmouseup', 'onchange', 'onfocus', 
-            'onblur', 'onscroll', 'onselect', 'onsubmit', 'onkeydown', 
-            'onkeypress', 'onkeyup', 'onload', 'onunload']
-
     html_url_attrs = ['href', 'src']
 
     def __init__(self):
@@ -212,6 +305,9 @@ class HtmlAttrQuote(HtmlAttr):
     @normalize_html
     @inside_html
     def match(self, data):
+        return self._match(data)
+    
+    def _match(self, data):
         if self.inside_comment(data):
             return False
         quote_character = None
@@ -220,7 +316,7 @@ class HtmlAttrQuote(HtmlAttr):
         if open_angle_bracket <= data.rfind('>'):
             return False
         for s in data[open_angle_bracket+1:]:
-            if s in self.delimeters:
+            if s in ATTR_DELIMETERS:
                 if quote_character and s == quote_character:
                     quote_character = None
                     continue
@@ -238,7 +334,7 @@ class HtmlAttrQuote(HtmlAttr):
 
     def is_executable(self):
         data = self.data.lower().replace(' ', '')
-        for attr_name in (self.html_url_attrs + self.js_event_handlers):
+        for attr_name in (self.html_url_attrs + JS_EVENTS):
             if data.endswith(attr_name + '=' + self.quote_character):
                 return True
         return False
@@ -284,6 +380,7 @@ class ScriptContext(Context):
             return True
         return False
 
+
 class StyleContext(Context):
 
     @normalize_html
@@ -294,8 +391,6 @@ class StyleContext(Context):
             return False
         return True
 
-    def crop(self, data):
-        return data[data.lower().rfind('<style')+1:]
 
 class ScriptMultiComment(ScriptContext):
 
@@ -337,11 +432,7 @@ class ScriptQuote(ScriptContext):
         if self.inside_comment(data):
             return False
         quote_character = None
-        open_angle_bracket = data.lower().rfind('<script')
-        # We are inside <...
-        if open_angle_bracket <= data.lower().rfind('</script>'):
-            return False
-        for s in data[open_angle_bracket+1:]:
+        for s in data:
             if s in ['"', "'"]:
                 if quote_character and s == quote_character:
                     quote_character = None
@@ -381,7 +472,7 @@ class StyleText(StyleContext):
         if self.inside_comment(data):
             return False
         quote_character = None
-        for s in self.crop(data):
+        for s in data:
             if s in ['"', "'"]:
                 if quote_character and s == quote_character:
                     quote_character = None
@@ -399,7 +490,7 @@ class StyleText(StyleContext):
                 return False
         return True
 
-class ScriptText(StyleContext):
+class ScriptText(ScriptContext):
 
     def __init__(self):
         self.name = 'SCRIPT_TEXT'
@@ -407,12 +498,15 @@ class ScriptText(StyleContext):
     @normalize_html
     @inside_js
     def match(self, data):
+        return self._match(data)
+
+    def _match(self, data):
         if self.inside_comment(data):
             return False
         return True
 
         quote_character = None
-        for s in self.crop(data):
+        for s in data:
             if s in ['"', "'"]:
                 if quote_character and s == quote_character:
                     quote_character = None
@@ -459,11 +553,7 @@ class StyleQuote(StyleContext):
         if self.inside_comment(data):
             return False
         quote_character = None
-        open_angle_bracket = data.lower().rfind('<style')
-        # We are inside <...
-        if open_angle_bracket <= data.lower().rfind('</style>'):
-            return False
-        for s in data[open_angle_bracket+1:]:
+        for s in data:
             if s in ['"', "'"]:
                 if quote_character and s == quote_character:
                     quote_character = None
@@ -492,6 +582,45 @@ class StyleDoubleQuote(StyleQuote):
         self.name = 'STYLE_DOUBLE_QUOTE'
         self.quote_character = '"'
 
+class HtmlAttrDoubleQuote2Script(HtmlAttrDoubleQuote):
+
+    def __init__(self):
+        HtmlAttrDoubleQuote.__init__(self)
+        self.name = 'HTML_ATTR_DOUBLE_QUOTE2SCRIPT'
+
+    @normalize_html
+    @inside_html
+    def match(self, data):
+        if not HtmlAttrDoubleQuote._match(self, data):
+            return False
+        data = data.lower().replace(' ', '')
+        for attr_name in JS_EVENTS:
+            if data.endswith(attr_name + '=' + self.quote_character):
+                break
+        else:
+            return False
+        #        data = data.lower().replace('&quote;', '"')
+        return True
+
+class HtmlAttrDoubleQuote2ScriptText(HtmlAttrDoubleQuote2Script, ScriptText):
+
+    def __init__(self):
+        HtmlAttrDoubleQuote2Script.__init__(self)
+        self.name = 'HTML_ATTR_DOUBLE_QUOTE2SCRIPT_TEXT'
+
+    def match(self, data):
+        if not HtmlAttrDoubleQuote2Script.match(self, data):
+            return False
+        if not ScriptText._match(self, data):
+            return False
+        return True
+
+    def can_break(self, payload):
+        return HtmlAttrDoubleQuote2Script.can_break(self, payload)
+
+    def is_executable(self):
+        return True
+   
 def get_contexts():
     contexts = []
     contexts.append(HtmlAttrSingleQuote())
@@ -510,6 +639,7 @@ def get_contexts():
     contexts.append(StyleComment())
     contexts.append(StyleSingleQuote())
     contexts.append(StyleDoubleQuote())
+    #contexts.append(HtmlAttrDoubleQuote2ScriptText())
     return contexts
 
 def get_context(data, payload):
@@ -519,15 +649,15 @@ def get_context(data, payload):
     chunks = data.split(payload)
     tmp = ''
     result = []
-    counter = 0
 
     for chunk in chunks[:-1]:
         tmp += chunk
+        contexts = []
         for context in get_contexts():
             if context.match(tmp):
                 context.save(tmp)
-                result.append((context, counter))
-        counter += 1
+                contexts.append(context)
+        result.append(contexts)
     return result
 
 
