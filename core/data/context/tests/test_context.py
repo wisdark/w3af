@@ -190,6 +190,36 @@ class TestContext(unittest.TestCase):
         context = get_context(html, 'PAYLOAD<')[0][0]
         self.assertTrue(context.can_break('PAYLOAD<'))
 
+    def test_payload_text_with_quotes(self):
+        html = '''
+        <html>
+            <a>Quoting the great Linus Torvalds: "PAYLOAD<"</a>
+        </html>
+        '''
+        context = get_context(html, 'PAYLOAD<')[0][0]
+        self.assertTrue(isinstance(context, HtmlText))
+        self.assertTrue(context.can_break('PAYLOAD<'))
+
+    def test_payload_text_with_start_quote(self):
+        html = '''
+        <html>
+            <a>Quoting the great Linus Torvalds: "PAYLOAD<</a>
+        </html>
+        '''
+        context = get_context(html, 'PAYLOAD<')[0][0]
+        self.assertTrue(isinstance(context, HtmlText))
+        self.assertTrue(context.can_break('PAYLOAD<'))
+
+    def test_payload_text_with_end_quote(self):
+        html = '''
+        <html>
+            <a>Quoting the great Linus Torvalds: PAYLOAD<"</a>
+        </html>
+        '''
+        context = get_context(html, 'PAYLOAD<')[0][0]
+        self.assertTrue(isinstance(context, HtmlText))
+        self.assertTrue(context.can_break('PAYLOAD<'))
+
     def test_payload_src(self):
         html = '''
         <html>
